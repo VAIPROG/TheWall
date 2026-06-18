@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — The Wall Dev</title>
+  <link rel="icon" href="https://filianislost.com/static/favicon.png">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win">
+    <div class="titlebar">
+      <span><span class="led"></span>login.exe</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>Two ways to sign in</span>
+          <span data-lang="ru" data-inline>Два способа войти</span>
+          <span data-lang="de" data-inline>Zwei Wege zum Login</span>
+          <span data-lang="fr" data-inline>Deux façons de se connecter</span>
+        </div>
+
+        <div data-lang="en">
+          <p><b>1. Via the extension (recommended)</b></p>
+          <p>Install the extension, open filianislost.com, the panel auto-attaches. That's it — your wall session is exchanged for our own JWT under the hood.</p>
+          <p style="margin-top:14px"><b>2. Manually (for browsing /me here)</b></p>
+          <p>Paste your wall site token below. We exchange it for a 24-hour JWT and stash it in <code>localStorage</code>. Same flow as the extension uses.</p>
+        </div>
+        <div data-lang="ru">
+          <p><b>1. Через расширение (рекомендуется)</b></p>
+          <p>Поставь расширение, открой filianislost.com — панель сама привяжется. Сессия сайта обменивается на наш JWT.</p>
+          <p style="margin-top:14px"><b>2. Вручную (для просмотра /me здесь)</b></p>
+          <p>Вставь свой site token ниже. Мы поменяем его на 24-часовой JWT и положим в <code>localStorage</code>. Тот же flow что в расширении.</p>
+        </div>
+        <div data-lang="de">
+          <p><b>1. Über die Extension (empfohlen)</b></p>
+          <p>Extension installieren, filianislost.com öffnen — das Panel verbindet sich automatisch.</p>
+          <p style="margin-top:14px"><b>2. Manuell (für /me hier)</b></p>
+          <p>Wall-Site-Token unten einfügen — wir tauschen ihn gegen ein 24h JWT.</p>
+        </div>
+        <div data-lang="fr">
+          <p><b>1. Via l'extension (recommandé)</b></p>
+          <p>Installez l'extension, ouvrez filianislost.com — le panneau se connecte automatiquement.</p>
+          <p style="margin-top:14px"><b>2. Manuellement (pour /me ici)</b></p>
+          <p>Collez votre site token ci-dessous — nous l'échangeons contre un JWT 24h.</p>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="legend">site token</div>
+        <p style="font-size:12px;color:var(--sub);margin-bottom:6px">
+          <span data-lang="en" data-inline>Find it at filianislost.com → DevTools → Application → Local Storage → <code>auth-token</code></span>
+          <span data-lang="ru" data-inline>Возьми на filianislost.com → DevTools → Application → Local Storage → <code>auth-token</code></span>
+          <span data-lang="de" data-inline>Im Browser auf filianislost.com → DevTools → Application → Local Storage → <code>auth-token</code></span>
+          <span data-lang="fr" data-inline>Sur filianislost.com → DevTools → Application → Local Storage → <code>auth-token</code></span>
+        </p>
+        <input type="password" id="site-token" class="input" placeholder="paste wall site token…">
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn primary" id="btn-login">
+            <span data-lang="en" data-inline>Sign in</span>
+            <span data-lang="ru" data-inline>Войти</span>
+            <span data-lang="de" data-inline>Anmelden</span>
+            <span data-lang="fr" data-inline>Se connecter</span>
+          </button>
+          <button class="btn" id="btn-logout">
+            <span data-lang="en" data-inline>Sign out</span>
+            <span data-lang="ru" data-inline>Выйти</span>
+            <span data-lang="de" data-inline>Abmelden</span>
+            <span data-lang="fr" data-inline>Déconnexion</span>
+          </button>
+        </div>
+        <div id="login-status" class="note" style="margin-top:10px;display:none"></div>
+      </div>
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>Why a token, not OAuth?</span>
+          <span data-lang="ru" data-inline>Почему токен, а не OAuth?</span>
+          <span data-lang="de" data-inline>Warum Token, kein OAuth?</span>
+          <span data-lang="fr" data-inline>Pourquoi un token, pas OAuth ?</span>
+        </div>
+        <p style="font-size:13px">
+          <span data-lang="en" data-inline>filianislost.com doesn't expose an OAuth flow. The cleanest way is to reuse the session you already have. The token never leaves your browser without your action, and we verify it server-side by calling the site's own <code>/user/me</code> endpoint.</span>
+          <span data-lang="ru" data-inline>У filianislost.com нет OAuth. Самый честный путь — переиспользовать твою существующую сессию. Токен не покидает браузер без твоего действия, и мы проверяем его на сервере через <code>/user/me</code> сайта.</span>
+          <span data-lang="de" data-inline>filianislost.com bietet keinen OAuth-Flow. Wir nutzen deine bestehende Session und verifizieren server-seitig über <code>/user/me</code>.</span>
+          <span data-lang="fr" data-inline>filianislost.com n'a pas d'OAuth. On réutilise votre session existante et on vérifie côté serveur via <code>/user/me</code>.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+const API = "/api";
+function status(msg, kind) {
+  const el = document.getElementById("login-status");
+  el.style.display = "block";
+  el.className = "note" + (kind === "warn" ? " warn" : "");
+  el.textContent = msg;
+}
+async function oauthSignIn(provider) {
+  status("redirecting to " + provider + "…");
+  try {
+    const r = await fetch(API + "/v2/auth/" + provider + "/login-url");
+    if (!r.ok) return status(provider + " sign-in unavailable: " + r.status, "warn");
+    const d = await r.json();
+    location.href = d.url;
+  } catch (e) { status("error: " + e.message, "warn"); }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  // OAuth sign-in buttons (work only for accounts that linked the provider).
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0";
+  grid.innerHTML =
+    '<button class="btn" id="btn-oauth-tg">✈️ Sign in with Telegram</button>' +
+    '<button class="btn" id="btn-oauth-dc">🎮 Sign in with Discord</button>';
+  const loginBtn = document.getElementById("btn-login");
+  loginBtn.parentElement.insertBefore(grid, loginBtn);
+  document.getElementById("btn-oauth-tg").addEventListener("click", () => oauthSignIn("telegram"));
+  document.getElementById("btn-oauth-dc").addEventListener("click", () => oauthSignIn("discord"));
+
+  document.getElementById("btn-login").addEventListener("click", async () => {
+    const tok = document.getElementById("site-token").value.trim();
+    if (!tok) return status("paste a token first", "warn");
+    status("verifying…");
+    try {
+      const r = await fetch(API + "/auth/site", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteToken: tok }),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        return status("login failed: " + r.status + " " + t, "warn");
+      }
+      const d = await r.json();
+      localStorage.setItem("wall_landing_jwt", d.token);
+      localStorage.setItem("wall_landing_refresh", d.refresh_token || "");
+      status("signed in as " + d.user.username + " — go to Profile");
+    } catch (e) { status("error: " + e.message, "warn"); }
+  });
+  document.getElementById("btn-logout").addEventListener("click", () => {
+    localStorage.removeItem("wall_landing_jwt");
+    localStorage.removeItem("wall_landing_refresh");
+    status("signed out");
+  });
+  if (localStorage.getItem("wall_landing_jwt")) status("already signed in (JWT in localStorage)");
+});
+</script>
+</body>
+</html>

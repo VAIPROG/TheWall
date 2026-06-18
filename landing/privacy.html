@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy — The Wall Dev</title>
+  <link rel="icon" href="https://filianislost.com/static/favicon.png">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win wide">
+    <div class="titlebar">
+      <span><span class="led"></span>privacy.txt</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>What we store</span>
+          <span data-lang="ru" data-inline>Что мы храним</span>
+          <span data-lang="de" data-inline>Was wir speichern</span>
+          <span data-lang="fr" data-inline>Ce que nous stockons</span>
+        </div>
+        <div data-lang="en">
+          <p>When you connect the extension to our backend we keep a small profile so the clan features work. The full list of fields:</p>
+          <ul class="bullets">
+            <li><b>Wall ID + username</b> — to identify you across sessions.</li>
+            <li><b>Discord ID + Discord username</b> — to show your tag and proxy your Discord avatar (so you don't load it from Discord's CDN on every page).</li>
+            <li><b>Role</b> (member / clan moderator / admin) — for permissions.</li>
+            <li><b>Preferred language</b> (en/ru/de/fr) — to localise responses.</li>
+            <li><b>Custom avatar</b> — only if you uploaded one. Stored as WebP, max 256×256.</li>
+            <li><b>Clan chat messages, templates, moderation requests, notifications</b> — content you've actively created.</li>
+            <li><b>Session tokens</b> — hashed, used for "stay logged in".</li>
+          </ul>
+        </div>
+        <div data-lang="ru">
+          <p>Когда расширение подключается к нашему бэкенду, мы храним небольшой профиль, чтобы клановые фичи работали. Полный список:</p>
+          <ul class="bullets">
+            <li><b>Wall ID + ник</b> — чтобы узнавать тебя между сессиями.</li>
+            <li><b>Discord ID + ник Discord</b> — чтобы показать тег и проксировать аватар.</li>
+            <li><b>Роль</b> (member / clan moderator / admin) — для прав.</li>
+            <li><b>Язык</b> (en/ru/de/fr) — для локализации.</li>
+            <li><b>Кастомный аватар</b> — только если загружал. Хранится как WebP 256×256.</li>
+            <li><b>Сообщения клан-чата, шаблоны, заявки на модератора, уведомления</b> — контент, который ты сам создал.</li>
+            <li><b>Сессионные токены</b> — хэшированные, чтобы «оставаться залогиненым».</li>
+          </ul>
+        </div>
+        <div data-lang="de">
+          <p>Wenn die Extension sich mit unserem Backend verbindet, speichern wir ein kleines Profil:</p>
+          <ul class="bullets">
+            <li><b>Wall-ID + Nutzername</b></li>
+            <li><b>Discord-ID + Discord-Name</b></li>
+            <li><b>Rolle</b> (member / clan moderator / admin)</li>
+            <li><b>Sprache</b> (en/ru/de/fr)</li>
+            <li><b>Eigener Avatar</b> — nur wenn hochgeladen (WebP, max. 256×256)</li>
+            <li><b>Clan-Chat-Nachrichten, Vorlagen, Moderationsanfragen, Benachrichtigungen</b></li>
+            <li><b>Session-Tokens</b> — gehasht</li>
+          </ul>
+        </div>
+        <div data-lang="fr">
+          <p>Quand l'extension se connecte à notre backend, nous gardons un petit profil :</p>
+          <ul class="bullets">
+            <li><b>Wall ID + nom d'utilisateur</b></li>
+            <li><b>ID Discord + nom Discord</b></li>
+            <li><b>Rôle</b> (member / clan moderator / admin)</li>
+            <li><b>Langue</b> (en/ru/de/fr)</li>
+            <li><b>Avatar personnalisé</b> — uniquement si téléchargé (WebP, max. 256×256)</li>
+            <li><b>Messages de chat de clan, modèles, demandes de modération, notifications</b></li>
+            <li><b>Jetons de session</b> — hachés</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>What we DON'T store</span>
+          <span data-lang="ru" data-inline>Что мы НЕ храним</span>
+          <span data-lang="de" data-inline>Was wir NICHT speichern</span>
+          <span data-lang="fr" data-inline>Ce que nous NE stockons PAS</span>
+        </div>
+        <ul class="bullets">
+          <li><span data-lang="en" data-inline>Your filianislost.com password (we never see it).</span><span data-lang="ru" data-inline>Твой пароль от filianislost.com (мы его не видим).</span><span data-lang="de" data-inline>Dein filianislost.com-Passwort (sehen wir nie).</span><span data-lang="fr" data-inline>Votre mot de passe filianislost.com (jamais vu).</span></li>
+          <li><span data-lang="en" data-inline>Your raw site session token (we exchange it once for our own JWT and discard).</span><span data-lang="ru" data-inline>Сырой токен сессии сайта (меняем один раз на JWT и забываем).</span><span data-lang="de" data-inline>Den ursprünglichen Site-Session-Token.</span><span data-lang="fr" data-inline>Le jeton de session brut du site.</span></li>
+          <li><span data-lang="en" data-inline>Your IP address (not logged at the application level).</span><span data-lang="ru" data-inline>Твой IP-адрес (не пишем в приложении).</span><span data-lang="de" data-inline>Deine IP-Adresse (nicht auf App-Ebene geloggt).</span><span data-lang="fr" data-inline>Votre adresse IP (non journalisée au niveau application).</span></li>
+          <li><span data-lang="en" data-inline>Analytics, trackers, fingerprinting.</span><span data-lang="ru" data-inline>Аналитика, трекеры, фингерпринты.</span><span data-lang="de" data-inline>Analytics, Tracker, Fingerprinting.</span><span data-lang="fr" data-inline>Analytics, traceurs, empreintes.</span></li>
+        </ul>
+        <div class="note">
+          <span data-lang="en" data-inline>nginx access logs do retain IP + URL for 14 days for abuse-prevention only.</span>
+          <span data-lang="ru" data-inline>nginx access logs хранят IP + URL 14 дней только для защиты от абуза.</span>
+          <span data-lang="de" data-inline>nginx-Access-Logs speichern IP + URL für 14 Tage zur Missbrauchsprävention.</span>
+          <span data-lang="fr" data-inline>Les logs nginx gardent IP + URL pendant 14 jours pour la prévention d'abus.</span>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>Your rights</span>
+          <span data-lang="ru" data-inline>Твои права</span>
+          <span data-lang="de" data-inline>Deine Rechte</span>
+          <span data-lang="fr" data-inline>Vos droits</span>
+        </div>
+        <p data-lang="en">You can delete your account and all related data from the extension's <b>Settings → Account → Delete my account</b>. This wipes profile, avatar, messages, templates, sessions in one transaction. Or email <a href="mailto:vadim+the_wall@vai-rice.space" class="link">vadim+the_wall@vai-rice.space</a> and I'll do it manually.</p>
+        <p data-lang="ru">Удалить аккаунт и все связанные данные можно прямо из расширения: <b>Опции → Account → Delete my account</b>. Чистится профиль, аватар, сообщения, шаблоны, сессии — всё одной транзакцией. Или напиши на <a href="mailto:vadim+the_wall@vai-rice.space" class="link">vadim+the_wall@vai-rice.space</a> — сделаю вручную.</p>
+        <p data-lang="de">Konto löschen: <b>Einstellungen → Account → Delete my account</b>. Wischt Profil, Avatar, Nachrichten, Vorlagen und Sessions in einer Transaktion.</p>
+        <p data-lang="fr">Supprimer le compte : <b>Options → Account → Delete my account</b>. Efface profil, avatar, messages, modèles et sessions en une transaction.</p>
+      </div>
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>Where is the server</span>
+          <span data-lang="ru" data-inline>Где сервер</span>
+          <span data-lang="de" data-inline>Wo steht der Server</span>
+          <span data-lang="fr" data-inline>Où est le serveur</span>
+        </div>
+        <p data-lang="en">A single VPS in Europe. Single operator: VAI_PROG.</p>
+        <p data-lang="ru">Один VPS в Европе. Один оператор: VAI_PROG.</p>
+        <p data-lang="de">Ein VPS in Europa. Ein Betreiber: VAI_PROG.</p>
+        <p data-lang="fr">Un VPS en Europe. Un opérateur : VAI_PROG.</p>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>

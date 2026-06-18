@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — VAI-PROG Account</title>
+  <link rel="icon" href="https://filianislost.com/static/favicon.png">
+  <link rel="stylesheet" href="/assets/style.css">
+  <style>
+    .auth-tabs{display:flex;gap:4px;margin-bottom:10px}
+    .auth-tabs .btn{flex:1}
+    .auth-tabs .btn.active{font-weight:bold;background:var(--group)}
+    .field{margin:10px 0}
+    .field label{display:block;font-size:13px;color:var(--sub);margin-bottom:4px}
+    .form-status{margin-top:10px;padding:8px;border:2px inset var(--shadow);background:var(--field);color:var(--fieldtext);font-size:13px;min-height:1em}
+    .badge-vai{display:inline-block;padding:3px 8px;background:#3838aa;color:#fff;font-weight:bold;font-size:12px;border:1px solid var(--dark)}
+    .ecosystem{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    .ecosystem .feat-card{font-size:12px}
+    @media (max-width:540px){.ecosystem{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win">
+    <div class="titlebar">
+      <span><span class="led"></span>vai-auth.exe</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>VAI-PROG Account</span>
+          <span data-lang="ru" data-inline>VAI-PROG Аккаунт</span>
+          <span data-lang="de" data-inline>VAI-PROG Konto</span>
+          <span data-lang="fr" data-inline>Compte VAI-PROG</span>
+        </div>
+        <p>
+          <span class="badge-vai">united auth</span>
+          <span data-lang="en" data-inline> One identity for The Wall Dev — and every future service VAI ships.</span>
+          <span data-lang="ru" data-inline> Один аккаунт для The Wall Dev — и для всех будущих сервисов VAI.</span>
+          <span data-lang="de" data-inline> Eine Identität für The Wall Dev — und alle künftigen VAI-Services.</span>
+          <span data-lang="fr" data-inline> Une identité pour The Wall Dev — et tous les futurs services VAI.</span>
+        </p>
+        <div class="ecosystem">
+          <div class="feat-card"><b>🧱 The Wall Dev</b>
+            <span data-lang="en" data-inline>Pixel canvas extension. Live now.</span>
+            <span data-lang="ru" data-inline>Расширение с guide-слоем для холста. Доступно сейчас.</span>
+            <span data-lang="de" data-inline>Pixel-Canvas-Erweiterung. Verfügbar jetzt.</span>
+            <span data-lang="fr" data-inline>Extension de toile de pixels. Disponible maintenant.</span>
+          </div>
+          <div class="feat-card" style="opacity:.6"><b>🎮 Coming soon</b>
+            <span data-lang="en" data-inline>More VAI-PROG tools. Same account.</span>
+            <span data-lang="ru" data-inline>Больше инструментов VAI-PROG. Тот же аккаунт.</span>
+            <span data-lang="de" data-inline>Weitere VAI-PROG-Tools. Selbes Konto.</span>
+            <span data-lang="fr" data-inline>Plus d'outils VAI-PROG. Même compte.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="btn active" id="tab-signin" onclick="switchTab('signin')">
+          <span data-lang="en" data-inline>Sign in</span>
+          <span data-lang="ru" data-inline>Войти</span>
+          <span data-lang="de" data-inline>Anmelden</span>
+          <span data-lang="fr" data-inline>Connexion</span>
+        </button>
+        <button class="btn" id="tab-signup" onclick="switchTab('signup')">
+          <span data-lang="en" data-inline>Create account</span>
+          <span data-lang="ru" data-inline>Создать аккаунт</span>
+          <span data-lang="de" data-inline>Konto erstellen</span>
+          <span data-lang="fr" data-inline>Créer un compte</span>
+        </button>
+      </div>
+
+      <div class="group" id="form-signin">
+        <div class="legend">Sign in</div>
+        <div class="field">
+          <label for="signin-email">Email</label>
+          <input type="email" id="signin-email" class="input" autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="signin-password">Password</label>
+          <input type="password" id="signin-password" class="input" autocomplete="current-password">
+        </div>
+        <button class="btn primary full" onclick="doSignin()">→ Sign in</button>
+      </div>
+
+      <div class="group" id="form-signup" style="display:none">
+        <div class="legend">Create account</div>
+        <div class="field">
+          <label for="signup-name">
+            <span data-lang="en" data-inline>Display name (optional)</span>
+            <span data-lang="ru" data-inline>Имя (опционально)</span>
+            <span data-lang="de" data-inline>Anzeigename (optional)</span>
+            <span data-lang="fr" data-inline>Nom (optionnel)</span>
+          </label>
+          <input type="text" id="signup-name" class="input" maxlength="64">
+        </div>
+        <div class="field">
+          <label for="signup-email">Email</label>
+          <input type="email" id="signup-email" class="input" autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="signup-password">
+            <span data-lang="en" data-inline>Password (8–256)</span>
+            <span data-lang="ru" data-inline>Пароль (8–256)</span>
+            <span data-lang="de" data-inline>Passwort (8–256)</span>
+            <span data-lang="fr" data-inline>Mot de passe (8–256)</span>
+          </label>
+          <input type="password" id="signup-password" class="input" minlength="8" maxlength="256" autocomplete="new-password">
+        </div>
+        <button class="btn primary full" onclick="doSignup()">→ Create</button>
+      </div>
+
+      <div class="form-status" id="form-status"></div>
+
+      <div class="group" style="margin-top:14px">
+        <div class="legend">
+          <span data-lang="en" data-inline>Already in The Wall via filianislost?</span>
+          <span data-lang="ru" data-inline>Уже залогинены через filianislost?</span>
+          <span data-lang="de" data-inline>Schon im Wall via filianislost?</span>
+          <span data-lang="fr" data-inline>Déjà sur Wall via filianislost ?</span>
+        </div>
+        <p style="font-size:13px">
+          <span data-lang="en" data-inline>After signing in here, open the extension → Settings → "Link VAI account" to bind the two together. Both routes will then reach the same data.</span>
+          <span data-lang="ru" data-inline>После входа сюда откройте расширение → Settings → «Link VAI account» чтобы связать аккаунты. Дальше оба пути ведут к одним и тем же данным.</span>
+          <span data-lang="de" data-inline>Nach dem Anmelden hier öffne die Extension → Settings → "Link VAI account" um beide zu verbinden.</span>
+          <span data-lang="fr" data-inline>Après connexion ici, ouvrez l'extension → Settings → « Link VAI account » pour lier les deux.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+const API = "/api/v2/vai";
+const TOK_KEY = "wall_vai_jwt";
+
+// OAuth callback router. Telegram and Discord redirect users back to this
+// page after consent with ?code=...&state=... query params. We forward the
+// pair to the matching exchange endpoint using the Wall JWT that's already
+// sitting in localStorage from the extension's auto-attach.
+(async function handleOauthReturn() {
+  const qs = new URLSearchParams(location.search);
+  const code = qs.get("code");
+  const stateParam = qs.get("state");
+  const errorParam = qs.get("error");
+  if (errorParam) {
+    document.addEventListener("DOMContentLoaded", () => status("OAuth error: " + errorParam));
+    return;
+  }
+  if (!code || !stateParam) return;
+  // The backend prefixes states with provider AND purpose:
+  //   tg./dc.   → LINK an account to the signed-in user (needs Bearer JWT)
+  //   ltg./ldc. → LOGIN by provider identity (no session needed)
+  // This page works no matter where the flow started — sessionStorage from
+  // another origin never arrives here, so the state itself is the router.
+  const isLogin = stateParam.startsWith("ltg.") || stateParam.startsWith("ldc.");
+  const provider = (stateParam.startsWith("tg.") || stateParam.startsWith("ltg.")) ? "telegram"
+    : (stateParam.startsWith("dc.") || stateParam.startsWith("ldc.")) ? "discord"
+    : (sessionStorage.getItem("wall_oauth_pending") || "discord");
+  sessionStorage.removeItem("wall_oauth_pending");
+
+  if (isLogin) {
+    // OAuth SIGN-IN: exchange code+state for a fresh Wall session.
+    try {
+      const r = await fetch("/api/v2/auth/" + provider + "/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, state: stateParam }),
+      });
+      if (!r.ok) throw new Error("login " + r.status + ": " + await r.text());
+      const d = await r.json();
+      localStorage.setItem("wall_landing_jwt", d.token);
+      localStorage.setItem("wall_landing_refresh", d.refresh_token || "");
+      history.replaceState({}, "", "/me.html?signed_in=" + provider);
+      location.replace("/me.html?signed_in=" + provider);
+    } catch (e) {
+      document.addEventListener("DOMContentLoaded", () =>
+        status("Sign-in failed: " + e.message));
+    }
+    return;
+  }
+  const wallJwt = localStorage.getItem("walldev_cfg")
+    ? (JSON.parse(localStorage.getItem("walldev_cfg")).backendToken || "")
+    : (localStorage.getItem("wall_landing_jwt") || "");
+  if (!wallJwt) {
+    document.addEventListener("DOMContentLoaded", () =>
+      status("Sign in to The Wall first (open the extension on filianislost.com), then retry."));
+    return;
+  }
+  try {
+    const r = await fetch(`/api/v2/me/links/${provider}/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + wallJwt },
+      body: JSON.stringify({ code, state: stateParam }),
+    });
+    if (!r.ok) throw new Error("exchange " + r.status + ": " + await r.text());
+    // Strip the OAuth params and bounce to /me.
+    history.replaceState({}, "", "/me.html?linked=" + provider);
+    location.replace("/me.html?linked=" + provider);
+  } catch (e) {
+    document.addEventListener("DOMContentLoaded", () =>
+      status("Link failed: " + e.message));
+  }
+})();
+
+function switchTab(t) {
+  document.getElementById("tab-signin").classList.toggle("active", t === "signin");
+  document.getElementById("tab-signup").classList.toggle("active", t === "signup");
+  document.getElementById("form-signin").style.display = t === "signin" ? "" : "none";
+  document.getElementById("form-signup").style.display = t === "signup" ? "" : "none";
+  status("");
+}
+function status(msg, ok) {
+  const el = document.getElementById("form-status");
+  el.textContent = msg || "";
+  el.style.color = ok ? "#1e6e2c" : "#c33";
+}
+async function doSignin() {
+  const email = document.getElementById("signin-email").value.trim();
+  const password = document.getElementById("signin-password").value;
+  if (!email || !password) return status("Email and password required");
+  status("verifying…", true);
+  try {
+    const r = await fetch(API + "/login", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!r.ok) return status("login failed: " + r.status + " " + await r.text());
+    const d = await r.json();
+    localStorage.setItem(TOK_KEY, d.token);
+    status("Signed in as " + d.account.email + " — go to /me.html", true);
+  } catch (e) { status("error: " + e.message); }
+}
+async function doSignup() {
+  const email = document.getElementById("signup-email").value.trim();
+  const password = document.getElementById("signup-password").value;
+  const display_name = document.getElementById("signup-name").value.trim() || null;
+  if (!email || !password) return status("Email and password required");
+  if (password.length < 8) return status("Password too short");
+  status("creating…", true);
+  try {
+    const r = await fetch(API + "/signup", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, display_name }),
+    });
+    if (!r.ok) return status("signup failed: " + r.status + " " + await r.text());
+    const d = await r.json();
+    localStorage.setItem(TOK_KEY, d.token);
+    status("Account created — welcome, " + d.account.email, true);
+  } catch (e) { status("error: " + e.message); }
+}
+</script>
+</body>
+</html>

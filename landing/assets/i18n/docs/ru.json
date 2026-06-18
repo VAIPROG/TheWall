@@ -1,0 +1,65 @@
+{
+  "title": "Документация",
+  "intro": "Пошаговые гайды: установка, настройка, Deep Integration, анти-grief и API.",
+  "sections": {
+    "getting_started": "Быстрый старт",
+    "anti_grief": "Анти-grief мониторинг",
+    "linked_accounts": "Привязанные аккаунты",
+    "api": "API-справочник",
+    "troubleshooting": "Траблшутинг",
+    "self_host": "Хостинг бэкенда у себя"
+  },
+  "getting_started": {
+    "heading": "1. Быстрый старт",
+    "body": "Выберите формат: Tampermonkey userscript, Chrome MV3 (распакованное), или Firefox (временный add-on).",
+    "steps": [
+      "Откройте <a href=\"/\" class=\"link\">главную страницу</a> и скачайте версию для вашего браузера.",
+      "Установите согласно инструкции.",
+      "Перейдите на <a href=\"https://filianislost.com\" class=\"link\">filianislost.com</a> — панель Win95 появится в правом верхнем углу.",
+      "При первом визите расширение автоматически подключится к нашему бэкенду (ручной вход не нужен)."
+    ],
+    "tip": "Автообновление опрашивает <code>/dist/signature.json</code> каждые 30 минут. Tampermonkey также умеет обновлять userscript'ы сам."
+  },
+  "anti_grief": {
+    "heading": "2. Анти-grief мониторинг",
+    "body": "Закрепите шаблон — бэкенд будет скачивать соответствующее окно тайлов стены каждые <code>check_interval</code> секунд (мин. 60, по умолчанию 600), сравнивать с шаблоном и создавать событие <code>clan_alert</code> в почтовом ящике когда повреждения превысят <code>alert_threshold</code> (по умолчанию 25 пикселей).",
+    "example": "POST /api/v2/templates/{id}/protect\n{\n  \"clan_id\": \"uuid-клана\",\n  \"alert_threshold\": 25,\n  \"check_interval\": 600\n}",
+    "disable": "Отключить: <code>DELETE /api/v2/templates/{id}/protect</code>. Может владелец шаблона, модератор/админ клана, или глобальный админ."
+  },
+  "linked_accounts": {
+    "heading": "3. Привязанные аккаунты",
+    "body": "Из <a href=\"/me.html\" class=\"link\">/me</a>:",
+    "methods": [
+      "<b>Telegram</b> через OIDC (<code>oauth.telegram.org</code>) с PKCE + скоуп <code>telegram:bot_access</code>. Бот сможет писать вам в ЛС.",
+      "<b>Discord</b> через стандартный OAuth2 со скоупом <code>identify</code>. Бот сможет писать в ЛС если у вас общий сервер или вы написали ему первым.",
+      "<b>Email</b> через поддержку: запросите 6-символьный код, отправьте письмо на адрес поддержки с темой <code>LINK-MAIL</code> с вашего адреса, админ подтвердит."
+    ],
+    "tip": "VAI Account — отдельная идентичность на <a href=\"/vai-auth.html\" class=\"link\">/vai-auth</a>, задуманная для всех сервисов VAI-PROG. Привязать к вашему Wall-пользователю можно из настроек расширения."
+  },
+  "api": {
+    "heading": "4. API",
+    "body": "Две поверхности живут рядом под <code>/api/</code>:",
+    "surfaces": [
+      "<code>/api/v1/*</code> эквиваленты и общие эндпоинты под <code>/api/*</code> — заморожены, для старых клиентов.",
+      "<code>/api/v2/*</code> — активно развивается, все новые фичи приходят сюда."
+    ],
+    "browse": "Интерактивно: <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Спецификация: <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
+  },
+  "troubleshooting": {
+    "heading": "5. Траблшутинг",
+    "items": [
+      "<b>Панель не появляется</b>: убедитесь что вы на <code>https://filianislost.com</code> (не <code>www.</code>); перезагрузите после установки.",
+      "<b>Precise Place серый</b>: Deep Integration выключена, включите в Настройках и перезагрузите.",
+      "<b>Deep Integration «WARN: missing probes»</b>: бандл сайта поменял форму — дождитесь обновления расширения или напишите на <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
+      "<b>Чёрная вспышка на вкладке Клан</b>: исправлено в v3.0.x — обновитесь.",
+      "<b>CORS-ошибки</b>: очистите кэшированные Service Workers и перезагрузите. Production nginx теперь явно выставляет заголовки.",
+      "<b>Тост «out of paint»</b>: это кулдаун сайта — дождитесь рефилла или отправьте ожидающие пиксели."
+    ]
+  },
+  "self_host": {
+    "heading": "6. Хостинг бэкенда у себя",
+    "body": "Бэкенд — один Rust-бинарник + Postgres + nginx + Let's Encrypt. Смотрите <code>backend/Dockerfile</code> и <code>backend/example.env</code>.",
+    "example": "cp backend/example.env backend/.env\ndocker compose -f backend/docker-compose.yml up -d   # Postgres\ncargo run --release                                  # backend",
+    "env_note": "Или укажите <code>THE_WALL_DEV_ENV_FILE</code> на внешний файл секретов (перезаписывает текущие env vars)."
+  }
+}

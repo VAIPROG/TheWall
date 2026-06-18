@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ReDoc · The Wall Dev API</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg">
+  <style>
+    @font-face { font-family: W95FA; src: url("/assets/font/W95FA.otf") format("opentype"); font-display: swap; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #16213e; }
+
+    /* ---- Win95 topbar ---- */
+    .topbar {
+      position: sticky; top: 0; z-index: 200;
+      display: flex; align-items: center; gap: 0;
+      padding: 0;
+      background: #c0c0c0;
+      border-top: 2px solid #fff;
+      border-bottom: 2px solid #404040;
+      font-family: W95FA, "MS Sans Serif", monospace; font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.5);
+    }
+    .topbar .start-btn {
+      display: flex; align-items: center; gap: 4px;
+      padding: 3px 10px 3px 4px;
+      background: #c0c0c0;
+      border: 2px solid; border-color: #fff #404040 #404040 #fff;
+      font-weight: bold; color: #000; cursor: default;
+      margin: 2px 4px;
+    }
+    .topbar .start-btn .win-logo {
+      width: 16px; height: 16px;
+      background: linear-gradient(135deg, #f00 25%, #0f0 25%, #0f0 50%, #00f 50%, #00f 75%, #ff0 75%);
+    }
+    .topbar .divider {
+      width: 2px; align-self: stretch; margin: 3px 2px;
+      border-left: 1px solid #808080; border-right: 1px solid #fff;
+    }
+    .topbar a {
+      color: #000; text-decoration: none; padding: 4px 10px;
+      border: 1px solid transparent;
+    }
+    .topbar a:hover {
+      border-color: #fff #404040 #404040 #fff;
+      background: #d4d0c8;
+    }
+    .topbar a.active {
+      border-color: #404040 #fff #fff #404040;
+      background: #bbb;
+    }
+    .topbar .spacer { flex: 1; }
+    .topbar .clock {
+      padding: 3px 10px; margin: 2px 4px;
+      border: 2px solid; border-color: #808080 #fff #fff #808080;
+      background: #c0c0c0; font-size: 12px; color: #000;
+    }
+
+    /* ---- ReDoc dark theme fixes ---- */
+    /* Selected tab (react-tabs) */
+    [class*="react-tabs__tab--selected"],
+    li.react-tabs__tab--selected {
+      background: #1a2a44 !important;
+      border-color: #3a5a80 !important;
+      color: #e0e4ea !important;
+    }
+    li.react-tabs__tab {
+      background: #0d1b2a !important;
+      color: #99a8b8 !important;
+      border-color: #2a3650 !important;
+    }
+
+    /* Response/example headers and nested backgrounds */
+    [class*="cEAxIC"], [class*="dhTbPR"],
+    [class*="sc-fqkvVR"], [class*="dTJWQH"] {
+      background: #0d1b2a !important;
+      color: #b8c4d4 !important;
+    }
+
+    /* h5 labels inside operation detail (properties, required, etc) */
+    [class*="cEAxIC"] h5,
+    [class*="sc-fqkvVR"] h5 {
+      color: rgba(255,255,255,.5) !important;
+    }
+
+    /* Table rows inside schemas */
+    [class*="sc-"] table,
+    [class*="sc-"] table td,
+    [class*="sc-"] table th {
+      border-color: #2a3650 !important;
+      color: #b8c4d4 !important;
+    }
+    [class*="sc-"] table tr:nth-child(2n) {
+      background: rgba(13,27,42,.5) !important;
+    }
+
+    /* Buttons / expand toggles */
+    button[class*="sc-"] {
+      color: #7bf !important;
+      background: transparent !important;
+    }
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <div class="start-btn"><div class="win-logo"></div> API</div>
+  <div class="divider"></div>
+  <a href="/">Home</a>
+  <a href="/api-docs/">Docs</a>
+  <a href="/api-docs/swagger.html">Swagger</a>
+  <a href="/openapi.yaml">spec.yaml</a>
+  <span class="spacer"></span>
+  <div class="clock" id="clock">v2.1</div>
+</div>
+<div id="redoc-root"></div>
+<script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+<script>
+Redoc.init('/openapi.yaml', {
+  scrollYOffset: 40,
+  hideDownloadButton: false,
+  expandResponses: '200',
+  theme: {
+    colors: {
+      primary: { main: '#5b9bd5' },
+      success: { main: '#66bb6a' },
+      warning: { main: '#ffa726' },
+      error: { main: '#ef5350' },
+      text: { primary: '#e0e4ea', secondary: '#99a8b8' },
+      border: { dark: '#2a3650', light: '#3a4a60' },
+    },
+    sidebar: {
+      backgroundColor: '#0d1b2a',
+      textColor: '#cdd',
+      activeTextColor: '#7bf',
+      groupItems: { activeBackgroundColor: '#1a2e4a', activeTextColor: '#fff' },
+    },
+    rightPanel: { backgroundColor: '#0f1e34' },
+    typography: {
+      fontSize: '14px',
+      fontFamily: 'W95FA, "JetBrains Mono", monospace',
+      headings: { fontFamily: 'W95FA, monospace' },
+      code: { fontSize: '13px', backgroundColor: '#1a2a40' },
+    },
+    schema: { nestedBackground: '#0d1b2a' },
+  }
+}, document.getElementById('redoc-root'));
+</script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Changelog · The Wall Dev</title>
+        <link
+            rel="icon"
+            type="image/svg+xml"
+            href="/assets/favicon/favicon.svg"
+        />
+        <link rel="stylesheet" href="/assets/style.css" />
+        <style>
+            .ver-card {
+                border: 2px outset var(--bg);
+                background: var(--field);
+                color: var(--fieldtext);
+                padding: 12px;
+                margin-bottom: 10px;
+            }
+            .ver-card h3 {
+                margin: 0 0 6px;
+                color: var(--accent);
+                font-size: 16px;
+            }
+            .ver-card .ver-meta {
+                font-size: 11px;
+                color: var(--sub);
+                margin-bottom: 8px;
+            }
+            .ver-card ul {
+                margin: 6px 0;
+                padding-left: 20px;
+                font-size: 13px;
+                line-height: 1.6;
+            }
+            .pill {
+                display: inline-block;
+                padding: 2px 6px;
+                font-size: 11px;
+                background: var(--accent);
+                color: #fff;
+                margin-left: 4px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="chrome-root"></div>
+
+        <main>
+            <div class="win wide">
+                <div class="titlebar">
+                    <span><span class="led"></span>changelog.txt</span>
+                    <span class="tbtns"
+                        ><span class="tbtn">_</span><span class="tbtn">▢</span
+                        ><span class="tbtn">✕</span></span
+                    >
+                </div>
+                <div class="content">
+                    <div class="group">
+                        <div class="legend">
+                            <span data-i18n="changelog.title">Changelog</span>
+                        </div>
+                        <p data-i18n="changelog.intro"></p>
+
+                        <div class="ver-card">
+                            <h3>
+                                Backend v2.0.0 · Extension v4.0.0
+                                <span class="pill">latest</span>
+                            </h3>
+                            <div class="ver-meta">
+                                June 2026 · Backend re-architected · Extension
+                                UI rebuild
+                            </div>
+                            <ul>
+                                <li>
+                                    <b>V2 API</b> at <code>/api/v2/*</code> —
+                                    frozen v1 lives at <code>/api/*</code>
+                                </li>
+                                <li>
+                                    <b>Two-axis role model</b>: global (user /
+                                    admin / owner) × per-clan (member /
+                                    moderator / admin), many-to-many memberships
+                                </li>
+                                <li>
+                                    <b>Multi-site</b>: backend infra ready for
+                                    wplace.live; filianislost.com fully wired up
+                                </li>
+                                <li>
+                                    <b>Unified mailbox</b>: announcements, clan
+                                    alerts, clan_announcement, mod_alert,
+                                    modmail, DMs, template_event
+                                </li>
+                                <li>
+                                    <b>Modmail threads</b> with mod-only
+                                    visibility
+                                </li>
+                                <li>
+                                    <b>Anti-grief monitor</b>: pin a template,
+                                    server polls tiles every 5 min, alerts on
+                                    damage threshold
+                                </li>
+                                <li>
+                                    <b>Server snapshots</b> every 5 min in
+                                    small/medium/large → Discord DM + Telegram
+                                    DM + public channel; only URLs persisted
+                                </li>
+                                <li>
+                                    <b>Signal mirror</b> of
+                                    <code>signal.filianislost.com/fetch</code>
+                                </li>
+                                <li>
+                                    <b>Achievements</b>: 20+ badges, hidden
+                                    secrets, public-profile showcase
+                                </li>
+                                <li>
+                                    <b>Profile v2</b>: bio, social links
+                                    (whitelisted https only), pinned templates,
+                                    stats
+                                </li>
+                                <li>
+                                    <b>Notification preferences</b> per kind ×
+                                    channel (in_app / os_push / email / discord
+                                    / telegram)
+                                </li>
+                                <li>
+                                    <b>Telegram OIDC</b> linking with PKCE +
+                                    <code>telegram:bot_access</code> scope
+                                </li>
+                                <li><b>Discord OAuth2</b> linking</li>
+                                <li>
+                                    <b>Email via support</b>: 6-char code,
+                                    template body, admin-side approve UI
+                                </li>
+                                <li>
+                                    <b>VAI Account System</b> stub: unified
+                                    identity across future VAI-PROG services
+                                </li>
+                                <li>
+                                    <b>Audit log + telemetry</b> tables ready
+                                </li>
+                                <li>
+                                    Configurable limits with hard ceiling 4096
+                                    (messages, bio, social labels)
+                                </li>
+                                <li>
+                                    <code>THE_WALL_DEV_ENV_FILE</code> env hook
+                                    for external secrets file with override
+                                </li>
+                                <li>
+                                    OpenAPI 3.1 spec at
+                                    <code>/openapi.yaml</code>, Swagger UI +
+                                    ReDoc browsers
+                                </li>
+                                <li>
+                                    Structured i18n: per-locale JSON, lazy
+                                    fetch, cached in localStorage
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="ver-card">
+                            <h3>Extension v3.0.x series</h3>
+                            <div class="ver-meta">Spring 2026</div>
+                            <ul>
+                                <li>
+                                    Tile-based snapshot tool with quality
+                                    selector (low/medium/high)
+                                </li>
+                                <li>
+                                    Brick-background fill matching the site's
+                                    own wall
+                                </li>
+                                <li>
+                                    "Made with The Wall Dev" header watermark
+                                </li>
+                                <li>
+                                    Win95-styled dialogs replacing browser
+                                    alerts
+                                </li>
+                                <li>
+                                    Avatar cascade: skip
+                                    <code>/api/avatar</code> if user has no
+                                    custom upload
+                                </li>
+                                <li>
+                                    WebP avatar conversion server-side; Discord
+                                    avatar 7-day cache
+                                </li>
+                                <li>
+                                    Bilingual UI text routed through i18n.ts
+                                    instead of inlined
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="ver-card">
+                            <h3>Extension v2.0</h3>
+                            <div class="ver-meta">2025</div>
+                            <ul>
+                                <li>Win95 panel, overlay</li>
+                                <li>
+                                    Clan chat (markdown), public + clan
+                                    templates, share links
+                                </li>
+                                <li>
+                                    Custom avatars uploaded through our backend
+                                </li>
+                                <li>Cursor filter: clanmates only</li>
+                                <li>
+                                    Auto-update polling via
+                                    <code>signature.json</code>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="footer-root"></div>
+        <script src="/assets/i18n.js"></script>
+        <script src="/assets/app.js"></script>
+    </body>
+</html>

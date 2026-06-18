@@ -1,0 +1,78 @@
+{
+  "title": "Dokumentation",
+  "intro": "Schritt-für-Schritt-Anleitungen: Installation, Konfiguration, Deep Integration, Anti-Grief und API.",
+  "sections": {
+    "getting_started": "Erste Schritte",
+    "deep_integration": "Deep Integration",
+    "anti_grief": "Anti-Grief-Überwachung",
+    "linked_accounts": "Verknüpfte Konten",
+    "api": "API-Referenz",
+    "troubleshooting": "Fehlerbehebung",
+    "self_host": "Backend selbst hosten"
+  },
+  "getting_started": {
+    "heading": "1. Erste Schritte",
+    "body": "Wählen Sie ein Format: Tampermonkey-Userscript, Chrome MV3 (entpackt) oder Firefox (temporäres Add-on).",
+    "steps": [
+      "Öffnen Sie <a href=\"/\" class=\"link\">die Startseite</a> und laden Sie die Version für Ihren Browser herunter.",
+      "Installieren Sie gemäß der Anleitung.",
+      "Besuchen Sie <a href=\"https://filianislost.com\" class=\"link\">filianislost.com</a> — das Win95-Panel erscheint oben rechts.",
+      "Beim ersten Besuch verbindet sich die Erweiterung automatisch mit unserem Backend (keine manuelle Anmeldung nötig)."
+    ],
+    "tip": "Auto-Update fragt <code>/dist/signature.json</code> alle 30 Minuten ab. Tampermonkey kann Userscripts auch nativ aktualisieren."
+  },
+  "deep_integration": {
+    "heading": "2. Deep Integration",
+    "body": "Standardmäßig deaktiviert. Bei Aktivierung greift die Erweiterung auf die <b>eingebaute Mal-Funktion der Seite</b> zu — dieselbe interne Methode, die die Seiten-UI bei Klick auf einen Pixel aufruft. <b>Der Quellcode der Seite wird NICHT verändert, gepatcht oder ersetzt.</b> Das JavaScript der Seite läuft exakt so, wie es die Entwickler ausgeliefert haben. Was Deep Integration bietet:",
+    "features": [
+      "<b>Precise Place</b>: 1 Klick = exakt 1 Pixel, durch direkten Aufruf der Mal-Methode der Seite statt Simulation eines Klicks auf das Canvas-Element",
+      "<b>Pipette</b> liest aus dem Live-Preview-Canvas für genaue Farbwahl",
+      "Durchgehendes Drag-Paint mit Bresenham-Linieninterpolation",
+      "Suppression-Schicht verhindert das Auslösen des Spray-Handlers der Seite während die Erweiterungstools aktiv sind"
+    ],
+    "toggle": "Umschalten in <b>Einstellungen → Deep Integration (experimentell)</b>. Erfordert Seitenneuladen.",
+    "tip": "Die Funktion findet die interne Mal-Methode der Seite durch Code-Form-Analyse zur Laufzeit — sie liest den vorhandenen Code um herauszufinden was aufzurufen ist, schreibt ihn nie um. Bei Site-Updates mit geänderter Funktionssignatur schlägt die Probe sicher fehl (ausgegraut) bis zum nächsten Extension-Update."
+  },
+  "anti_grief": {
+    "heading": "3. Anti-Grief-Überwachung",
+    "body": "Vorlage anpinnen — das Backend lädt das entsprechende Tile-Fenster alle <code>check_interval</code> Sekunden (min. 60, Standard 600), vergleicht mit der Vorlage und erstellt ein <code>clan_alert</code>-Event wenn der Schaden <code>alert_threshold</code> übersteigt (Standard 25 Pixel).",
+    "example": "POST /api/v2/templates/{id}/protect\n{\n  \"clan_id\": \"uuid-des-clans\",\n  \"alert_threshold\": 25,\n  \"check_interval\": 600\n}",
+    "disable": "Deaktivieren: <code>DELETE /api/v2/templates/{id}/protect</code>. Vorlagenbesitzer, Clan-Mod/Admin oder globaler Admin können es umschalten."
+  },
+  "linked_accounts": {
+    "heading": "4. Verknüpfte Konten",
+    "body": "Von <a href=\"/me.html\" class=\"link\">/me</a>:",
+    "methods": [
+      "<b>Telegram</b> via OIDC (<code>oauth.telegram.org</code>) mit PKCE + Scope <code>telegram:bot_access</code>. Bot kann Ihnen danach DMs senden.",
+      "<b>Discord</b> via Standard-OAuth2 mit Scope <code>identify</code>. Bot kann DMs senden wenn Sie einen gemeinsamen Server haben.",
+      "<b>Email</b> über Support: 6-Zeichen-Code anfordern, E-Mail an Support-Adresse mit Betreff <code>LINK-MAIL</code> senden, Admin bestätigt."
+    ],
+    "tip": "VAI Account ist eine separate Identität unter <a href=\"/vai-auth.html\" class=\"link\">/vai-auth</a> — für alle VAI-PROG-Dienste. Verknüpfung mit Ihrem Wall-Benutzer in den Erweiterungseinstellungen."
+  },
+  "api": {
+    "heading": "5. API",
+    "body": "Zwei Oberflächen nebeneinander unter <code>/api/</code>:",
+    "surfaces": [
+      "<code>/api/v1/*</code> Äquivalente und gemeinsame Endpunkte unter <code>/api/*</code> — eingefroren, Legacy-Clients.",
+      "<code>/api/v2/*</code> — aktiv entwickelt, neue Features landen hier."
+    ],
+    "browse": "Interaktiv: <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Spec: <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
+  },
+  "troubleshooting": {
+    "heading": "6. Fehlerbehebung",
+    "items": [
+      "<b>Panel erscheint nicht</b>: Stellen Sie sicher dass Sie auf <code>https://filianislost.com</code> sind (nicht <code>www.</code>); nach Installation neu laden.",
+      "<b>Precise Place ausgegraut</b>: Deep Integration ist aus — in Einstellungen aktivieren und neu laden.",
+      "<b>Deep Integration «WARN: missing probes»</b>: Site-Bundle hat Form geändert — auf Extension-Update warten oder auf <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a> melden.",
+      "<b>Schwarzer Blitz bei Clan-Tab</b>: Behoben in v3.0.x — aktualisieren.",
+      "<b>CORS-Fehler</b>: Gecachte Service Workers löschen und neu laden.",
+      "<b>Toast «out of paint»</b>: Das ist der Cooldown der Seite — auf Refill warten."
+    ]
+  },
+  "self_host": {
+    "heading": "7. Backend selbst hosten",
+    "body": "Backend ist eine einzelne Rust-Binary + Postgres + nginx + Let's Encrypt. Siehe <code>backend/Dockerfile</code> und <code>backend/example.env</code>.",
+    "example": "cp backend/example.env backend/.env\ndocker compose -f backend/docker-compose.yml up -d   # Postgres\ncargo run --release                                  # backend",
+    "env_note": "Oder <code>THE_WALL_DEV_ENV_FILE</code> auf eine externe Secrets-Datei zeigen lassen (überschreibt vorhandene env vars)."
+  }
+}

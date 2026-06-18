@@ -1,0 +1,65 @@
+{
+  "title": "Documentation",
+  "intro": "Step-by-step guides covering installation, configuration, Deep Integration, anti-grief and the API.",
+  "sections": {
+    "getting_started": "Getting started",
+    "anti_grief": "Anti-grief monitoring",
+    "linked_accounts": "Linked accounts",
+    "api": "API reference",
+    "troubleshooting": "Troubleshooting",
+    "self_host": "Self-hosting the backend"
+  },
+  "getting_started": {
+    "heading": "1. Getting started",
+    "body": "Pick a flavour: Tampermonkey userscript, Chrome MV3 unpacked, or Firefox temporary add-on.",
+    "steps": [
+      "Open <a href=\"/\" class=\"link\">the homepage</a> and grab the download link for your browser.",
+      "Install per the instructions on the card.",
+      "Visit <a href=\"https://filianislost.com\" class=\"link\">filianislost.com</a> — the Win95 panel pops up in the top-right.",
+      "The first time you visit, the extension auto-attaches to our backend (no manual login needed)."
+    ],
+    "tip": "Auto-update polls <code>/dist/signature.json</code> every 30 minutes. Tampermonkey can also auto-update userscripts natively."
+  },
+  "anti_grief": {
+    "heading": "2. Anti-grief monitoring",
+    "body": "Pin a template and the backend will fetch the matching window of wall tiles every <code>check_interval</code> seconds (min 60, default 600), diff against the template, and emit a <code>clan_alert</code> mailbox event when damage crosses <code>alert_threshold</code> (default 25 pixels).",
+    "example": "POST /api/v2/templates/{id}/protect\n{\n  \"clan_id\": \"uuid-of-clan\",\n  \"alert_threshold\": 25,\n  \"check_interval\": 600\n}",
+    "disable": "Disable with <code>DELETE /api/v2/templates/{id}/protect</code>. Anyone who owns the template, any clan moderator/admin, or a global admin can flip it."
+  },
+  "linked_accounts": {
+    "heading": "3. Linked accounts",
+    "body": "From <a href=\"/me.html\" class=\"link\">/me</a>:",
+    "methods": [
+      "<b>Telegram</b> via OIDC (<code>oauth.telegram.org</code>) with PKCE + <code>telegram:bot_access</code> scope. Bot can DM you afterwards.",
+      "<b>Discord</b> via standard OAuth2 with <code>identify</code> scope. Bot can DM you if you share a guild with it or DM it first.",
+      "<b>Email</b> through support: request a 6-char code, email the support address with subject <code>LINK-MAIL</code> from your address, an admin approves."
+    ],
+    "tip": "VAI Account is a separate identity at <a href=\"/vai-auth.html\" class=\"link\">/vai-auth</a> — designed to span all VAI-PROG services. You can bind it to your Wall user from the extension's Settings."
+  },
+  "api": {
+    "heading": "4. API",
+    "body": "Two surfaces live side by side under <code>/api/</code>:",
+    "surfaces": [
+      "<code>/api/v1/*</code> equivalents and shared endpoints under <code>/api/*</code> — frozen, legacy clients.",
+      "<code>/api/v2/*</code> — actively developed, new features land here."
+    ],
+    "browse": "Browse interactively: <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Raw spec: <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
+  },
+  "troubleshooting": {
+    "heading": "5. Troubleshooting",
+    "items": [
+      "<b>Panel doesn't appear</b>: ensure you're on <code>https://filianislost.com</code> (not <code>www.</code>); reload after install.",
+      "<b>Precise Place greyed out</b>: Deep Integration is off, enable it in Settings and reload.",
+      "<b>Deep Integration \"WARN: missing probes\"</b>: site bundle changed shape — wait for the next extension update or report at <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
+      "<b>Black flash on Clan tab</b>: known fixed in v3.0.x — update.",
+      "<b>CORS errors</b>: clear cached service workers and reload. Production nginx now sets the headers explicitly.",
+      "<b>\"out of paint\" toast</b>: that's the site's cooldown — wait for refill or submit pending pixels."
+    ]
+  },
+  "self_host": {
+    "heading": "6. Self-hosting the backend",
+    "body": "Backend is a single Rust binary backed by Postgres + nginx + Let's Encrypt. See <code>backend/Dockerfile</code> and <code>backend/example.env</code> for the moving parts.",
+    "example": "cp backend/example.env backend/.env\ndocker compose -f backend/docker-compose.yml up -d   # Postgres\ncargo run --release                                  # backend",
+    "env_note": "Or point <code>THE_WALL_DEV_ENV_FILE</code> at an external secrets file (overrides existing env vars)."
+  }
+}

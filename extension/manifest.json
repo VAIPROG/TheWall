@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "The Wall Dev",
+  "version": "5.1.1",
+  "description": "Win95 overlay, drawing assists, Discord/clan sync, VAI-PROG backend chat & templates for The Wall (filianislost.com).",
+  "author": "VAI_PROG",
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "permissions": ["notifications", "storage"],
+  "host_permissions": [
+    "https://the-wall.vai-rice.space/*",
+    "https://filianislost.com/*",
+    "https://ws.filianislost.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "The Wall Dev",
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://filianislost.com/*"],
+      "js": ["wall-core.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://filianislost.com/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ]
+}

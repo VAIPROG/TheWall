@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="page-i18n" content="docs">
+  <title>Docs · The Wall Dev</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg">
+  <link rel="stylesheet" href="/assets/style.css">
+  <style>
+    .toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-bottom:12px}
+    .toc a{display:block;padding:10px;background:var(--field);color:var(--fieldtext);border:2px outset var(--bg);text-decoration:none;font-weight:bold}
+    .toc a:hover{background:var(--group)}
+    .doc-section{margin-top:20px}
+    .doc-section h2{color:var(--accent);border-bottom:2px solid var(--shadow);padding-bottom:6px;margin-bottom:10px}
+    .doc-section pre{background:var(--field);color:var(--fieldtext);border:2px inset var(--shadow);padding:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap}
+    .doc-section .tip{border-left:4px solid var(--accent);padding:6px 10px;background:var(--field);color:var(--fieldtext);margin:8px 0;font-size:13px}
+  </style>
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win wide">
+    <div class="titlebar">
+      <span><span class="led"></span>docs.exe</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+      <div class="group">
+        <div class="legend"><span data-i18n="docs.title">Documentation</span></div>
+        <p data-i18n="docs.intro"></p>
+        <div class="toc">
+          <a href="#getting-started"   data-i18n="docs.sections.getting_started">Getting started</a>
+          <a href="#anti-grief"        data-i18n="docs.sections.anti_grief">Anti-grief</a>
+          <a href="#linked-accounts"   data-i18n="docs.sections.linked_accounts">Linked accounts</a>
+          <a href="#api"               data-i18n="docs.sections.api">API</a>
+          <a href="#troubleshooting"   data-i18n="docs.sections.troubleshooting">Troubleshooting</a>
+          <a href="#self-host"         data-i18n="docs.sections.self_host">Self-host</a>
+        </div>
+        <div id="docs-content"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+(function() {
+  function g(k) { return window.wd_raw ? window.wd_raw("page." + k) : undefined; }
+  function s(k) { var v = g(k); return (v == null || v === "page." + k) ? "" : String(v); }
+  function arr(k) { var v = g(k); return Array.isArray(v) ? v : []; }
+
+  function render() {
+    if (!window.wd_raw) return;
+    var container = document.getElementById("docs-content");
+    if (!container) return;
+    if (!g("getting_started")) return;
+
+    var h = "";
+
+    h += '<div class="doc-section" id="getting-started">';
+    h += "<h2>" + s("getting_started.heading") + "</h2>";
+    h += "<p>" + s("getting_started.body") + "</p><ol>";
+    arr("getting_started.steps").forEach(function(x) { h += "<li>" + x + "</li>"; });
+    h += '</ol><div class="tip">' + s("getting_started.tip") + "</div></div>";
+
+    h += '<div class="doc-section" id="anti-grief">';
+    h += "<h2>" + s("anti_grief.heading") + "</h2>";
+    h += "<p>" + s("anti_grief.body") + "</p>";
+    h += "<pre>" + s("anti_grief.example") + "</pre>";
+    h += "<p>" + s("anti_grief.disable") + "</p></div>";
+
+    h += '<div class="doc-section" id="linked-accounts">';
+    h += "<h2>" + s("linked_accounts.heading") + "</h2>";
+    h += "<p>" + s("linked_accounts.body") + "</p><ul class=\"bullets\">";
+    arr("linked_accounts.methods").forEach(function(x) { h += "<li>" + x + "</li>"; });
+    h += '</ul><div class="tip">' + s("linked_accounts.tip") + "</div></div>";
+
+    h += '<div class="doc-section" id="api">';
+    h += "<h2>" + s("api.heading") + "</h2>";
+    h += "<p>" + s("api.body") + "</p><ul class=\"bullets\">";
+    arr("api.surfaces").forEach(function(x) { h += "<li>" + x + "</li>"; });
+    h += "</ul><p>" + s("api.browse") + "</p></div>";
+
+    h += '<div class="doc-section" id="troubleshooting">';
+    h += "<h2>" + s("troubleshooting.heading") + "</h2><ul class=\"bullets\">";
+    arr("troubleshooting.items").forEach(function(x) { h += "<li>" + x + "</li>"; });
+    h += "</ul></div>";
+
+    h += '<div class="doc-section" id="self-host">';
+    h += "<h2>" + s("self_host.heading") + "</h2>";
+    h += "<p>" + s("self_host.body") + "</p>";
+    h += "<pre>" + s("self_host.example") + "</pre>";
+    h += "<p>" + s("self_host.env_note") + "</p></div>";
+
+    container.innerHTML = h;
+  }
+
+  document.addEventListener("wd:lang-changed", render);
+  setTimeout(render, 150);
+})();
+</script>
+</body>
+</html>

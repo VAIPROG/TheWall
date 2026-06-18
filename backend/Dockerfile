@@ -1,0 +1,16 @@
+FROM rust:1.95-slim AS builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+COPY Cargo.toml Cargo.lock* ./
+COPY src/ src/
+COPY migrations/ migrations/
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/the-wall-backend /usr/local/bin/
+COPY --from=builder /app/migrations /opt/the-wall/migrations
+WORKDIR /opt/the-wall
+ENV PORT=3080
+EXPOSE 3080
+CMD ["the-wall-backend"]

@@ -1,0 +1,14 @@
+pub mod account;
+pub mod admin;
+pub mod announcements;
+pub mod auth;
+pub mod avatar;
+pub mod chat;
+pub mod clan;
+pub mod dm;
+pub mod i18n;
+pub mod meta;
+pub mod notifications;
+pub mod stats;
+pub mod templates;
+pub mod v2;

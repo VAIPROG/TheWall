@@ -1,0 +1,768 @@
+export const DICT: Record<string, Record<string, string>> = {
+  en: {
+    title: "the_wall_dev.exe",
+    min: "_",
+    close: "✕",
+    tabOverlay: "Overlay",
+    tabDraw: "Draw",
+    tabShare: "Share",
+    tabTpl: "Templates",
+    tabSocial: "Social",
+    tabProfile: "Profile",
+    tabClan: "Clan",
+    tabSettings: "Settings",
+    file: "Template image",
+    coords: "Position (canvas px)",
+    scale: "Pixel scale",
+    pickPoint: "Pick point on canvas",
+    opacity: "Opacity",
+    lock: "Edit mode (movable)",
+    unlock: "Locked (click-through)",
+    visibility: "Toggle visibility",
+    shareHub: "Share link",
+    importLink: "Import & teleport",
+    genLink: "Generate share link",
+    snapshot: "Download wall snapshot",
+    drawTitle: "Drawing assists",
+    hud: "Pixel under cursor",
+    guide: "Guide layer",
+    lineTool: "Line guide (2 clicks)",
+    rectTool: "Rect guide (2 clicks)",
+    clearGuide: "Clear guide",
+    placeAssist: "Precise place (1 click = 1 px)",
+    color: "Active color",
+    backend: "VAI-PROG backend",
+    connect: "Connect",
+    disconnect: "Disconnect",
+    clanChat: "Clan chat",
+    templates: "Templates",
+    roster: "Roster",
+    sendLong: "Send (markdown, long)",
+    via: "via VAI-PROG backend",
+    lang: "Language",
+    advanced: "Advanced",
+    resetCfg: "Reset settings",
+    guest: "Guest / not logged in",
+    noClan: "No clan",
+    syncing: "Syncing…",
+    online: "online",
+    offline: "offline",
+    notifs: "Notifications",
+    markRead: "Mark all read",
+    pixels: "Pixels",
+    members: "Members",
+    visible: "Visible paint",
+    progress: "Template progress",
+    showRemaining: "Mark remaining on guide",
+    publicTpl: "Public (verified)",
+    clanTpl: "Clan templates",
+    unverified: "Show unverified",
+    shareScope: "Share as",
+    scopeClan: "Clan only",
+    scopePublic: "Public (needs review)",
+    report: "Report",
+    approve: "Approve",
+    load: "Load",
+    applyMod: "Apply for Clan Moderator",
+    theme: "Theme",
+    themeAuto: "Auto (site)",
+    themeLight: "Light",
+    themeDark: "Dark",
+    uiScale: "Interface size",
+    cozy: "Cozy mode (soft CRT)",
+    cursors: "Other cursors",
+    cursorsOff: "Show all",
+    cursorsClan: "Clanmates only",
+    customAvatar: "Custom avatar",
+    setAvatar: "Upload avatar",
+    delete: "Delete",
+    justDev: "Just a Dev",
+    unverifiedWarn:
+      "Unverified templates are NOT reviewed. Loading one only shows an overlay (it never paints for you), but the image could be misleading or NSFW. The service owners take no responsibility. Continue?",
+    avatarNote:
+      "Custom avatars are converted to WebP; Discord avatars are cached server-side for 7 days.",
+    advancedNote:
+      "Both interception and WebSocket mirroring are read-only. The extension never paints through WS and never bypasses cooldown/captcha.",
+    modApplyPrompt: "Apply for Clan Moderator — a few words on why:",
+    modSubmittedToast: "Submitted to the owner",
+    /* ---------- Site profile injection ---------- */
+    profileTitle: "The Wall Dev · Profile",
+    profileLoading: "Loading…",
+    profileLinks: "Links",
+    profilePinned: "Pinned templates",
+    profileNoAccount: "{name} hasn't joined The Wall Dev yet.",
+    profileNoAccountCta: "Tell them about",
+    profileSendDM: "Send DM",
+    profileRoleUser: "user",
+    profileRoleAdmin: "admin",
+    profileRoleOwner: "owner",
+    profileRoleModerator: "moderator",
+    profileClanRoleMember: "clan member",
+    profileClanRoleModerator: "clan moderator",
+    profileClanRoleAdmin: "clan admin",
+    profileVaiDevBadge: "Just a Dev",
+    profileVaiDevNote: "Created The Wall Dev extension for filianislost.com.",
+    /* Plural forms — t() picks via pluralize(). */
+    profileAchievement_one: "achievement",
+    profileAchievement_other: "achievements",
+    /* 5 generic bios — one is picked deterministically from the username
+       so every user gets the same one. */
+    profileBioFallback1:
+      "A quiet artisan of the canvas. Has not written a bio yet.",
+    profileBioFallback2:
+      "Pixel by pixel. No bio yet — actions speak louder than words.",
+    profileBioFallback3: "Bio coming soon. Probably busy drawing.",
+    profileBioFallback4: "This user prefers their pixels to do the talking.",
+    profileBioFallback5: "Member of The Wall. Mystery wrapped in 1×1 squares.",
+    /* ---------- Achievements UX ---------- */
+    achTitle: "Achievement unlocked",
+    achFromDev: "From The Wall Dev — not the site itself.",
+    achPoints: "points",
+    achLocked: "Locked",
+    achSecret: "Secret",
+    achCategoryGeneral: "General",
+    achCategoryPixels: "Pixels",
+    achCategoryTemplates: "Templates",
+    achCategoryClan: "Clan",
+    achCategorySocial: "Social",
+    achCategoryTools: "Tools",
+    achCategoryTime: "Time",
+    achCategoryEaster: "Easter eggs",
+    achFoundDevPrize:
+      "🎨 One-time prize: DM @vai_prog on Discord to claim 0.5 paint can. Don't waste it!",
+    achTabTitle: "Achievements",
+    achTotalPoints: "Total: {n} {label}",
+    achUnlockedCount: "{got} of {all} unlocked",
+    achAdminGrantTitle: "Grant Achievement",
+    achAdminUserId: "Username or UUID",
+    achAdminPickAch: "Achievement",
+    achAdminGrant: "Grant",
+    achAdminRevoke: "Revoke",
+    achAdminCreateTitle: "Create achievement",
+    achAdminCreateId: "ID (slug, snake_case)",
+    achAdminCreateName: "Display name",
+    achAdminCreateDesc: "Description",
+    achAdminCreatePoints: "Points",
+    achAdminCreateSecret: "Secret (hidden until earned)",
+    achAdminCreate: "Create",
+    achAdminCreated: "Achievement created",
+    /* ---------- Paint helpers ---------- */
+    paintGroup: "Paint helpers",
+    paintNotifRefill: "Notify when paint recharges",
+    paintNotifRefillNote:
+      "A toast pops up the moment your spray paint refills, even when the tab is in the background.",
+    paintSoundRefill: "Play sound when paint recharges",
+    paintSoundRefillNote:
+      "A short two-tone chime plays via WebAudio. No external file is downloaded. Tone is silent until you've clicked the page at least once (browser autoplay policy).",
+    paintSoundVolume: "Volume",
+    paintSoundTest: "Test sound",
+    paintRefilledTitle: "Paint recharged",
+    paintRefilledAwayTitle: "Paint refilled while you were away",
+    paintRefilledAwayBody:
+      "Welcome back — {cans} {cansLabel} are waiting for you.",
+    paintEmptyTitle: "Out of paint",
+    paintEmptyBody: "We'll ping you the moment it refills.",
+    /* Random refill phrases. The runtime picks one at random and uses it as
+       the body of the refilled toast. Keep them short and on-vibe. */
+    paintPhrase1: "Fresh ink, ready to draw. {cans} {cansLabel} in the tank.",
+    paintPhrase2: "Spray cans clinking. {cans} {cansLabel} ready.",
+    paintPhrase3: "Mark something. {cans} {cansLabel} of paint available.",
+    paintPhrase4: "Refill landed — {cans} {cansLabel}. Make it count.",
+    paintPhrase5: "Back in business: {cans} {cansLabel} loaded.",
+    paintPhrase6: "Cans full. Wall waiting. {cans} {cansLabel}.",
+    paintPhrase7: "Ink restock complete. {cans} {cansLabel} on standby.",
+    paintPhrase8: "Painters, assemble. {cans} {cansLabel} ready to fly.",
+    /* Signal archive background poll */
+    signalNewTitle: "New signals in the archive",
+    signalNewBody: "{count} new signal(s). Latest: #{newest}.",
+    /* Profile: paint + coin block */
+    profilePaintHeading: "Paint & coins",
+    profilePaintAmount: "{px} px ({cans} {cansLabel})",
+    profilePaintEmpty: "Out of paint — waiting for refill.",
+    profileCoinsHeading: "Coin balance",
+    profileCoinsAmount: "{coins} coin(s)",
+    profileCoinsUnknown: "Open the wall to refresh balance",
+    profileRefreshBalance: "Refresh balance",
+    profileOpenShop: "Open cursor shop",
+    profileShopHint: "Opens the site's User → Cursor Inventory menu.",
+    profileShopMissed:
+      "Couldn't find the User menu — open it from the top bar.",
+    paintCan_one: "can",
+    paintCan_other: "cans",
+    paintCurrentHeading: "Current paint",
+    paintCurrentNone: "No paint yet — keep an eye on the bottom bar.",
+    paintCurrentLine: "{px} px ({cans} {cansLabel})",
+    sellAllTitle: "Sell all spray cans",
+    sellAllBtn: "Sell all cans",
+    sellAllNote:
+      "Sells every extra full can for coins via the site's official endpoint. Skips the partial can. No paint is consumed besides what you confirm.",
+    sellAllConfirm: "Sell {cans} full {cansLabel} for ~{coins} coin(s)?",
+    sellAllInProgress: "Selling {done}/{total}…",
+    sellAllDone: "Sold {sold} can(s). Refresh inventory to see coins.",
+    sellAllNothing: "Nothing to sell — no full extra cans.",
+    sellAllBusy: "Cannot sell while drawing. Submit or undo first.",
+    sellAllFailed: "Sell failed at can {at}: {err}",
+    sellPromptTitle: "Sell cans",
+    sellPromptBody:
+      'How many cans to sell? You have {available} {cansLabel}. Enter a number or "all".',
+    sellPromptInvalid: 'Not a valid number: "{raw}".',
+    sellSomeBtn: "Sell some…",
+    /* Charity import */
+    charityImportFetch: "Fetch templates",
+    charityPickTitle: "Pick a Charity template",
+    charityPickBody: "Faction: {faction}. Found {count} template(s).",
+    charityFetchFailed: "Couldn't fetch the Charity config: {err}",
+    charityImageFailed: "Couldn't fetch the template image: {err}",
+    charityImported: 'Imported "{name}" at ({x},{y}) · {w}×{h}',
+    exportNoTemplate: "Load a template first.",
+    exportOptsTitle: "Export options",
+    exportOptsIncludeAuthor: "Include my username in the file",
+    exportOptsShowClan: "Also include my clan",
+    exportOptsAnonymise: 'Anonymise (export as "anonymous")',
+    exportOptsName: "Template name (optional):",
+    exportOptsNote: "Note for the importer (optional):",
+    exportOptsConfirm: "Export",
+    exportOptsCancel: "Cancel",
+    /* import display */
+    importedFromTitle: "Overlay imported",
+    importedFromAuthor: "From {name}",
+    importedFromAuthorClan: "From {name} · {clan} ({role})",
+    importedFromNoteHeading: "Note from the author:",
+    importedFromOpen: "Open",
+    /* JSON import UI */
+    importJsonInvalid: "Couldn't recognise that JSON.",
+    /* Share tab */
+    shareLegendImport: "Import overlay",
+    shareLegendExport: "Export overlay",
+    shareImportFileBtn: "Choose file…",
+    shareImportFileHint:
+      "JSON / share-link / PNG / base64. We auto-detect the format.",
+    shareImportUrlPlaceholder:
+      "Or paste a URL: https://… (Charity / the-wall-dev / image)",
+    shareImportPasteBtn: "Import from URL",
+    shareDetected: "Detected: {kind}",
+    shareUnknown: "Couldn't identify the format.",
+    shareExportCopyUrlTheWallDev: "Copy share URL (The Wall Dev)",
+    shareExportCopyUrlCharity: "Copy share URL (Charity)",
+    shareExportCopyShareLink: "Copy share link",
+    shareExportSaveJson: "Save The Wall Dev as JSON",
+    shareExportSaveCharity: "Save Charity as JSON",
+    shareExportNoteUrlTheWallDev:
+      "Share URL (The Wall Dev) → short link that points at the backend's /json endpoint for this template. Best for chat / Discord — the receiver gets the latest version every time. Requires Publish (above) first.",
+    shareExportNoteUrlCharity:
+      "Share URL (Charity) → short link that points at the backend's /charity endpoint for this template.",
+    shareExportNoteLink:
+      "Share link → standalone the-wall-dev:// with the image inlined. Works offline, no backend needed. Long, but pasting it into any extension instantly teleports + applies the overlay.",
+    shareExportNoteJson:
+      "Save The Wall Dev as JSON → a portable .json file with the image embedded + optional author / clan / note. Re-import via the file picker above on any device.",
+    shareExportNoteCharity:
+      "Save Charity as JSON → if you've Published above, builds the config from /v2/templates/.../charity (PNG served by us). Otherwise asks for a hosted PNG URL.",
+    shareUrlNeedsBackend:
+      "Click Publish above first — the URL points at the backend's /json endpoint for this template, so it needs a template id. Or use Copy share link instead: it inlines everything and works offline.",
+    ovShareLegend: "Share & Import",
+    ovShareGo: "Open Share tab",
+    ovShareHint:
+      "Moved to its own tab with a unified import (file / URL / paste) and short backend-hosted share URLs.",
+    mailMarkAllReadHint:
+      "Marks every visible item in the current filter as read (server + local).",
+    mailDmHint:
+      "DMs go through our backend — the recipient sees it as a mailbox item with a Reply button. Markdown, :emote: and @mention all work in the body.",
+    mailUnreadBadge: "{n} unread",
+    shareNoOverlay: "Load a template first.",
+    sharePublishLegend: "Publish to backend",
+    sharePublishBtn: "Publish current overlay",
+    sharePublishNote:
+      "Saves the current overlay as a backend template. Public scope goes through admin review; clan scope is auto-approved if you're clan_admin / clan_moderator. After publish, \"Copy share URL\" works (it references the backend's /json endpoint).",
+    tplSearchLegend: "Search",
+    tplSearchPlaceholder: "swarm   x:5000-6000   y:440   author:vai",
+    tplSearchHint:
+      "Tokens combine with AND. Prefixes: x:N or x:N-N (coord range), y:N or y:N-N, author:STR. Anything else matches the name. Empty input = show all.",
+    animLegend: "Animation (sprite sheet)",
+    animStatusOff: "no animation — static template",
+    animStop: "Stop animation",
+    animAdvanced: "Advanced",
+    animHint: "Load an animated config via Share → Import (auto-detected: ours or Charity), or set up the sheet manually under Advanced.",
+    animAutosplit: "Auto-split sheet (derive grid)",
+    animLayoutGrid: "Grid sheet",
+    animLayoutLine: "Single line",
+    animOrderRow: "Row by row",
+    animOrderColumn: "Column by column",
+    animOrderSerp: "Serpentine",
+    animFrameMs: "Frame duration (ms)",
+    animLooping: "Loop the animation",
+    animScaling: "Art scaling",
+    animScalingNative: "1:1 with the grid (100%)",
+    animScalingScaled: "Apply overlay scale",
+    animApply: "Apply animation",
+    animStartNow: "Start from now",
+    animExportOur: "Copy the-wall-dev JSON",
+    animExportCharity: "Copy Charity JSON",
+    animShareScope: "Publish to backend",
+    animSharePass: "Access password (private links, optional)",
+    animUpload: "Upload config",
+    animBrowse: "Browse shared",
+    animPublishLegend: "Publish animation",
+    animPublishMoved: "Publishing lives in the Share tab now (Share → Publish animation).",
+    animPublishNote:
+      "Uploads the currently applied animation. Private configs are visible only to you; set a password to hand access to anyone via code + password.",
+    animByCodeLegend: "Access by code",
+    animByCodePlaceholder: "template ID or share link",
+    animByCodeLoad: "Load by code",
+    animByCodeNote:
+      "Paste the ID you were given (plus its password, if one was set) to load a shared template — classic or animated, even private ones.",
+    animShareCodeReady:
+      "Share code copied to clipboard — send it together with the password:",
+    myTpl: "My templates",
+    myTplHint:
+      "Private templates only you can see. Publish via Share tab with scope “Private”.",
+    protectLegend: "Region protection",
+    protectTolerance: "Tolerance %",
+    protectScopeLbl: "Scope",
+    scopeLocal: "This device only",
+    scopePrivate: "Private (my account)",
+    protectFixTemplate: "Fix template area as stable",
+    protectFixZone: "Fix custom zone…",
+    protectWatch: "Watch locally (alert on damage)",
+    protectVerifyAll: "Verify now",
+    protectList: "Refresh list",
+    tabProtect: "Protect",
+    protectGlobalList: "Global protected regions",
+    protectClanList: "Clan protected regions",
+    protectLocalList: "Local & private regions",
+    linksLegend: "Linked accounts",
+    linksManage: "Open account page ↗",
+    linksManageTip:
+      "Opens the account page with your session attached — approve the provider there and come back; status refreshes automatically.",
+    linksRefresh: "Refresh",
+    linksRefreshTip: "Re-check link status",
+    linksNotLinked: "not linked",
+    linksUnlinkTg: "Unlink Telegram",
+    linksUnlinkDc: "Unlink Discord",
+    linksHint: "Connect opens the account page with your session attached — approve the provider there and come back; status refreshes automatically.",
+    paintReminderRemote: "DM me on Telegram/Discord when paint refills (works with browser closed)",
+    animTplList: "Animated templates",
+    hideAnimatedTpl: "Hide animated templates",
+    linksConnect: "Connect",
+    linksUnlink: "Unlink",
+  },
+  ru: {
+    title: "the_wall_dev.exe",
+    min: "_",
+    close: "✕",
+    tabOverlay: "Оверлей",
+    tabDraw: "Рисование",
+    tabShare: "Поделиться",
+    tabTpl: "Шаблоны",
+    tabSocial: "Связь",
+    tabProfile: "Профиль",
+    tabClan: "Клан",
+    tabSettings: "Опции",
+    file: "Картинка-шаблон",
+    coords: "Позиция (px холста)",
+    scale: "Масштаб пикселя",
+    pickPoint: "Указать точку на холсте",
+    opacity: "Непрозрачность",
+    lock: "Режим правки (двигать)",
+    unlock: "Заблокировано (сквозь клик)",
+    visibility: "Показать / скрыть",
+    shareHub: "Share-ссылка",
+    importLink: "Импорт и телепорт",
+    genLink: "Сгенерировать ссылку",
+    snapshot: "Скачать дамп стены",
+    drawTitle: "Помощники рисования",
+    hud: "Пиксель под курсором",
+    guide: "Слой-подсказка",
+    lineTool: "Линия-гайд (2 клика)",
+    rectTool: "Прямоугольник-гайд (2 клика)",
+    clearGuide: "Очистить гайд",
+    placeAssist: "Точная установка (1 клик = 1 px)",
+    color: "Активный цвет",
+    backend: "Бэкенд VAI-PROG",
+    connect: "Подключить",
+    disconnect: "Отключить",
+    clanChat: "Чат клана",
+    templates: "Шаблоны",
+    roster: "Состав",
+    sendLong: "Отправить (markdown, длинно)",
+    via: "через бэкенд VAI-PROG",
+    lang: "Язык",
+    advanced: "Продвинутое",
+    resetCfg: "Сбросить настройки",
+    guest: "Гость / не авторизован",
+    noClan: "Без клана",
+    syncing: "Синхронизация…",
+    online: "на связи",
+    offline: "оффлайн",
+    notifs: "Уведомления",
+    markRead: "Прочитать все",
+    pixels: "Пикселей",
+    members: "Участников",
+    visible: "Видимых пикселей",
+    progress: "Прогресс шаблона",
+    showRemaining: "Отметить остаток на гайде",
+    publicTpl: "Публичные (проверенные)",
+    clanTpl: "Шаблоны клана",
+    unverified: "Показать непроверенные",
+    shareScope: "Поделиться как",
+    scopeClan: "Только клан",
+    scopePublic: "Публично (на проверку)",
+    report: "Пожаловаться",
+    approve: "Одобрить",
+    load: "Загрузить",
+    applyMod: "Подать на Clan Moderator",
+    theme: "Тема",
+    themeAuto: "Авто (как сайт)",
+    themeLight: "Светлая",
+    themeDark: "Тёмная",
+    uiScale: "Размер интерфейса",
+    cozy: "Ламповый режим (мягкий CRT)",
+    cursors: "Чужие курсоры",
+    cursorsOff: "Показывать все",
+    cursorsClan: "Только соклановцев",
+    customAvatar: "Своя аватарка",
+    setAvatar: "Загрузить аватар",
+    delete: "Удалить",
+    justDev: "Just a Dev",
+    unverifiedWarn:
+      "Непроверенные шаблоны НЕ модерировались. Загрузка лишь показывает оверлей (он никогда не рисует за тебя), но картинка может вводить в заблуждение или быть NSFW. Владельцы сервиса ответственности не несут. Продолжить?",
+    avatarNote:
+      "Кастомные аватарки конвертируются в WebP. Кэш Discord-аватарок на бэкенде — 7 дней.",
+    advancedNote:
+      "Перехват и WS-зеркало только читают данные сайта. Расширение никогда не рисует через WS и не обходит кулдаун/капчу.",
+    modApplyPrompt: "Заявка на роль Clan Moderator — пара слов почему:",
+    modSubmittedToast: "Заявка отправлена владельцу",
+    /* ---------- Site profile injection ---------- */
+    profileTitle: "The Wall Dev · Профиль",
+    profileLoading: "Загрузка…",
+    profileLinks: "Ссылки",
+    profilePinned: "Закреплённые шаблоны",
+    profileNoAccount: "{name} ещё не присоединился к The Wall Dev.",
+    profileNoAccountCta: "Расскажи о",
+    profileSendDM: "Написать ЛС",
+    profileRoleUser: "юзер",
+    profileRoleAdmin: "админ",
+    profileRoleOwner: "владелец",
+    profileRoleModerator: "модератор",
+    profileClanRoleMember: "член клана",
+    profileClanRoleModerator: "модератор клана",
+    profileClanRoleAdmin: "админ клана",
+    profileVaiDevBadge: "Просто Разработчик",
+    profileVaiDevNote:
+      "Создатель The Wall Dev расширения для filianislost.com.",
+    /* Plural — ru имеет 3 формы (one / few / many). */
+    profileAchievement_one: "ачивка",
+    profileAchievement_few: "ачивки",
+    profileAchievement_many: "ачивок",
+    /* 5 generic bios — выбирается детерминированно по имени, чтобы один и
+       тот же юзер всегда получал одну и ту же подпись. */
+    profileBioFallback1: "Тихий ремесленник холста. Описание пока не написал.",
+    profileBioFallback2:
+      "Пиксель за пикселем. Описания пока нет — дела важнее слов.",
+    profileBioFallback3:
+      "Описание скоро будет. Скорее всего, занят рисованием.",
+    profileBioFallback4:
+      "Этот пользователь предпочитает, чтобы за него говорили пиксели.",
+    profileBioFallback5:
+      "Участник The Wall. Загадка, завёрнутая в 1×1 квадраты.",
+    /* ---------- Achievements UX ---------- */
+    achTitle: "Получено достижение",
+    achFromDev: "От The Wall Dev — не от самой стены.",
+    achPoints: "очков",
+    achLocked: "Закрыто",
+    achSecret: "Секрет",
+    achCategoryGeneral: "Общее",
+    achCategoryPixels: "Пиксели",
+    achCategoryTemplates: "Шаблоны",
+    achCategoryClan: "Клан",
+    achCategorySocial: "Социал",
+    achCategoryTools: "Инструменты",
+    achCategoryTime: "Время",
+    achCategoryEaster: "Пасхалки",
+    achFoundDevPrize:
+      "🎨 Разовый приз: напиши @vai_prog в Discord и получи 0.5 балончика краски. Не растрать!",
+    achTabTitle: "Достижения",
+    achTotalPoints: "Всего: {n} {label}",
+    achUnlockedCount: "{got} из {all} получено",
+    achAdminGrantTitle: "Выдать достижение",
+    achAdminUserId: "Username или UUID",
+    achAdminPickAch: "Достижение",
+    achAdminGrant: "Выдать",
+    achAdminRevoke: "Отозвать",
+    achAdminCreateTitle: "Создать достижение",
+    achAdminCreateId: "ID (slug, snake_case)",
+    achAdminCreateName: "Название",
+    achAdminCreateDesc: "Описание",
+    achAdminCreatePoints: "Очки",
+    achAdminCreateSecret: "Секретное (скрыто до получения)",
+    achAdminCreate: "Создать",
+    achAdminCreated: "Достижение создано",
+    /* ---------- Paint helpers ---------- */
+    paintGroup: "Помощники краски",
+    paintNotifRefill: "Уведомлять о перезарядке краски",
+    paintNotifRefillNote:
+      "Появится тост ровно в момент когда баллончик перезарядится — даже если вкладка скрыта.",
+    paintSoundRefill: "Звук при перезарядке краски",
+    paintSoundRefillNote:
+      "Короткий двухтоновый сигнал через WebAudio. Файлы не качаются. До первого клика по странице звук может молчать — это политика автоплея браузера.",
+    paintSoundVolume: "Громкость",
+    paintSoundTest: "Проверить звук",
+    paintRefilledTitle: "Краска перезарядилась",
+    paintRefilledAwayTitle: "Краска пополнилась пока тебя не было",
+    paintRefilledAwayBody: "С возвращением — тебя ждут {cans} {cansLabel}.",
+    paintEmptyTitle: "Краска закончилась",
+    paintEmptyBody: "Пингану как только перезарядится.",
+    /* Случайные фразы при пополнении — рантайм выбирает одну как тело тоста. */
+    paintPhrase1: "Свежие чернила, готов рисовать. В баке: {cans} {cansLabel}.",
+    paintPhrase2: "Баллончики звякнули — {cans} {cansLabel} наготове.",
+    paintPhrase3: "Оставь след. Доступно: {cans} {cansLabel} краски.",
+    paintPhrase4:
+      "Перезарядка случилась — {cans} {cansLabel}. Не растрать впустую.",
+    paintPhrase5: "Снова в деле: загружено {cans} {cansLabel}.",
+    paintPhrase6: "Баллончики полные. Стена ждёт. {cans} {cansLabel}.",
+    paintPhrase7:
+      "Запас краски пополнен. {cans} {cansLabel} на боевом дежурстве.",
+    paintPhrase8: "Художники, по местам. {cans} {cansLabel} к запуску.",
+    /* Сигнальный архив, фоновый поллинг */
+    signalNewTitle: "Новые сигналы в архиве",
+    signalNewBody: "Новых сигналов: {count}. Последний: #{newest}.",
+    /* Профиль: краска + монеты */
+    profilePaintHeading: "Краска и монеты",
+    profilePaintAmount: "{px} px ({cans} {cansLabel})",
+    profilePaintEmpty: "Краска кончилась — ждём перезарядки.",
+    profileCoinsHeading: "Баланс монет",
+    profileCoinsAmount: "{coins} монет",
+    profileCoinsUnknown: "Открой стену чтобы обновить баланс",
+    profileRefreshBalance: "Обновить баланс",
+    profileOpenShop: "Открыть магазин курсоров",
+    profileShopHint: "Открывает меню сайта Пользователь → Инвентарь курсоров.",
+    profileShopMissed:
+      "Не нашёл меню пользователя — открой его из верхней панели сайта.",
+    paintCan_one: "балончик",
+    paintCan_few: "балончика",
+    paintCan_many: "балончиков",
+    paintCurrentHeading: "Сейчас краски",
+    paintCurrentNone: "Пока нет краски — следи за нижней панелью.",
+    paintCurrentLine: "{px} px ({cans} {cansLabel})",
+    sellAllTitle: "Продать все баллончики",
+    sellAllBtn: "Продать все баллончики",
+    sellAllNote:
+      "Продаёт все полные баллончики за монеты через официальный endpoint сайта. Частичный баллончик не трогается. Никакая краска не расходуется без подтверждения.",
+    sellAllConfirm:
+      "Продать {cans} полных {cansLabel} примерно за {coins} монет?",
+    sellAllInProgress: "Продано {done}/{total}…",
+    sellAllDone: "Продано: {sold}. Обнови инвентарь чтобы увидеть монеты.",
+    sellAllNothing: "Нечего продавать — нет полных баллончиков.",
+    sellAllBusy: "Нельзя продавать пока рисуешь. Сначала Submit или отмени.",
+    sellAllFailed: "Сбой на баллончике {at}: {err}",
+    sellPromptTitle: "Продать баллончики",
+    sellPromptBody:
+      'Сколько баллончиков продать? У тебя есть {available} {cansLabel}. Введи число или "all".',
+    sellPromptInvalid: 'Неверное число: "{raw}".',
+    sellSomeBtn: "Продать N…",
+    /* Импорт из Charity */
+    charityImportFetch: "Загрузить список",
+    charityPickTitle: "Выбери шаблон Charity",
+    charityPickBody: "Faction: {faction}. Найдено шаблонов: {count}.",
+    charityFetchFailed: "Не удалось получить Charity config: {err}",
+    charityImageFailed: "Не удалось скачать картинку: {err}",
+    charityImported: 'Загружено: "{name}" в ({x},{y}) · {w}×{h}',
+    exportNoTemplate: "Сначала загрузи шаблон.",
+    exportOptsTitle: "Параметры экспорта",
+    exportOptsIncludeAuthor: "Включить мой username в файл",
+    exportOptsShowClan: "Также добавить клан",
+    exportOptsAnonymise: 'Анонимно (экспорт как "anonymous")',
+    exportOptsName: "Название шаблона (опционально):",
+    exportOptsNote: "Заметка для импортирующего (опционально):",
+    exportOptsConfirm: "Экспортировать",
+    exportOptsCancel: "Отмена",
+    /* отображение импорта */
+    importedFromTitle: "Оверлей импортирован",
+    importedFromAuthor: "От {name}",
+    importedFromAuthorClan: "От {name} · {clan} ({role})",
+    importedFromNoteHeading: "Заметка от автора:",
+    importedFromOpen: "Открыть",
+    /* JSON импорт */
+    importJsonInvalid: "Не удалось распознать JSON.",
+    /* Вкладка Share */
+    shareLegendImport: "Импорт оверлея",
+    shareLegendExport: "Экспорт оверлея",
+    shareImportFileBtn: "Выбрать файл…",
+    shareImportFileHint:
+      "JSON / share-link / PNG / base64. Формат определяется автоматически.",
+    shareImportUrlPlaceholder:
+      "Или вставь URL: https://… (Charity / the-wall-dev / картинка)",
+    shareImportPasteBtn: "Импорт по URL",
+    shareDetected: "Определено: {kind}",
+    shareUnknown: "Не удалось определить формат.",
+    shareExportCopyUrlTheWallDev: "Скопировать share URL (The Wall Dev)",
+    shareExportCopyUrlCharity: "Скопировать share URL (Charity)",
+    shareExportCopyShareLink: "Скопировать share-link",
+    shareExportSaveJson: "Сохранить The Wall Dev как JSON",
+    shareExportSaveCharity: "Сохранить Charity как JSON",
+    shareExportCopied: "Скопировано.",
+    shareExportNoteUrlTheWallDev:
+      "Share URL (The Wall Dev) → короткая ссылка на /json-эндпоинт бэкенда этого шаблона. Лучше всего для чата / Discord — получатель всегда видит самую актуальную версию. Требует Publish выше.",
+    shareExportNoteUrlCharity:
+      "Share URL (Charity) → короткая ссылка на /charity-эндпоинт бэкенда этого шаблона.",
+    shareExportNoteLink:
+      "Share link → автономная the-wall-dev:// ссылка с картинкой внутри. Работает полностью оффлайн, без бэкенда. Длинная, зато при вставке в любое расширение мгновенно телепортирует шаблон и применяет оверлей.",
+    shareExportNoteJson:
+      "Save The Wall Dev as JSON → портативный .json-файл со встроенной картинкой, автором, кланом и заметкой. Можно импортировать через выбор файла выше на любом устройстве.",
+    shareExportNoteCharity:
+      "Save Charity as JSON → если шаблон уже опубликован, собирает конфиг через /v2/templates/.../charity (PNG отдаём мы). Иначе попросит URL уже загруженной картинки.",
+    shareUrlNeedsBackend:
+      "Сначала нажми Publish выше — URL ссылается на /json эндпоинт бэкенда для этого шаблона, поэтому нужен id. Или используй Copy share link: он встраивает всё внутрь и работает оффлайн.",
+    ovShareLegend: "Share & Import",
+    ovShareGo: "Открыть Share",
+    ovShareHint:
+      "Переехали в отдельную вкладку с единым импортом (файл / URL / вставка) и короткими share URL через бэкенд.",
+    mailMarkAllReadHint:
+      "Помечает прочитанным всё видимое в текущем фильтре (сервер + локально).",
+    mailDmHint:
+      "DM идут через наш бэкенд — получатель видит их как inbox item с кнопкой Reply. В теле работают markdown, :emote: и @mention.",
+    mailUnreadBadge: "{n} непрочитанных",
+    shareNoOverlay: "Сначала загрузи шаблон.",
+    sharePublishLegend: "Опубликовать на бэкенд",
+    sharePublishBtn: "Опубликовать текущий оверлей",
+    sharePublishNote:
+      'Сохраняет текущий оверлей как шаблон на бэкенде. Публичный scope проходит модерацию; клановый авто-одобряется для clan_admin / clan_moderator. После публикации работает "Скопировать share URL" (он ссылается на /json эндпоинт бэкенда).',
+    tplSearchLegend: "Поиск",
+    tplSearchPlaceholder: "swarm   x:5000-6000   y:440   author:vai",
+    tplSearchHint:
+      "Токены объединяются через AND. Префиксы: x:N или x:N-N (диапазон координат), y:N или y:N-N, author:СТРОКА. Всё остальное — совпадение по имени. Пусто = показать всё.",
+    animLegend: "Анимация (спрайт-лист)",
+    animStatusOff: "анимации нет — статичный шаблон",
+    animStop: "Остановить анимацию",
+    animAdvanced: "Продвинутые",
+    animHint: "Грузите анимационный конфиг через Share → Импорт (формат определяется сам: наш или Charity), либо настройте лист вручную в Продвинутых.",
+    animAutosplit: "Автоделение листа (вычислить сетку)",
+    animLayoutGrid: "Сетка",
+    animLayoutLine: "Одна линия",
+    animOrderRow: "По строкам",
+    animOrderColumn: "По столбцам",
+    animOrderSerp: "Змейкой",
+    animFrameMs: "Длительность кадра (мс)",
+    animLooping: "Зациклить анимацию",
+    animScaling: "Скейлинг арта",
+    animScalingNative: "1:1 как на сетке (100%)",
+    animScalingScaled: "Применять масштаб оверлея",
+    animApply: "Применить анимацию",
+    animStartNow: "Старт с этого момента",
+    animExportOur: "Скопировать the-wall-dev JSON",
+    animExportCharity: "Скопировать Charity JSON",
+    animShareScope: "Публикация на бэкенд",
+    animSharePass: "Пароль доступа (для личных ссылок, опционально)",
+    animUpload: "Выгрузить конфиг",
+    animBrowse: "Смотреть общие",
+    animPublishLegend: "Публикация анимации",
+    animPublishMoved: "Публикация переехала во вкладку Share (Share → Публикация анимации).",
+    animPublishNote:
+      "Выгружает текущую применённую анимацию. Личные конфиги видны только вам; задайте пароль — и доступ получит любой, у кого есть код + пароль.",
+    animByCodeLegend: "Доступ по коду",
+    animByCodePlaceholder: "ID шаблона или ссылка",
+    animByCodeLoad: "Загрузить по коду",
+    animByCodeNote:
+      "Вставьте полученный ID (и пароль, если он задан), чтобы загрузить чужой шаблон — классический или анимационный, даже личный.",
+    animShareCodeReady:
+      "Код доступа скопирован в буфер — отправьте его вместе с паролем:",
+    myTpl: "Личные шаблоны",
+    myTplHint:
+      "Личные шаблоны видите только вы. Публикуются во вкладке Share со scope «Личный».",
+    protectLegend: "Защита регионов",
+    protectTolerance: "Допуск %",
+    protectScopeLbl: "Видимость",
+    scopeLocal: "Только это устройство",
+    scopePrivate: "Личный (мой аккаунт)",
+    protectFixTemplate: "Зафиксировать зону шаблона",
+    protectFixZone: "Зафиксировать свою зону…",
+    protectWatch: "Локальная вахта (тревога при порче)",
+    protectVerifyAll: "Проверить сейчас",
+    protectList: "Обновить список",
+    tabProtect: "Защита",
+    protectGlobalList: "Глобальные регионы",
+    protectClanList: "Клановые регионы",
+    protectLocalList: "Локальные и личные",
+    linksLegend: "Привязанные аккаунты",
+    linksManage: "Страница аккаунта ↗",
+    linksManageTip:
+      "Откроет страницу аккаунта с вашей сессией — подтвердите провайдера там и вернитесь; статус обновится сам.",
+    linksRefresh: "Обновить",
+    linksRefreshTip: "Перепроверить статус привязок",
+    linksNotLinked: "не привязан",
+    linksUnlinkTg: "Отвязать Telegram",
+    linksUnlinkDc: "Отвязать Discord",
+    linksHint: "Кнопка открывает страницу аккаунта с вашей сессией — подтвердите провайдера там и возвращайтесь; статус обновится сам.",
+    paintReminderRemote: "Писать в Telegram/Discord, когда краска пополнится (работает при закрытом браузере)",
+    animTplList: "Анимированные шаблоны",
+    hideAnimatedTpl: "Скрыть анимационные шаблоны",
+    linksConnect: "Привязать",
+    linksUnlink: "Отвязать",
+  },
+};
+
+export let lang: string = localStorage.getItem("wall_overlay_lang") ?? "en";
+export let remoteDict: Record<string, string> = {};
+
+export function setRemoteDict(d: Record<string, string>): void {
+  remoteDict = d;
+}
+
+export function t(k: string, vars?: Record<string, string | number>): string {
+  const raw = remoteDict[k] ?? DICT[lang]?.[k] ?? DICT.en[k] ?? k;
+  if (!vars) return raw;
+  return raw.replace(/\{(\w+)\}/g, (_, key) => {
+    const v = vars[key];
+    return v == null ? `{${key}}` : String(v);
+  });
+}
+
+/** Returns the active extension UI language ("en" / "ru" / ...). Modules
+ *  that compose strings outside of `t()` can branch on this. */
+export function getLang(): string {
+  return lang;
+}
+
+/**
+ * Pick the plural form of a base key for a given count, following the
+ * CLDR-like rule:
+ *
+ *   en — `one` (n=1) / `other`
+ *   ru — `one` (n%10==1 && n%100!=11) / `few` (2..4 except 12..14) / `many`
+ *   anything else — `other` (English-style default)
+ *
+ * Dictionary expects sub-keys with suffixes `_one`, `_few`, `_many`, `_other`.
+ * The function falls back through the chain: requested form → other → bare key.
+ *
+ * Example: `pluralize(2, "profileAchievement")` →
+ *   en: "achievements"     (other)
+ *   ru: "ачивки"           (few)
+ */
+export function pluralize(n: number, baseKey: string): string {
+  const form = pickForm(n, lang);
+  // Try the picked form first, then the English-style fallbacks.
+  const candidates = [
+    `${baseKey}_${form}`,
+    `${baseKey}_other`,
+    `${baseKey}_many`,
+    baseKey,
+  ];
+  for (const k of candidates) {
+    const v = remoteDict[k] ?? DICT[lang]?.[k] ?? DICT.en[k];
+    if (v != null) return v;
+  }
+  return baseKey;
+}
+
+function pickForm(n: number, l: string): "one" | "few" | "many" | "other" {
+  const abs = Math.abs(n);
+  if (l === "ru") {
+    const mod10 = abs % 10;
+    const mod100 = abs % 100;
+    if (mod100 >= 11 && mod100 <= 14) return "many";
+    if (mod10 === 1) return "one";
+    if (mod10 >= 2 && mod10 <= 4) return "few";
+    return "many";
+  }
+  // English-style default
+  return abs === 1 ? "one" : "other";
+}

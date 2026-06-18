@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Achievements · The Wall Dev</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg">
+  <link rel="stylesheet" href="/assets/style.css">
+  <style>
+    .ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:10px}
+    .ach-card{border:2px outset var(--bg);background:var(--field);color:var(--fieldtext);padding:10px;position:relative}
+    .ach-card.locked{opacity:.55;filter:grayscale(.6)}
+    .ach-card .ach-ic{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-weight:bold;margin-bottom:6px}
+    .ach-card .ach-pts{position:absolute;top:6px;right:8px;font-weight:bold;color:var(--accent);font-size:12px}
+    .ach-card .ach-cat{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px}
+    .ach-card .ach-name{font-weight:bold;margin:4px 0 6px}
+    .ach-card .ach-desc{font-size:12px;line-height:1.4}
+  </style>
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win wide">
+    <div class="titlebar">
+      <span><span class="led"></span>achievements.exe</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+      <div class="group">
+        <div class="legend"><span data-i18n="achievements.title">Achievements</span></div>
+        <p data-i18n="achievements.intro"></p>
+        <div id="ach-grid" class="ach-grid">
+          <p data-i18n="achievements.loading">Loading…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+async function loadAchievements() {
+  const box = document.getElementById('ach-grid');
+  try {
+    const r = await fetch('/api/v2/me/achievements', {
+      headers: walledevAuthHeaders(),
+      cache: 'no-store',
+    });
+    let items;
+    if (r.ok) {
+      items = await r.json();
+    } else {
+      // Public fallback — fetch without auth shows just the catalogue
+      // (server returns 401 if signed-out, so we manually map to "locked all").
+      items = SEED_CATALOGUE;
+    }
+    if (!items.length) { box.innerHTML = '<i>None yet.</i>'; return; }
+    box.innerHTML = items.map(a => `
+      <div class="ach-card ${a.unlocked_at ? '' : 'locked'}" title="${esc(a.description)}">
+        <div class="ach-pts">+${a.points}</div>
+        <div class="ach-ic">${a.icon ? a.icon.slice(0,2).toUpperCase() : '★'}</div>
+        <div class="ach-cat">${esc(a.category)}</div>
+        <div class="ach-name">${esc(a.name)}</div>
+        <div class="ach-desc">${esc(a.description)}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    box.innerHTML = '<i>Error: '+esc(e.message)+'</i>';
+  }
+}
+function walledevAuthHeaders() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('walldev_cfg') || '{}');
+    if (cfg.backendToken) return { Authorization: 'Bearer ' + cfg.backendToken };
+  } catch {}
+  const t = localStorage.getItem('wall_landing_jwt') || localStorage.getItem('wall_vai_jwt');
+  return t ? { Authorization: 'Bearer ' + t } : {};
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+const SEED_CATALOGUE = []; // empty fallback; server is the source of truth
+document.addEventListener('DOMContentLoaded', loadAchievements);
+</script>
+</body>
+</html>

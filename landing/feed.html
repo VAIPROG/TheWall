@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feed · The Wall Dev</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg">
+  <link rel="stylesheet" href="/assets/style.css">
+  <style>
+    .snap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:10px}
+    .snap-card{border:2px outset var(--bg);background:var(--field);color:var(--fieldtext);padding:0;overflow:hidden;display:flex;flex-direction:column}
+    .snap-card img{display:block;width:100%;height:auto;max-height:240px;object-fit:cover;background:#333;image-rendering:pixelated}
+    .snap-card .meta{padding:8px 10px;font-size:12px}
+    .snap-card .meta b{color:var(--accent);text-transform:capitalize}
+    .snap-card .ts{font-size:11px;color:var(--sub);margin-top:2px}
+    .snap-card .links{display:flex;gap:6px;flex-wrap:wrap;padding:0 10px 8px;font-size:11px}
+    .snap-card .links a{padding:3px 6px;background:var(--bg);color:var(--text);border:1px outset var(--bg);text-decoration:none}
+
+    .sig-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+    .sig-card{border:2px outset var(--bg);background:var(--field);color:var(--fieldtext);padding:0;overflow:hidden;display:flex;flex-direction:column}
+    .sig-card .thumb{aspect-ratio:1/1;background:#222;overflow:hidden}
+    .sig-card .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+    .sig-card .body{padding:10px}
+    .sig-card .body b{display:block;font-size:14px;margin-bottom:4px;color:var(--accent)}
+    .sig-card .body .loc{font-size:12px;color:var(--sub);margin-bottom:4px}
+    .sig-card .body .when{font-size:11px;color:var(--sub)}
+    .sig-card .note{margin-top:8px;padding:6px;background:var(--bg);color:var(--text);border-left:3px solid var(--accent);font-size:12px;line-height:1.4}
+    .sig-card .tag{display:inline-block;padding:1px 6px;background:var(--accent);color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+  </style>
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win wide">
+    <div class="titlebar">
+      <span><span class="led"></span>feed.exe</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+      <div class="group">
+        <div class="legend"><span data-i18n="feed.snapshots">Recent snapshots</span></div>
+        <p data-i18n="feed.intro"></p>
+        <div id="snap-grid" class="snap-grid"><p data-i18n="common.loading">Loading…</p></div>
+      </div>
+
+      <div class="group">
+        <div class="legend"><span data-i18n="feed.signals">Latest signals</span></div>
+        <div id="sig-grid" class="sig-grid"><p data-i18n="common.loading">Loading…</p></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function currentLang(){ return document.documentElement.lang || 'en'; }
+function fmtDate(s){ try { return new Date(s).toLocaleString(); } catch { return s; } }
+
+function pickNote(notes){
+  if (!notes) return '';
+  const lang = currentLang();
+  return notes[lang] || notes.en || Object.values(notes)[0] || '';
+}
+
+async function loadSnapshots(){
+  const box = document.getElementById('snap-grid');
+  try{
+    const r = await fetch('/api/v2/snapshots?limit=24', { cache:'no-store' });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const list = await r.json();
+    if (!list.length){ box.innerHTML = '<p>'+wd_t('feed.no_snapshots')+'</p>'; return; }
+    // Group by batch_id so we render one card per batch.
+    const batches = new Map();
+    for (const s of list) {
+      const key = s.batch_id || s.id;
+      if (!batches.has(key)) batches.set(key, []);
+      batches.get(key).push(s);
+    }
+    box.innerHTML = [...batches.values()].map(group => {
+      // Prefer the medium size for preview; fall back to large then small.
+      // discord_url IS the cdn.discordapp.com attachment URL — usable as <img>.
+      const order = ['medium','large','small'];
+      const preview = order.map(o => group.find(g => g.size === o)).find(Boolean) || group[0];
+      const imgSrc = preview.discord_url || '';
+      const ts = new Date(preview.created_at).toLocaleString();
+      const linkRow = group.map(g => {
+        const sz = esc(g.size);
+        const parts = [];
+        if (g.discord_url)  parts.push(`<a href="${esc(g.discord_url)}" target="_blank">⬇ ${sz}</a>`);
+        if (g.telegram_url) parts.push(`<a href="${esc(g.telegram_url)}" target="_blank">📡 ${sz}</a>`);
+        return parts.join(' ');
+      }).join(' · ');
+      return `
+        <div class="snap-card">
+          ${imgSrc ? `<a href="${esc(imgSrc)}" target="_blank"><img loading="lazy" src="${esc(imgSrc)}" alt=""></a>` : ''}
+          <div class="meta">
+            <b>${group.length} sizes</b>
+            <div class="ts">${esc(ts)}</div>
+          </div>
+          <div class="links">${linkRow}</div>
+        </div>
+      `;
+    }).join('');
+  } catch(e){ box.innerHTML = '<p style="color:#c33">Error: '+esc(e.message)+'</p>'; }
+}
+
+async function loadSignals(){
+  const box = document.getElementById('sig-grid');
+  try{
+    const r = await fetch('/api/v2/signals?limit=24', { cache:'no-store' });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const list = await r.json();
+    if (!list.length){ box.innerHTML = '<p>'+wd_t('feed.no_signals')+'</p>'; return; }
+    box.innerHTML = list.map(s => {
+      const note = pickNote(s.notes);
+      return `
+        <div class="sig-card">
+          <div class="thumb">
+            ${s.image_url ? `<a href="${esc(s.image_url)}" target="_blank"><img loading="lazy" src="${esc(s.image_url)}" alt=""></a>` : ''}
+          </div>
+          <div class="body">
+            ${s.tag ? `<div class="tag">${esc(s.tag)}</div>` : ''}
+            <b>${esc(s.name || '—')}</b>
+            ${s.location ? `<div class="loc">📍 ${esc(s.location)}</div>` : ''}
+            <div class="when">
+              ${s.submitted_at ? esc(fmtDate(s.submitted_at)) : esc(fmtDate(s.sampled_at))}
+              ${s.num_id ? ` · #${s.num_id}` : ''}
+            </div>
+            ${note ? `<div class="note">${esc(note)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch(e){ box.innerHTML = '<p style="color:#c33">Error: '+esc(e.message)+'</p>'; }
+}
+
+document.addEventListener('DOMContentLoaded', () => { loadSnapshots(); loadSignals(); });
+document.addEventListener('wd:lang-changed', () => { loadSignals(); }); // re-pick notes language
+</script>
+</body>
+</html>

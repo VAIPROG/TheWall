@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile — The Wall Dev</title>
+  <link rel="icon" href="https://filianislost.com/static/favicon.png">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win">
+    <div class="titlebar">
+      <span><span class="led"></span>me.exe</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>Your profile</span>
+          <span data-lang="ru" data-inline>Твой профиль</span>
+          <span data-lang="de" data-inline>Dein Profil</span>
+          <span data-lang="fr" data-inline>Votre profil</span>
+        </div>
+        <div id="me-card">
+          <p style="color:var(--sub)">
+            <span data-lang="en" data-inline>loading…</span>
+            <span data-lang="ru" data-inline>загрузка…</span>
+            <span data-lang="de" data-inline>laden…</span>
+            <span data-lang="fr" data-inline>chargement…</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>Backend meta</span>
+          <span data-lang="ru" data-inline>Состояние бэкенда</span>
+          <span data-lang="de" data-inline>Backend-Meta</span>
+          <span data-lang="fr" data-inline>État du backend</span>
+        </div>
+        <pre id="meta-out" class="input" style="white-space:pre-wrap;min-height:80px;font:12px monospace">loading…</pre>
+      </div>
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>Linked accounts</span>
+          <span data-lang="ru" data-inline>Привязанные аккаунты</span>
+          <span data-lang="de" data-inline>Verknüpfte Konten</span>
+          <span data-lang="fr" data-inline>Comptes liés</span>
+        </div>
+        <div id="links-card" style="font-size:13px">
+          <span data-lang="en" data-inline>Loading…</span>
+          <span data-lang="ru" data-inline>Загрузка…</span>
+          <span data-lang="de" data-inline>Laden…</span>
+          <span data-lang="fr" data-inline>Chargement…</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+          <button class="btn" onclick="startOauth('telegram')">🔗 Connect Telegram</button>
+          <button class="btn" onclick="startOauth('discord')">🔗 Connect Discord</button>
+          <button class="btn" onclick="unlinkProvider('telegram')">✕ Unlink Telegram</button>
+          <button class="btn" onclick="unlinkProvider('discord')">✕ Unlink Discord</button>
+        </div>
+        <div class="note" style="margin-top:10px;font-size:12px;line-height:1.5">
+          <b>
+            <span data-lang="en" data-inline>📬 Let the bots DM you (reminders &amp; alerts)</span>
+            <span data-lang="ru" data-inline>📬 Разрешить ботам писать вам в ЛС (напоминания и алерты)</span>
+            <span data-lang="de" data-inline>📬 Bots erlauben, dir DMs zu senden</span>
+            <span data-lang="fr" data-inline>📬 Autoriser les bots à vous écrire en MP</span>
+          </b><br>
+          ✈️
+          <span data-lang="en" data-inline>Telegram — open <a class="link" href="https://t.me/theWALLdevBot" target="_blank" rel="noopener">@theWALLdevBot</a> and press <b>Start</b> once.</span>
+          <span data-lang="ru" data-inline>Telegram — откройте <a class="link" href="https://t.me/theWALLdevBot" target="_blank" rel="noopener">@theWALLdevBot</a> и один раз нажмите <b>Start</b>.</span>
+          <span data-lang="de" data-inline>Telegram — öffne <a class="link" href="https://t.me/theWALLdevBot" target="_blank" rel="noopener">@theWALLdevBot</a> und drücke einmal <b>Start</b>.</span>
+          <span data-lang="fr" data-inline>Telegram — ouvrez <a class="link" href="https://t.me/theWALLdevBot" target="_blank" rel="noopener">@theWALLdevBot</a> et appuyez une fois sur <b>Start</b>.</span>
+          <br>
+          🎮
+          <span data-lang="en" data-inline>Discord — a bot can only DM people it shares a server with: <a class="link" href="https://discord.com/oauth2/authorize?client_id=1511735101250076833&scope=bot&permissions=0" target="_blank" rel="noopener">add The Wall Dev bot to any server you're in</a>.</span>
+          <span data-lang="ru" data-inline>Discord — бот может писать в ЛС только участникам общего с ним сервера: <a class="link" href="https://discord.com/oauth2/authorize?client_id=1511735101250076833&scope=bot&permissions=0" target="_blank" rel="noopener">добавьте бота The Wall Dev на любой ваш сервер</a>.</span>
+          <span data-lang="de" data-inline>Discord — ein Bot kann nur DMs senden, wenn ihr einen Server teilt: <a class="link" href="https://discord.com/oauth2/authorize?client_id=1511735101250076833&scope=bot&permissions=0" target="_blank" rel="noopener">füge den Bot einem deiner Server hinzu</a>.</span>
+          <span data-lang="fr" data-inline>Discord — un bot ne peut écrire en MP que s'il partage un serveur avec vous : <a class="link" href="https://discord.com/oauth2/authorize?client_id=1511735101250076833&scope=bot&permissions=0" target="_blank" rel="noopener">ajoutez le bot à l'un de vos serveurs</a>.</span>
+        </div>
+        <div style="margin-top:12px">
+          <input type="email" id="link-email" class="input" placeholder="you@example.com">
+          <button class="btn full" onclick="requestEmailLink()">📧 Request email link by support</button>
+          <div id="email-instruction" style="font-size:12px;color:var(--sub);margin-top:6px"></div>
+        </div>
+        <div id="links-status" class="note" style="margin-top:8px;display:none"></div>
+      </div>
+
+      <div class="group">
+        <div class="legend">
+          <span data-lang="en" data-inline>Danger zone</span>
+          <span data-lang="ru" data-inline>Опасная зона</span>
+          <span data-lang="de" data-inline>Gefahrenzone</span>
+          <span data-lang="fr" data-inline>Zone dangereuse</span>
+        </div>
+        <p style="font-size:13px">
+          <span data-lang="en" data-inline>This permanently deletes your profile, avatars, messages and templates.</span>
+          <span data-lang="ru" data-inline>Это безвозвратно удалит профиль, аватары, сообщения и шаблоны.</span>
+          <span data-lang="de" data-inline>Dies löscht dauerhaft Profil, Avatare, Nachrichten und Vorlagen.</span>
+          <span data-lang="fr" data-inline>Cela supprime définitivement profil, avatars, messages et modèles.</span>
+        </p>
+        <button class="btn" id="btn-delete-me" style="color:#c33">
+          🗑
+          <span data-lang="en" data-inline>Delete my account</span>
+          <span data-lang="ru" data-inline>Удалить мой аккаунт</span>
+          <span data-lang="de" data-inline>Mein Konto löschen</span>
+          <span data-lang="fr" data-inline>Supprimer mon compte</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+const API = "/api";
+
+// JWT handoff: the extension opens me.html#wd_jwt=<token> so linking works
+// without a separate landing login. Stored, then scrubbed from the URL.
+(function acceptJwtHandoff() {
+  const m = location.hash.match(/wd_jwt=([^&]+)/);
+  if (m) {
+    localStorage.setItem("wall_landing_jwt", decodeURIComponent(m[1]));
+    history.replaceState({}, "", location.pathname + location.search);
+  }
+})();
+function jwt() { return localStorage.getItem("wall_landing_jwt"); }
+function authHeaders() {
+  const t = jwt();
+  return t ? { Authorization: "Bearer " + t } : {};
+}
+
+async function loadProfile() {
+  const box = document.getElementById("me-card");
+  if (!jwt()) {
+    box.innerHTML = `<p style="color:#c33">Not signed in.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0">
+        <button class="btn" onclick="oauthSignIn('telegram')">✈️ Sign in with Telegram</button>
+        <button class="btn" onclick="oauthSignIn('discord')">🎮 Sign in with Discord</button>
+      </div>
+      <p style="font-size:12px;color:var(--sub)">OAuth sign-in works once the provider is linked to your Wall account. First time here? <a href="/login.html" class="link">Sign in with a site token →</a></p>`;
+    return;
+  }
+  try {
+    const r = await fetch(API + "/auth/me", { headers: authHeaders() });
+    if (!r.ok) {
+      box.innerHTML = `<p style="color:#c33">auth/me → ${r.status}. <a href="/login.html" class="link">re-login</a></p>`;
+      return;
+    }
+    const u = await r.json();
+    const avatarUrl = u.has_custom_avatar
+      ? `${API}/avatar?userId=${encodeURIComponent(u.id)}`
+      : (u.discord_id ? `${API}/discord/avatar?userId=${encodeURIComponent(u.discord_id)}` : "");
+    box.innerHTML = `
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        ${avatarUrl ? `<img src="${avatarUrl}" style="width:80px;height:80px;border:2px solid var(--dark);image-rendering:pixelated;background:#808080">` : '<div style="width:80px;height:80px;background:#808080;border:2px solid var(--dark)"></div>'}
+        <div>
+          <h2 style="margin:0 0 6px;font-size:20px">${escapeHtml(u.username)}
+            <span class="badge ${u.role === 'admin' ? 'red' : (u.role === 'moderator' ? 'green' : '')}">${escapeHtml(u.role)}</span>
+          </h2>
+          <p>id: <code>${u.id}</code></p>
+          ${u.discord_username ? `<p>discord: <code>@${escapeHtml(u.discord_username)}</code></p>` : ''}
+          ${u.discord_id ? `<p>discord id: <code>${u.discord_id}</code></p>` : ''}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    box.innerHTML = `<p style="color:#c33">error: ${e.message}</p>`;
+  }
+}
+
+async function loadMeta() {
+  const out = document.getElementById("meta-out");
+  try {
+    const r = await fetch(API + "/meta", { cache: "no-store" });
+    const m = await r.json();
+    out.textContent =
+      `version:    v${m.version}\n` +
+      `started:    ${m.started_at}\n` +
+      `uptime:     ${Math.round(m.uptime_secs / 60)} min\n` +
+      (m.deployed_at ? `deployed:   ${m.deployed_at}\n` : "") +
+      (m.built_at ? `built:      ${m.built_at}\n` : "");
+  } catch (e) {
+    out.textContent = "could not reach backend: " + e.message;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+async function loadLinks() {
+  const box = document.getElementById("links-card");
+  if (!jwt()) { box.innerHTML = '<i>Not signed in.</i>'; return; }
+  try {
+    const r = await fetch(API + "/v2/me/links", { headers: authHeaders() });
+    if (!r.ok) { box.innerHTML = '<i>Error ' + r.status + '</i>'; return; }
+    const d = await r.json();
+    box.innerHTML = [
+      '<div>Discord: <b>' + (d.discord_username || '—') + '</b>' +
+        (d.discord_linked_via_oauth ? ' <span class="badge green">OAuth ✓</span>' : '') + '</div>',
+      '<div>Telegram: <b>' + (d.telegram_username || '—') + '</b></div>',
+      '<div>Email: <b>' + (d.email || '—') + '</b>' +
+        (d.email_request_status ? ' <span class="badge">' + d.email_request_status + '</span>' : '') + '</div>',
+    ].join('');
+  } catch (e) { box.innerHTML = '<i>' + e.message + '</i>'; }
+}
+function linkStatus(msg, ok) {
+  const el = document.getElementById("links-status");
+  el.style.display = 'block';
+  el.style.color = ok ? '#1e6e2c' : '#c33';
+  el.textContent = msg || '';
+}
+async function oauthSignIn(provider) {
+  try {
+    const r = await fetch(API + "/v2/auth/" + provider + "/login-url");
+    if (!r.ok) return linkStatus(provider + " sign-in unavailable: " + r.status);
+    const d = await r.json();
+    location.href = d.url;
+  } catch (e) { linkStatus(e.message); }
+}
+async function startOauth(provider) {
+  if (!jwt()) return linkStatus('Sign in first.');
+  try {
+    const r = await fetch(API + '/v2/me/links/' + provider + '/oauth-url', { headers: authHeaders() });
+    if (!r.ok) return linkStatus(provider + ' oauth start failed: ' + r.status + ' ' + await r.text());
+    const d = await r.json();
+    sessionStorage.setItem('wall_oauth_pending', provider);
+    location.href = d.url;
+  } catch (e) { linkStatus(e.message); }
+}
+async function unlinkProvider(provider) {
+  if (!jwt()) return linkStatus('Sign in first.');
+  if (!confirm('Unlink ' + provider + '?')) return;
+  try {
+    const r = await fetch(API + '/v2/me/links/' + provider, { method: 'DELETE', headers: authHeaders() });
+    if (!r.ok) return linkStatus('Unlink failed: ' + r.status);
+    linkStatus(provider + ' unlinked', true);
+    loadLinks();
+  } catch (e) { linkStatus(e.message); }
+}
+async function requestEmailLink() {
+  if (!jwt()) return linkStatus('Sign in first.');
+  const email = document.getElementById('link-email').value.trim();
+  if (!email) return linkStatus('Enter an email.');
+  try {
+    const r = await fetch(API + '/v2/me/links/email/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ email }),
+    });
+    if (!r.ok) return linkStatus('Request failed: ' + r.status + ' ' + await r.text());
+    const d = await r.json();
+    document.getElementById('email-instruction').innerHTML =
+      '<b>Send this email:</b><br>' +
+      'To: <code>' + d.send_to + '</code><br>' +
+      'Subject: <code>' + d.subject + '</code><br>' +
+      'Body:<br><pre style="white-space:pre-wrap;background:var(--field);color:var(--fieldtext);padding:6px;border:1px solid var(--shadow)">' + d.body_template + '</pre>' +
+      'Your verification code: <b>' + d.code + '</b>';
+    linkStatus('Request created — send the email and wait for approval.', true);
+  } catch (e) { linkStatus(e.message); }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadProfile();
+  loadMeta();
+  loadLinks();
+  const q = new URLSearchParams(location.search);
+  if (q.get("linked")) linkStatus("✓ Linked!", true);
+  if (q.get("signed_in")) linkStatus("✓ Signed in via " + q.get("signed_in") + "!", true);
+  document.getElementById("btn-delete-me").addEventListener("click", async () => {
+    if (!confirm("Permanently delete your account?")) return;
+    if (!confirm("Really? This cannot be undone.")) return;
+    try {
+      const r = await fetch(API + "/me/delete", {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true, reason: null }),
+      });
+      if (!r.ok) { alert("delete failed: " + r.status); return; }
+      localStorage.removeItem("wall_landing_jwt");
+      localStorage.removeItem("wall_landing_refresh");
+      alert("account deleted.");
+      location.href = "/";
+    } catch (e) { alert("error: " + e.message); }
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# Dependencies
+*node_modules/*
+
+# Build output
+dist/
+backend/target/
+
+# Secrets and local environment (commit example.env instead)
+.env
+*.env
+!example.env
+!backend/example.env
+secrets.env
+backend/secrets.env
+# Ship only the vetted example.env template, not other env variants
+*.env.example
+
+# Local tooling / editor state
+!.vscode/
+!.vs/
+!.idea/
+.*/
+*.swp
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Reference copy of the host site's own source — not ours to redistribute
+source-code-wall/

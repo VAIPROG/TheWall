@@ -1,0 +1,65 @@
+{
+  "title": "Documentation",
+  "intro": "Guides pas-à-pas : installation, configuration, Deep Integration, anti-grief et API.",
+  "sections": {
+    "getting_started": "Démarrage",
+    "anti_grief": "Anti-grief",
+    "linked_accounts": "Comptes liés",
+    "api": "Référence API",
+    "troubleshooting": "Dépannage",
+    "self_host": "Auto-hébergement"
+  },
+  "getting_started": {
+    "heading": "1. Démarrage",
+    "body": "Choisissez un format : userscript Tampermonkey, Chrome MV3 (décompressé), ou Firefox (module temporaire).",
+    "steps": [
+      "Ouvrez <a href=\"/\" class=\"link\">la page d'accueil</a> et téléchargez la version pour votre navigateur.",
+      "Installez selon les instructions.",
+      "Visitez <a href=\"https://filianislost.com\" class=\"link\">filianislost.com</a> — le panneau Win95 apparaît en haut à droite.",
+      "À la première visite, l'extension se connecte automatiquement à notre backend (pas de connexion manuelle nécessaire)."
+    ],
+    "tip": "Mise à jour auto via <code>/dist/signature.json</code> toutes les 30 minutes. Tampermonkey peut aussi mettre à jour les userscripts nativement."
+  },
+  "anti_grief": {
+    "heading": "2. Anti-grief",
+    "body": "Épinglez un modèle — le backend téléchargera la fenêtre de tuiles correspondante toutes les <code>check_interval</code> secondes (min 60, défaut 600), comparera avec le modèle et émettra un événement <code>clan_alert</code> quand les dégâts dépassent <code>alert_threshold</code> (défaut 25 pixels).",
+    "example": "POST /api/v2/templates/{id}/protect\n{\n  \"clan_id\": \"uuid-du-clan\",\n  \"alert_threshold\": 25,\n  \"check_interval\": 600\n}",
+    "disable": "Désactiver : <code>DELETE /api/v2/templates/{id}/protect</code>. Le propriétaire du modèle, un mod/admin de clan ou un admin global peut basculer."
+  },
+  "linked_accounts": {
+    "heading": "3. Comptes liés",
+    "body": "Depuis <a href=\"/me.html\" class=\"link\">/me</a> :",
+    "methods": [
+      "<b>Telegram</b> via OIDC (<code>oauth.telegram.org</code>) avec PKCE + scope <code>telegram:bot_access</code>. Le bot peut vous envoyer des DMs ensuite.",
+      "<b>Discord</b> via OAuth2 standard avec scope <code>identify</code>. Le bot peut envoyer des DMs si vous partagez un serveur.",
+      "<b>Email</b> via support : demandez un code à 6 caractères, envoyez un email à l'adresse support avec sujet <code>LINK-MAIL</code>, un admin confirme."
+    ],
+    "tip": "Le compte VAI est une identité séparée sur <a href=\"/vai-auth.html\" class=\"link\">/vai-auth</a> — conçu pour tous les services VAI-PROG. Liaison avec votre utilisateur Wall dans les paramètres de l'extension."
+  },
+  "api": {
+    "heading": "4. API",
+    "body": "Deux surfaces côte à côte sous <code>/api/</code> :",
+    "surfaces": [
+      "<code>/api/v1/*</code> équivalents et endpoints partagés sous <code>/api/*</code> — gelés, clients legacy.",
+      "<code>/api/v2/*</code> — activement développé, les nouvelles fonctionnalités arrivent ici."
+    ],
+    "browse": "Interactif : <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Spec : <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
+  },
+  "troubleshooting": {
+    "heading": "5. Dépannage",
+    "items": [
+      "<b>Panneau absent</b> : vérifiez que vous êtes sur <code>https://filianislost.com</code> (pas <code>www.</code>) ; rechargez après installation.",
+      "<b>Precise Place grisé</b> : Deep Integration est désactivée — activez dans Paramètres et rechargez.",
+      "<b>Deep Integration « WARN: missing probes »</b> : le bundle du site a changé de forme — attendez la mise à jour de l'extension ou signalez sur <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
+      "<b>Flash noir sur l'onglet Clan</b> : corrigé en v3.0.x — mettez à jour.",
+      "<b>Erreurs CORS</b> : effacez les Service Workers en cache et rechargez.",
+      "<b>Toast « out of paint »</b> : c'est le cooldown du site — attendez le remplissage."
+    ]
+  },
+  "self_host": {
+    "heading": "6. Auto-hébergement",
+    "body": "Backend = un binaire Rust + Postgres + nginx + Let's Encrypt. Voir <code>backend/Dockerfile</code> et <code>backend/example.env</code>.",
+    "example": "cp backend/example.env backend/.env\ndocker compose -f backend/docker-compose.yml up -d   # Postgres\ncargo run --release                                  # backend",
+    "env_note": "Ou pointez <code>THE_WALL_DEV_ENV_FILE</code> vers un fichier de secrets externe (remplace les env vars existantes)."
+  }
+}

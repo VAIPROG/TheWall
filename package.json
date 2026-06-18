@@ -1,0 +1,30 @@
+{
+  "name": "the-wall-dev",
+  "version": "5.1.1",
+  "type": "module",
+  "description": "Win95 overlay, drawing assists, Discord/clan sync, VAI-PROG backend chat & templates for The Wall",
+  "author": "VAI_PROG",
+  "license": "MIT",
+  "scripts": {
+    "build": "bun build.ts",
+    "build:release": "bun build.ts --release",
+    "build:smallest": "bun build.ts --smallest",
+    "publish": "bun build.ts --publish",
+    "watch": "bun build.ts --watch",
+    "release": "bun build.ts --release",
+    "smallest": "bun build.ts --smallest",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun scripts/test.ts",
+    "test:bot": "bun scripts/test-bot.ts",
+    "test:extension": "bun scripts/test.ts --no-typecheck",
+    "test:backend": "cargo test --manifest-path backend/Cargo.toml",
+    "test:backend:live": "cargo test --manifest-path backend/Cargo.toml -- --ignored",
+    "test:all": "bun scripts/test.ts --backend",
+    "openapi": "bun scripts/gen-openapi.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

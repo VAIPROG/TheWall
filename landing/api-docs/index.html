@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API · The Wall Dev</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win wide">
+    <div class="titlebar">
+      <span><span class="led"></span>api-docs.exe</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+      <div class="group">
+        <div class="legend"><span data-i18n="api_docs.title">API Documentation</span></div>
+        <p data-i18n="api_docs.intro">Browse the public V2 API in two flavours below. Spec lives at /openapi.yaml.</p>
+        <div class="btn-row" style="margin-top:10px">
+          <a href="/api-docs/swagger.html" class="btn primary">📖 <span data-i18n="api_docs.swagger">Swagger UI</span></a>
+          <a href="/api-docs/redoc.html"   class="btn primary">📑 <span data-i18n="api_docs.redoc">ReDoc</span></a>
+          <a href="/openapi.yaml" class="btn">⬇ openapi.yaml</a>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="legend">Conventions</div>
+        <ul class="bullets">
+          <li><code>/api/auth/*</code>, <code>/api/meta</code>, <code>/api/i18n/*</code>, <code>/api/avatar*</code> are shared across v1 and v2.</li>
+          <li><code>/api/*</code> outside that list is <b>v1</b> — frozen.</li>
+          <li><code>/api/v2/*</code> is the actively developed surface.</li>
+          <li>Auth header: <code>Authorization: Bearer &lt;wall jwt&gt;</code>.</li>
+          <li>Time fields are ISO-8601 UTC.</li>
+          <li>Pagination uses <code>cursor</code> (last <code>created_at</code> you saw) + <code>limit</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>

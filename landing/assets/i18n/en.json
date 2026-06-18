@@ -1,0 +1,160 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "About",
+    "docs": "Docs",
+    "feed": "Feed",
+    "achievements": "Achievements",
+    "changelog": "Changelog",
+    "vai_auth": "VAI Account",
+    "privacy": "Privacy",
+    "dashboard": "Dashboard",
+    "me": "Profile",
+    "api_docs": "API"
+  },
+  "footer": {
+    "contact": "contact",
+    "made_by": "Built by <b>VAI_PROG (vai on wall)</b> for the Russian-speaking Filian community."
+  },
+  "common": {
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "open": "Open",
+    "yes": "Yes",
+    "no": "No",
+    "sign_in": "Sign in",
+    "sign_out": "Sign out",
+    "auth_required": "Sign in first.",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "more": "More"
+  },
+  "index": {
+    "title_suffix": "Win95-styled overlay for ",
+    "tagline_en": "Drawing aids, clan chat, templates, Discord & Telegram sync — does NOT modify the site's code. Uses only the site's own built-in public API. Made by the Russian-speaking Filian community.",
+    "version_pill": "Extension v4 · Backend v2",
+    "download_tampermonkey": "Tampermonkey",
+    "download_chrome": "Chrome",
+    "download_firefox": "Firefox",
+    "download_safari": "Safari",
+    "source_label": "source:",
+    "what_inside": "What's inside",
+    "fair_play_title": "Fair-Play · No Code Modification",
+    "fair_play_body": "This extension does NOT modify the site's source code. Every pixel is placed by your explicit click through the site's own public API — the same endpoint the site UI calls. We read the public tile layer and your existing session cookie (the one the site already set). No patching, no hooking, no WebSocket injection, no captcha bypass. The site's JavaScript runs exactly as the developers shipped it."
+  },
+  "features": {
+    "overlay": {
+      "title": "Cozy overlay",
+      "body": "Drop a PNG, snap it to coords, scale 5%–1000%, read progress %."
+    },
+    "clan": {
+      "title": "Clan toolkit",
+      "body": "Live chat, roster, templates, modmail, clan_alert broadcasts, role management."
+    },
+    "mailbox": {
+      "title": "Unified mailbox",
+      "body": "Announcements, clan alerts, DMs, modmail, template events — one inbox with per-channel preferences."
+    },
+    "grief": {
+      "title": "Anti-grief alerts",
+      "body": "Pin a template, the backend watches it on a 4-min loop and pings the clan when damage exceeds threshold."
+    },
+    "snapshots": {
+      "title": "Server snapshots",
+      "body": "Every 4 minutes the server stitches the wall at three qualities and ships them to Discord + Telegram with a signed link."
+    },
+    "achievements": {
+      "title": "Achievements",
+      "body": "20+ unlockable badges with hidden secrets — public profile shows your collection."
+    },
+    "themes": {
+      "title": "Themes + scaling",
+      "body": "Dark/light/cozy CRT mode, UI scale 80–160%, four UI languages."
+    },
+    "accounts": {
+      "title": "Linked accounts",
+      "body": "VAI Account SSO, Discord & Telegram OIDC, email via support — manage all from /me."
+    }
+  },
+  "install": {
+    "title": "Install",
+    "tampermonkey_step1": "Install Tampermonkey from your browser's store.",
+    "tampermonkey_step2": "Click the userscript link. Tampermonkey opens an install prompt → Install.",
+    "tampermonkey_step3": "Open filianislost.com — the panel pops up top-right.",
+    "chrome_step1": "Download & unzip extension-chrome.zip.",
+    "chrome_step2": "Open chrome://extensions, enable Developer mode (top-right).",
+    "chrome_step3": "Click Load unpacked → pick the unzipped folder.",
+    "firefox_step1": "Download extension-firefox.zip & unzip.",
+    "firefox_step2": "Open about:debugging#/runtime/this-firefox.",
+    "firefox_step3": "Click Load Temporary Add-on → pick manifest.json.",
+    "firefox_note": "The Firefox build is unsigned — it stays loaded until you restart Firefox. AMO publication is planned.",
+    "safari_step1": "Download extension-safari.zip on macOS and unzip it.",
+    "safari_step2": "Open Terminal and run: xcrun safari-web-extension-converter ./extension-safari",
+    "safari_step3": "Xcode opens with a generated wrapper project — build & run it once to install the extension.",
+    "safari_step4": "In Safari → Settings → Extensions, enable “The Wall Dev”, then open filianislost.com.",
+    "safari_note": "Safari requires a macOS + Xcode wrap and an Apple Developer ID ($99/yr) for App Store distribution. Local development install is free; we ship the raw extension payload, you do the wrap. Works on Safari 16.4+."
+  },
+  "docs": {
+    "title": "Documentation",
+    "intro": "Step-by-step guides covering installation, configuration, anti-grief and the API.",
+    "sections": {
+      "getting_started": "Getting started",
+      "anti_grief": "Anti-grief monitoring",
+      "linked_accounts": "Linked accounts",
+      "api": "API reference",
+      "troubleshooting": "Troubleshooting",
+      "self_host": "Self-hosting the backend"
+    }
+  },
+  "feed": {
+    "title": "Live feed",
+    "intro": "Server-built wall snapshots (every 4 min) and mirrored event signals from the canvas.",
+    "snapshots": "Recent snapshots",
+    "signals": "Latest signals",
+    "no_snapshots": "No snapshots yet.",
+    "no_signals": "No signals yet."
+  },
+  "achievements": {
+    "title": "Achievements",
+    "intro": "Collect badges by using the extension. Unlocks are tracked server-side and shown on your public profile.",
+    "loading": "Loading catalogue…",
+    "category": "Category",
+    "points": "Points",
+    "locked": "Locked",
+    "unlocked": "Unlocked",
+    "secret": "Hidden until unlocked"
+  },
+  "changelog": {
+    "title": "Changelog",
+    "intro": "Highlights from each released version. Full git history on GitHub."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Your control panel.",
+    "auth_gate": "You are not signed in. Use the extension on filianislost.com or sign in with a VAI account to access your dashboard.",
+    "my_clans": "My clans",
+    "my_templates": "My templates",
+    "linked_accounts": "Linked accounts",
+    "notifications": "Notification preferences",
+    "links_count": "{n} linked"
+  },
+  "vai": {
+    "title": "VAI Account",
+    "subtitle": "United identity across all VAI-PROG services.",
+    "sign_in_tab": "Sign in",
+    "sign_up_tab": "Create account",
+    "ecosystem_title": "Ecosystem",
+    "ecosystem_now": "The Wall Dev — live now.",
+    "ecosystem_soon": "More VAI-PROG tools — same account."
+  },
+  "api_docs": {
+    "title": "API Documentation",
+    "intro": "Browse the public V2 API in two flavours below. Spec lives at /openapi.yaml.",
+    "swagger": "Swagger UI",
+    "redoc": "ReDoc"
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "nav": {
+    "home": "Главная",
+    "about": "О проекте",
+    "docs": "Документация",
+    "feed": "Лента",
+    "achievements": "Достижения",
+    "changelog": "История",
+    "vai_auth": "VAI Аккаунт",
+    "privacy": "Приватность",
+    "dashboard": "Кабинет",
+    "me": "Профиль",
+    "api_docs": "API"
+  },
+  "footer": {
+    "contact": "контакты",
+    "made_by": "Сделано <b>VAI_PROG (vai на стене)</b> для русскоязычного сообщества Филиан."
+  },
+  "common": {
+    "loading": "Загрузка…",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "edit": "Изменить",
+    "back": "Назад",
+    "open": "Открыть",
+    "yes": "Да",
+    "no": "Нет",
+    "sign_in": "Войти",
+    "sign_out": "Выйти",
+    "auth_required": "Сначала войдите.",
+    "copy": "Копировать",
+    "copied": "Скопировано!",
+    "more": "Ещё"
+  },
+  "index": {
+    "title_suffix": "Win95-оверлей для ",
+    "tagline_en": "Помощники рисования, клановый чат, шаблоны, синхронизация Discord и Telegram — НЕ изменяет код сайта. Использует только встроенный публичный API сайта. Сделано русскоязычным сообществом Филиан.",
+    "version_pill": "Расширение v4 · Бэкенд v2",
+    "download_tampermonkey": "Tampermonkey",
+    "download_chrome": "Chrome",
+    "download_firefox": "Firefox",
+    "download_safari": "Safari",
+    "source_label": "исходники:",
+    "what_inside": "Что внутри",
+    "fair_play_title": "Fair-Play · Без модификации кода",
+    "fair_play_body": "Это расширение НЕ изменяет исходный код сайта. Каждый пиксель ставится вашим кликом через собственный публичный API сайта — тот же эндпоинт, который вызывает UI сайта. Мы читаем публичный слой тайлов и вашу существующую сессионную куку (ту, что сайт сам поставил при входе). Никакого патчинга, перехвата, инъекций WebSocket, обхода капчи. JavaScript сайта работает ровно так, как его выпустили разработчики."
+  },
+  "features": {
+    "overlay": {
+      "title": "Удобный оверлей",
+      "body": "Закинул PNG, прижал к координатам, масштаб 5%–1000%, прогресс в процентах."
+    },
+    "clan": {
+      "title": "Клановый тулкит",
+      "body": "Live-чат, ростер, шаблоны, modmail, broadcast clan_alert, управление ролями."
+    },
+    "mailbox": {
+      "title": "Единый mailbox",
+      "body": "Объявления, alerts, DM, modmail, события шаблонов — один inbox с настройкой каналов."
+    },
+    "grief": {
+      "title": "Анти-griefing",
+      "body": "Закрепил шаблон — бэкенд проверяет его каждые 4 мин и пингует клан при превышении порога повреждений."
+    },
+    "snapshots": {
+      "title": "Server snapshots",
+      "body": "Каждые 4 минуты сервер собирает стену в трёх качествах и доставляет в Discord + Telegram с подписанной ссылкой."
+    },
+    "achievements": {
+      "title": "Достижения",
+      "body": "20+ ачивок с секретными — публичный профиль показывает твою коллекцию."
+    },
+    "themes": {
+      "title": "Темы и масштаб",
+      "body": "Тёмный / светлый / CRT-cozy, scale UI 80–160%, 4 языка интерфейса."
+    },
+    "accounts": {
+      "title": "Linked accounts",
+      "body": "VAI SSO, Discord & Telegram OIDC, email через support — управление в /me."
+    }
+  },
+  "install": {
+    "title": "Установка",
+    "tampermonkey_step1": "Установите Tampermonkey из магазина расширений.",
+    "tampermonkey_step2": "Нажмите ссылку userscript. Tampermonkey откроет промпт → Install.",
+    "tampermonkey_step3": "Откройте filianislost.com — панель появится справа сверху.",
+    "chrome_step1": "Скачайте и распакуйте extension-chrome.zip.",
+    "chrome_step2": "Откройте chrome://extensions, включите «Developer mode» (правый верх).",
+    "chrome_step3": "Нажмите «Load unpacked» → выберите распакованную папку.",
+    "firefox_step1": "Скачайте extension-firefox.zip и распакуйте.",
+    "firefox_step2": "Откройте about:debugging#/runtime/this-firefox.",
+    "firefox_step3": "Нажмите «Load Temporary Add-on» → выберите manifest.json.",
+    "firefox_note": "Firefox-сборка не подписана — продержится до перезапуска браузера. Публикация в AMO в планах.",
+    "safari_step1": "Скачай extension-safari.zip на macOS и распакуй.",
+    "safari_step2": "Открой Terminal и выполни: xcrun safari-web-extension-converter ./extension-safari",
+    "safari_step3": "Xcode откроет сгенерированный wrapper-проект — собери и запусти один раз чтобы установить расширение.",
+    "safari_step4": "В Safari → Настройки → Расширения включи «The Wall Dev» и открой filianislost.com.",
+    "safari_note": "Safari требует macOS + Xcode для wrap и Apple Developer ID ($99/год) для публикации в App Store. Локальная установка для разработки — бесплатна. Совместимо с Safari 16.4+."
+  },
+  "docs": {
+    "title": "Документация",
+    "intro": "Пошаговые гайды: установка, конфигурация, анти-grief, API.",
+    "sections": {
+      "getting_started": "Быстрый старт",
+      "anti_grief": "Анти-grief мониторинг",
+      "linked_accounts": "Привязанные аккаунты",
+      "api": "API-справочник",
+      "troubleshooting": "Траблшутинг",
+      "self_host": "Хостинг бэкенда у себя"
+    }
+  },
+  "feed": {
+    "title": "Live-лента",
+    "intro": "Снапшоты стены, собранные сервером (каждые 4 мин), и зеркалированные сигналы холста.",
+    "snapshots": "Последние снапшоты",
+    "signals": "Последние сигналы",
+    "no_snapshots": "Снапшотов пока нет.",
+    "no_signals": "Сигналов пока нет."
+  },
+  "achievements": {
+    "title": "Достижения",
+    "intro": "Собирайте ачивки используя расширение. Открытия трекаются на сервере и видны в публичном профиле.",
+    "loading": "Загрузка каталога…",
+    "category": "Категория",
+    "points": "Очки",
+    "locked": "Закрыто",
+    "unlocked": "Открыто",
+    "secret": "Скрыто до получения"
+  },
+  "changelog": {
+    "title": "История изменений",
+    "intro": "Главное по каждому релизу. Полная история коммитов — на GitHub."
+  },
+  "dashboard": {
+    "title": "Кабинет",
+    "subtitle": "Ваша панель управления.",
+    "auth_gate": "Вы не вошли. Используйте расширение на filianislost.com или войдите через VAI Account, чтобы открыть кабинет.",
+    "my_clans": "Мои кланы",
+    "my_templates": "Мои шаблоны",
+    "linked_accounts": "Привязанные аккаунты",
+    "notifications": "Настройки уведомлений",
+    "links_count": "{n} привязано"
+  },
+  "vai": {
+    "title": "VAI Аккаунт",
+    "subtitle": "Единая личность для всех сервисов VAI-PROG.",
+    "sign_in_tab": "Войти",
+    "sign_up_tab": "Создать аккаунт",
+    "ecosystem_title": "Экосистема",
+    "ecosystem_now": "The Wall Dev — уже доступно.",
+    "ecosystem_soon": "Другие инструменты VAI-PROG — тот же аккаунт."
+  },
+  "api_docs": {
+    "title": "Документация API",
+    "intro": "Публичный V2 API в двух представлениях. Спецификация — /openapi.yaml.",
+    "swagger": "Swagger UI",
+    "redoc": "ReDoc"
+  }
+}

@@ -1,0 +1,635 @@
+@font-face {
+    font-family: W95FA;
+    src: url("/assets/font/W95FA.otf") format("opentype");
+    font-display: swap;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg: #c0c0c0;
+    --text: #000;
+    --light: #fff;
+    --shadow: #808080;
+    --dark: #404040;
+    --title1: #000080;
+    --title2: #1084d0;
+    --field: #fff;
+    --fieldtext: #000;
+    --group: #dfdfdf;
+    --accent: #000080;
+    --link: #00f;
+    --sub: #555;
+    --led: #3f6;
+    --desktop: #008080;
+}
+body.dark {
+    --bg: #2c2c2c;
+    --text: #fff;
+    --light: #5a5a5a;
+    --shadow: #141414;
+    --dark: #000;
+    --title1: #3838aa;
+    --title2: #1084d0;
+    --field: #0f0f0f;
+    --fieldtext: #fff;
+    --group: #3a3a3a;
+    --accent: #2889ff;
+    --link: #7aa6ff;
+    --sub: #aaa;
+    --led: #2d924d;
+    --desktop: #003030;
+}
+
+html,
+body {
+    font-family: W95FA, "MS Sans Serif", Tahoma, sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--text);
+    background: var(--bg);
+    min-height: 100vh;
+    image-rendering: pixelated;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    background: var(--desktop);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='8' height='8' fill='%23006464'/%3E%3Crect x='0' y='0' width='4' height='4' fill='%23005454'/%3E%3Crect x='4' y='4' width='4' height='4' fill='%23005454'/%3E%3C/svg%3E");
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+body.dark {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='8' height='8' fill='%23002828'/%3E%3Crect x='0' y='0' width='4' height='4' fill='%23001e1e'/%3E%3Crect x='4' y='4' width='4' height='4' fill='%23001e1e'/%3E%3C/svg%3E");
+}
+
+/* ---- Top menu bar (Win95 style) ---- */
+.menubar {
+    background: var(--bg);
+    border-bottom: 1px solid var(--shadow);
+    border-top: 2px solid var(--light);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+.menubar a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text);
+    text-decoration: none;
+    padding: 3px 10px;
+    font-size: 14px;
+}
+.menubar a:hover {
+    background: var(--title1);
+    color: #fff;
+}
+.menubar a.active {
+    background: var(--title1);
+    color: #fff;
+}
+.menubar .logo {
+    font-weight: bold;
+    padding-right: 8px;
+    border-right: 1px solid var(--shadow);
+    margin-right: 4px;
+    color: var(--title1);
+}
+body.dark .menubar .logo {
+    color: #6c8cff;
+}
+.menubar .spacer {
+    flex: 1;
+}
+.menubar .lang-sw,
+.menubar .theme-sw {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid;
+    border-color: var(--dark) var(--light) var(--light) var(--dark);
+}
+.menubar .lang-sw span,
+.menubar .theme-sw span {
+    padding: 2px 6px;
+    cursor: pointer;
+    font-size: 11px;
+    user-select: none;
+    border-right: 1px solid var(--shadow);
+}
+.menubar .lang-sw span:last-child,
+.menubar .theme-sw span:last-child {
+    border-right: none;
+}
+.menubar .lang-sw span.active,
+.menubar .theme-sw span.active {
+    background: var(--title1);
+    color: #fff;
+    font-weight: bold;
+}
+
+/* ---- Main page container ---- */
+main {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+}
+
+/* ---- Win95 window ---- */
+.win {
+    width: 100%;
+    max-width: 720px;
+    background: var(--bg);
+    border: 2px solid;
+    border-color: var(--light) var(--dark) var(--dark) var(--light);
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+}
+.win.wide {
+    max-width: 920px;
+}
+
+.titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 4px;
+    background: linear-gradient(90deg, var(--title1), var(--title2));
+    color: #fff;
+    font-weight: bold;
+    font-size: 13px;
+}
+.titlebar .led {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--led);
+    box-shadow: 0 0 5px var(--led);
+    margin-right: 6px;
+    display: inline-block;
+}
+.titlebar .tbtns {
+    display: flex;
+    gap: 2px;
+}
+.tbtn {
+    width: 16px;
+    height: 14px;
+    line-height: 11px;
+    text-align: center;
+    background: var(--bg);
+    color: var(--text);
+    font-weight: bold;
+    border: 1px solid;
+    border-color: var(--light) var(--dark) var(--dark) var(--light);
+    font-size: 10px;
+    cursor: default;
+}
+
+.content {
+    padding: 12px;
+    border: 1px solid;
+    border-color: var(--light) var(--shadow) var(--shadow) var(--light);
+    margin: 0 4px 4px;
+}
+.content p {
+    margin: 4px 0 8px;
+}
+
+.group {
+    border: 2px groove var(--group);
+    padding: 12px 12px 10px;
+    margin-bottom: 12px;
+    position: relative;
+}
+.legend {
+    position: absolute;
+    top: -9px;
+    left: 8px;
+    background: var(--bg);
+    padding: 0 6px;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+/* ---- Button Styles (Updated with authentic 3D Win95 inset shadows) ---- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 14px;
+    text-decoration: none;
+    color: var(--text);
+    background: var(--bg);
+    font:
+        14px W95FA,
+        "MS Sans Serif",
+        sans-serif;
+    border: 2px solid;
+    border-color: var(--light) var(--dark) var(--dark) var(--light);
+    box-shadow:
+        inset -1px -1px var(--shadow),
+        inset 1px 1px var(--light); /* Added classic 3D highlight */
+    cursor: pointer;
+    user-select: none;
+}
+.btn:hover {
+    background: var(--group);
+}
+.btn:active {
+    border-color: var(--dark) var(--light) var(--light) var(--dark);
+    box-shadow:
+        inset 1px 1px var(--shadow),
+        inset -1px -1px var(--light); /* Shadow inversion on press */
+    padding: 8px 13px 6px 15px; /* Shift text and icon down/right */
+}
+.btn.primary {
+    font-weight: bold;
+}
+.btn.full {
+    display: flex;
+    width: 100%;
+}
+
+/* ---- Inline Win95-style browser icons ---- */
+.btn-ic,
+.legend-ic {
+    display: inline-block;
+    vertical-align: middle;
+    flex: none;
+    image-rendering: pixelated; /* Now icons are strictly pixelated */
+}
+/* Changed to 16x16, because the new SVG icons are exact 16-bit pixel art */
+.btn-ic {
+    width: 16px;
+    height: 16px;
+}
+.legend-ic {
+    width: 14px;
+    height: 14px;
+    margin-right: 2px;
+}
+
+.btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.btn-row .btn {
+    flex: 1;
+    min-width: 140px;
+}
+
+.input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 5px 6px;
+    font: 13px monospace;
+    background: var(--field);
+    color: var(--fieldtext);
+    border: 2px inset var(--shadow);
+}
+
+a.link {
+    color: var(--link);
+    font-weight: bold;
+}
+a.link:hover {
+    background: var(--link);
+    color: #fff;
+    text-decoration: none;
+}
+
+code {
+    background: var(--field);
+    color: var(--fieldtext);
+    padding: 2px 5px;
+    border: 1px solid var(--shadow);
+    font:
+        13px JetBrains Mono,
+        monospace;
+}
+
+ol.steps,
+ul.bullets {
+    padding-left: 22px;
+    margin: 4px 0 8px;
+    line-height: 1.9;
+}
+ul.bullets {
+    list-style: none;
+    padding-left: 0;
+}
+ul.bullets li::before {
+    content: "▪ ";
+    color: var(--accent);
+    font-weight: bold;
+}
+
+.note {
+    background: var(--field);
+    color: var(--fieldtext);
+    border: 2px inset var(--shadow);
+    padding: 8px 10px;
+    font-size: 13px;
+    margin: 6px 0;
+}
+.note.warn {
+    background: #fff3cd;
+    color: #664d03;
+    border-color: #ffe69c;
+}
+body.dark .note.warn {
+    background: #3a2f15;
+    color: #ffd66e;
+    border-color: #5a4a20;
+}
+
+/* ---- Grid Layouts ---- */
+.hero-cta {
+    display: grid;
+    grid-template-columns: repeat(
+        2,
+        1fr
+    ); /* 2 columns — 4 buttons look better */
+    gap: 10px;
+    margin-top: 12px;
+}
+@media (min-width: 720px) {
+    .hero-cta {
+        grid-template-columns: repeat(4, 1fr);
+    } /* 4 in a row on desktop */
+}
+@media (max-width: 540px) {
+    .hero-cta {
+        grid-template-columns: 1fr;
+    }
+}
+
+.feat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+}
+@media (max-width: 540px) {
+    .feat-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.feat-card {
+    border: 2px solid;
+    border-color: var(--light) var(--dark) var(--dark) var(--light);
+    background: var(--field);
+    color: var(--fieldtext);
+    padding: 10px 12px;
+}
+.feat-card b {
+    color: var(--accent);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+.feat-card .ico {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    background: var(--accent);
+    color: #fff;
+    text-align: center;
+    line-height: 22px;
+    font-weight: bold;
+    margin-right: 6px;
+    vertical-align: -5px;
+}
+
+details {
+    margin: 4px 0 8px;
+    border-top: 1px dotted var(--shadow);
+    padding-top: 6px;
+}
+details:first-of-type {
+    border-top: none;
+    padding-top: 0;
+}
+details summary {
+    cursor: pointer;
+    font-weight: bold;
+    padding: 4px 0;
+    outline: none;
+}
+details summary:hover {
+    color: var(--accent);
+}
+details p {
+    padding: 4px 0 8px 16px;
+    line-height: 1.5;
+}
+
+footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(0, 0, 0, 0.2);
+    margin-top: auto;
+}
+footer a {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* hidden by default; lang switcher toggles via body class */
+[data-lang] {
+    display: none;
+}
+body.lang-en [data-lang="en"],
+body.lang-ru [data-lang="ru"],
+body.lang-de [data-lang="de"],
+body.lang-fr [data-lang="fr"] {
+    display: block;
+}
+[data-lang][data-inline] {
+    display: none;
+}
+body.lang-en [data-lang="en"][data-inline],
+body.lang-ru [data-lang="ru"][data-inline],
+body.lang-de [data-lang="de"][data-inline],
+body.lang-fr [data-lang="fr"][data-inline] {
+    display: inline;
+}
+
+.kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--shadow);
+    background: var(--bg);
+    color: var(--text);
+    font: 12px monospace;
+    box-shadow:
+        0 1px 0 var(--shadow),
+        inset 0 -1px 0 var(--shadow);
+}
+
+.badge {
+    display: inline-block;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: bold;
+    background: var(--accent);
+    color: #fff;
+    border: 1px solid var(--dark);
+}
+.badge.green {
+    background: #1e6e2c;
+}
+.badge.red {
+    background: #a8201f;
+}
+
+/* ===================================================================
+   Mobile responsive — phones (≤640px) and tablets (≤980px)
+   =================================================================== */
+
+@media (max-width: 980px) {
+    main {
+        padding: 12px;
+        gap: 14px;
+    }
+    .win,
+    .win.wide {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Slightly larger touch font + body padding scaled to viewport */
+    html,
+    body {
+        font-size: 14px;
+    }
+    main {
+        padding: 8px;
+        gap: 10px;
+    }
+
+    /* Menubar — wrap items and become slightly more compact */
+    .menubar {
+        flex-wrap: wrap;
+        padding: 4px 6px;
+        gap: 2px;
+    }
+    .menubar a {
+        padding: 4px 8px;
+        font-size: 13px;
+    }
+    .menubar .logo {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--shadow);
+        padding: 2px 0 4px;
+        margin-bottom: 2px;
+    }
+    .menubar .spacer {
+        display: none;
+    }
+    .menubar .lang-sw,
+    .menubar .theme-sw {
+        margin-left: auto;
+    }
+
+    /* Win95 windows take full width, lose the offset shadow */
+    .win,
+    .win.wide {
+        max-width: 100%;
+        box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+    }
+    .titlebar {
+        font-size: 12px;
+        padding: 3px 4px;
+    }
+
+    /* Content padding tightens up */
+    .content {
+        padding: 8px;
+    }
+    .group {
+        padding: 8px 8px 10px;
+        margin-bottom: 8px;
+    }
+
+    /* Buttons & lists — full width, tap-friendly */
+    .btn {
+        width: 100%;
+        padding: 8px 10px;
+    }
+    .btn-row,
+    .hero-cta {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    .feat-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .feat-card {
+        padding: 8px 10px;
+    }
+
+    /* Form fields stretch */
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    textarea,
+    select,
+    .wp-input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Footer */
+    footer {
+        padding: 12px 8px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 420px) {
+    /* Tiny phones — even more compact */
+    html,
+    body {
+        font-size: 13px;
+    }
+    .menubar a {
+        padding: 3px 6px;
+        font-size: 12px;
+    }
+    .menubar .lang-sw span,
+    .menubar .theme-sw span {
+        padding: 2px 4px;
+        font-size: 10px;
+    }
+    .titlebar {
+        font-size: 11px;
+    }
+    .content {
+        padding: 6px;
+    }
+    .group {
+        padding: 6px 6px 8px;
+    }
+}

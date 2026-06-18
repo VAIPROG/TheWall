@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · The Wall Dev</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg">
+  <link rel="stylesheet" href="/assets/style.css">
+  <style>
+    .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+    .dash-card{border:2px outset var(--bg);background:var(--field);color:var(--fieldtext);padding:12px}
+    .dash-card h3{margin:0 0 6px;color:var(--accent);font-size:14px}
+    .dash-card .v{font-size:24px;font-weight:bold}
+    .dash-card .l{font-size:12px;color:var(--sub);margin-top:2px}
+    .auth-gate{padding:30px;text-align:center;background:var(--field);color:var(--fieldtext);border:2px inset var(--shadow)}
+  </style>
+</head>
+<body>
+<div id="chrome-root"></div>
+
+<main>
+  <div class="win wide">
+    <div class="titlebar">
+      <span><span class="led"></span>dashboard.exe</span>
+      <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
+    </div>
+    <div class="content">
+      <div class="group">
+        <div class="legend"><span data-i18n="dashboard.title">Dashboard</span></div>
+        <p data-i18n="dashboard.subtitle"></p>
+      </div>
+
+      <div id="auth-gate" class="auth-gate" style="display:none">
+        <p data-i18n="dashboard.auth_gate"></p>
+        <p style="margin-top:10px">
+          <a href="/vai-auth.html" class="btn primary" data-i18n="common.sign_in">Sign in</a>
+        </p>
+      </div>
+
+      <div id="dash-body" style="display:none">
+        <div class="dash-grid">
+          <div class="dash-card">
+            <h3 data-i18n="dashboard.my_clans">My clans</h3>
+            <div class="v" id="stat-clans">—</div>
+            <div class="l" id="stat-clans-detail"></div>
+          </div>
+          <div class="dash-card">
+            <h3 data-i18n="dashboard.my_templates">My templates</h3>
+            <div class="v" id="stat-tpls">—</div>
+            <div class="l" id="stat-tpls-detail"></div>
+          </div>
+          <div class="dash-card">
+            <h3 data-i18n="dashboard.linked_accounts">Linked accounts</h3>
+            <div class="v" id="stat-links">—</div>
+            <div class="l">
+              <a href="/me.html" class="link" data-i18n="common.edit">Edit</a>
+            </div>
+          </div>
+          <div class="dash-card">
+            <h3>Achievements</h3>
+            <div class="v" id="stat-ach">—</div>
+            <div class="l">
+              <a href="/achievements.html" class="link" data-i18n="common.open">Open</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="group" style="margin-top:14px">
+          <div class="legend" data-i18n="dashboard.notifications">Notification preferences</div>
+          <table style="width:100%;font-size:12px" id="notif-table">
+            <thead><tr><th align="left">Kind</th><th align="left">Channels</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="footer-root"></div>
+<script src="/assets/i18n.js"></script>
+<script src="/assets/app.js"></script>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function authHeaders(){
+  try{
+    const cfg = JSON.parse(localStorage.getItem('walldev_cfg') || '{}');
+    if (cfg.backendToken) return { Authorization: 'Bearer ' + cfg.backendToken };
+  }catch{}
+  const t = localStorage.getItem('wall_landing_jwt') || localStorage.getItem('wall_vai_jwt');
+  return t ? { Authorization: 'Bearer ' + t } : null;
+}
+async function init(){
+  const h = authHeaders();
+  if (!h){
+    document.getElementById('auth-gate').style.display='block';
+    return;
+  }
+  document.getElementById('dash-body').style.display='block';
+  // Pull /me, count clans, templates by owner.
+  try {
+    const me = await (await fetch('/api/v2/auth/me', { headers: h })).json();
+    document.getElementById('stat-clans').textContent = me.clans?.length || 0;
+    document.getElementById('stat-clans-detail').textContent =
+      (me.clans||[]).map(c => c.clan_name).join(', ');
+    const tpls = await (await fetch('/api/v2/templates?author='+me.id+'&limit=200', { headers:h })).json();
+    document.getElementById('stat-tpls').textContent = tpls.length;
+    const approved = tpls.filter(t=>t.status==='approved').length;
+    document.getElementById('stat-tpls-detail').textContent = approved + ' approved';
+    const links = await (await fetch('/api/v2/me/links', { headers:h })).json();
+    const linkedCount = [links.discord_id, links.telegram_user_id, links.email].filter(Boolean).length;
+    document.getElementById('stat-links').textContent = wd_t('dashboard.links_count', {n: linkedCount});
+    const ach = await (await fetch('/api/v2/me/achievements', { headers:h })).json();
+    const unlocked = ach.filter(a => a.unlocked_at).length;
+    document.getElementById('stat-ach').textContent = unlocked + ' / ' + ach.length;
+    const prefs = await (await fetch('/api/v2/me/notifications', { headers:h })).json();
+    document.querySelector('#notif-table tbody').innerHTML =
+      prefs.map(p => `<tr><td>${esc(p.kind)}</td><td>${p.channels.map(esc).join(', ')}${p.is_default ? ' <i>(default)</i>':''}</td></tr>`).join('');
+  } catch (e) {
+    document.getElementById('dash-body').innerHTML = '<p style="color:#c33">Error: '+esc(e.message)+'</p>';
+  }
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

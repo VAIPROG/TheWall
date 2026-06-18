@@ -1,0 +1,157 @@
+{
+  "nav": {
+    "home": "Start",
+    "about": "Über",
+    "docs": "Doku",
+    "feed": "Feed",
+    "achievements": "Achievements",
+    "changelog": "Changelog",
+    "vai_auth": "VAI Konto",
+    "privacy": "Datenschutz",
+    "dashboard": "Dashboard",
+    "me": "Profil",
+    "api_docs": "API"
+  },
+  "footer": {
+    "contact": "Kontakt",
+    "made_by": "Erstellt von <b>VAI_PROG (vai an der Wand)</b> für die russischsprachige Filian-Community."
+  },
+  "common": {
+    "loading": "Laden…",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "back": "Zurück",
+    "open": "Öffnen",
+    "yes": "Ja",
+    "no": "Nein",
+    "sign_in": "Anmelden",
+    "sign_out": "Abmelden",
+    "auth_required": "Bitte zuerst anmelden.",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "more": "Mehr"
+  },
+  "index": {
+    "title_suffix": "Win95-Overlay für ",
+    "tagline_en": "Zeichenhilfen, Clan-Chat, Vorlagen, Discord- und Telegram-Sync — verändert den Code der Website NICHT. Nutzt ausschließlich die eingebaute öffentliche API der Seite.",
+    "version_pill": "Erweiterung v4 · Backend v2",
+    "download_tampermonkey": "Tampermonkey",
+    "download_chrome": "Chrome",
+    "download_firefox": "Firefox",
+    "download_safari": "Safari",
+    "source_label": "Quellcode:",
+    "what_inside": "Funktionen",
+    "fair_play_title": "Fair-Play · Kein Code verändert",
+    "fair_play_body": "Diese Erweiterung verändert den Quellcode der Website NICHT. Jeder Pixel wird durch Ihren Klick über die eigene öffentliche API der Seite gesetzt — derselbe Endpunkt, den die Seiten-UI aufruft. Wir lesen die öffentliche Tile-Schicht und Ihr bestehendes Session-Cookie (das die Seite beim Login gesetzt hat). Kein Patching, kein Hooking, keine WebSocket-Injection, kein Captcha-Bypass. Das JavaScript der Seite läuft exakt so, wie es die Entwickler ausgeliefert haben."
+  },
+  "features": {
+    "overlay": {
+      "title": "Cozy Overlay",
+      "body": "PNG laden, Koordinaten setzen, Skala 5%–1000%."
+    },
+    "clan": {
+      "title": "Clan-Toolkit",
+      "body": "Live-Chat, Liste, Vorlagen, modmail, clan_alert."
+    },
+    "mailbox": {
+      "title": "Vereinheitlichter Posteingang",
+      "body": "Announcements, alerts, DMs, modmail, template-events."
+    },
+    "grief": {
+      "title": "Anti-Grief",
+      "body": "Vorlage anpinnen — Server prüft alle 4 Min und alarmiert bei Schaden."
+    },
+    "snapshots": {
+      "title": "Server-Snapshots",
+      "body": "Alle 4 Min in 3 Qualitäten → Discord + Telegram."
+    },
+    "achievements": {
+      "title": "Achievements",
+      "body": "20+ Badges, einige geheim."
+    },
+    "themes": {
+      "title": "Themes & Skalierung",
+      "body": "Dunkel/Hell/CRT, 80–160% UI, 4 Sprachen."
+    },
+    "accounts": {
+      "title": "Verknüpfte Konten",
+      "body": "VAI SSO, Discord & Telegram OIDC, E-Mail per Support."
+    }
+  },
+  "install": {
+    "title": "Installation",
+    "tampermonkey_step1": "Tampermonkey im Browser-Store installieren.",
+    "tampermonkey_step2": "Userscript-Link klicken → Install.",
+    "tampermonkey_step3": "filianislost.com öffnen — Panel erscheint oben rechts.",
+    "chrome_step1": "extension-chrome.zip laden & entpacken.",
+    "chrome_step2": "chrome://extensions, Entwicklermodus aktivieren.",
+    "chrome_step3": "Entpackte Erweiterung laden → Ordner wählen.",
+    "firefox_step1": "extension-firefox.zip laden & entpacken.",
+    "firefox_step2": "about:debugging#/runtime/this-firefox.",
+    "firefox_step3": "Temporäres Add-on laden → manifest.json wählen.",
+    "firefox_note": "Firefox-Build unsigniert — bis Neustart geladen.",
+    "safari_step1": "extension-safari.zip auf macOS herunterladen und entpacken.",
+    "safari_step2": "Im Terminal: xcrun safari-web-extension-converter ./extension-safari",
+    "safari_step3": "Xcode öffnet ein Wrapper-Projekt — einmal kompilieren und starten, um die Erweiterung zu installieren.",
+    "safari_step4": "Safari → Einstellungen → Erweiterungen, „The Wall Dev“ aktivieren, dann filianislost.com öffnen.",
+    "safari_note": "Safari benötigt macOS + Xcode für den Wrap und eine Apple Developer ID (99 $/Jahr) für den App Store. Lokale Entwicklung kostenlos. Safari 16.4+."
+  },
+  "docs": {
+    "title": "Dokumentation",
+    "intro": "Schritt-für-Schritt-Anleitungen.",
+    "sections": {
+      "getting_started": "Erste Schritte",
+      "anti_grief": "Anti-Grief",
+      "linked_accounts": "Konten verknüpfen",
+      "api": "API-Referenz",
+      "troubleshooting": "Fehlerbehebung",
+      "self_host": "Backend selbst hosten"
+    }
+  },
+  "feed": {
+    "title": "Live-Feed",
+    "intro": "Server-Snapshots (4 Min) + gespiegelte Signale.",
+    "snapshots": "Letzte Snapshots",
+    "signals": "Letzte Signale",
+    "no_snapshots": "Noch keine Snapshots.",
+    "no_signals": "Noch keine Signale."
+  },
+  "achievements": {
+    "title": "Achievements",
+    "intro": "Badges durch Nutzung freischalten.",
+    "loading": "Lade Katalog…",
+    "category": "Kategorie",
+    "points": "Punkte",
+    "locked": "Gesperrt",
+    "unlocked": "Freigeschaltet",
+    "secret": "Verborgen"
+  },
+  "changelog": { "title": "Changelog", "intro": "Highlights pro Version." },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Deine Steuerzentrale.",
+    "auth_gate": "Nicht angemeldet.",
+    "my_clans": "Meine Clans",
+    "my_templates": "Meine Vorlagen",
+    "linked_accounts": "Verknüpfte Konten",
+    "notifications": "Benachrichtigungen",
+    "links_count": "{n} verknüpft"
+  },
+  "vai": {
+    "title": "VAI Konto",
+    "subtitle": "Eine Identität für alle VAI-PROG-Dienste.",
+    "sign_in_tab": "Anmelden",
+    "sign_up_tab": "Konto erstellen",
+    "ecosystem_title": "Ökosystem",
+    "ecosystem_now": "The Wall Dev — verfügbar.",
+    "ecosystem_soon": "Weitere VAI-PROG-Tools — gleiches Konto."
+  },
+  "api_docs": {
+    "title": "API-Dokumentation",
+    "intro": "Öffentliche V2-API. Spec: /openapi.yaml.",
+    "swagger": "Swagger UI",
+    "redoc": "ReDoc"
+  }
+}

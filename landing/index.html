@@ -1,0 +1,1698 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>The Wall Dev — Win95 overlay for filianislost.com</title>
+        <meta
+            name="description"
+            content="Win95-styled overlay extension for filianislost.com. Drawing aids, clan chat, templates, Discord & Telegram sync. Does NOT modify the site's code — uses only built-in public APIs."
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            href="/assets/favicon/favicon-96x96.png?v=20260603"
+            sizes="96x96"
+        />
+        <link
+            rel="icon"
+            type="image/svg+xml"
+            href="/assets/favicon/favicon.svg?v=20260603"
+        />
+        <link
+            rel="shortcut icon"
+            href="/assets/favicon/favicon.ico?v=20260603"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="180x180"
+            href="/assets/favicon/apple-touch-icon.png?v=20260603"
+        />
+        <meta name="apple-mobile-web-app-title" content="WallDev" />
+        <link
+            rel="manifest"
+            href="/assets/favicon/site.webmanifest?v=20260603"
+        />
+        <link rel="stylesheet" href="/assets/style.css" />
+        <style>
+            .version-pill {
+                display: inline-block;
+                padding: 3px 10px;
+                background: var(--accent);
+                color: #fff;
+                font-weight: bold;
+                font-size: 12px;
+                border: 1px solid var(--dark);
+                margin-bottom: 6px;
+            }
+            .banner-wrap {
+                margin: -12px -12px 8px;
+                padding: 0;
+                overflow: hidden;
+                border-bottom: 2px solid var(--shadow);
+            }
+            .banner-wrap img {
+                display: block;
+                width: 100%;
+                height: auto;
+                max-height: 160px;
+                object-fit: cover;
+            }
+            .feat-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 10px;
+            }
+            .feat-card {
+                border: 2px outset var(--bg);
+                background: var(--field);
+                color: var(--fieldtext);
+                padding: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .feat-card b {
+                color: var(--accent);
+                font-size: 14px;
+            }
+            .feat-card .ic {
+                font-size: 22px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="chrome-root"></div>
+
+        <main>
+            <!-- HERO -->
+            <div class="win wide">
+                <div class="titlebar">
+                    <span><span class="led"></span>the_wall_dev.exe</span>
+                    <span class="tbtns"
+                        ><span class="tbtn">_</span><span class="tbtn">▢</span
+                        ><span class="tbtn">✕</span></span
+                    >
+                </div>
+                <div class="content">
+                    <div class="group">
+                        <div class="banner-wrap">
+                            <img src="/assets/banner.svg" alt="The Wall Dev" />
+                        </div>
+                        <div class="legend">The Wall Dev</div>
+                        <div class="version-pill" id="version-pill">
+                            Extension · Backend — loading…
+                        </div>
+                        <h1
+                            style="
+                                font-size: 24px;
+                                margin: 6px 0 8px;
+                                line-height: 1.2;
+                            "
+                        >
+                            <span data-i18n="index.title_suffix"
+                                >Win95-styled overlay for
+                            </span>
+                            <a href="https://filianislost.com" class="link"
+                                >filianislost.com</a
+                            >
+                        </h1>
+                        <p data-i18n="index.tagline_en"></p>
+
+                        <div class="hero-cta">
+                            <a
+                                href="/dist/the-wall-dev.user.js"
+                                class="btn primary win95-btn"
+                            >
+                                <svg
+                                    class="btn-ic"
+                                    viewBox="0 0 16 16"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    shape-rendering="crispEdges"
+                                    aria-hidden="true"
+                                >
+                                    <rect
+                                        x="2"
+                                        y="3"
+                                        width="14"
+                                        height="12"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="1"
+                                        y="2"
+                                        width="14"
+                                        height="12"
+                                        fill="#c0c0c0"
+                                    />
+                                    <rect
+                                        x="1"
+                                        y="2"
+                                        width="14"
+                                        height="1"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="1"
+                                        y="2"
+                                        width="1"
+                                        height="12"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="14"
+                                        y="3"
+                                        width="1"
+                                        height="11"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="13"
+                                        width="13"
+                                        height="1"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="4"
+                                        width="10"
+                                        height="2"
+                                        fill="#0000a8"
+                                    />
+                                    <rect
+                                        x="11"
+                                        y="4"
+                                        width="2"
+                                        height="2"
+                                        fill="#c0c0c0"
+                                    />
+                                    <rect
+                                        x="11.5"
+                                        y="4.5"
+                                        width="1"
+                                        height="1"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="7"
+                                        width="10"
+                                        height="5"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="8"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                    <rect
+                                        x="4"
+                                        y="9"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="10"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                    <rect
+                                        x="9"
+                                        y="8"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                    <rect
+                                        x="8"
+                                        y="9"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                    <rect
+                                        x="7"
+                                        y="10"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                    <rect
+                                        x="11"
+                                        y="8"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                    <rect
+                                        x="12"
+                                        y="9"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                    <rect
+                                        x="11"
+                                        y="10"
+                                        width="1"
+                                        height="1"
+                                        fill="#00ff00"
+                                    />
+                                </svg>
+                                <span data-i18n="index.download_tampermonkey"
+                                    >Tampermonkey</span
+                                >
+                            </a>
+
+                            <a
+                                href="/dist/extension-chrome.zip"
+                                class="btn primary win95-btn"
+                            >
+                                <svg
+                                    class="btn-ic"
+                                    viewBox="0 0 16 16"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    shape-rendering="crispEdges"
+                                    aria-hidden="true"
+                                >
+                                    <rect
+                                        x="5"
+                                        y="1"
+                                        width="6"
+                                        height="14"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="2"
+                                        width="10"
+                                        height="12"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="3"
+                                        width="12"
+                                        height="10"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="1"
+                                        y="5"
+                                        width="14"
+                                        height="6"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="2"
+                                        width="6"
+                                        height="4"
+                                        fill="#ff0000"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="3"
+                                        width="10"
+                                        height="3"
+                                        fill="#ff0000"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="5"
+                                        width="5"
+                                        height="1"
+                                        fill="#ff0000"
+                                    />
+                                    <rect
+                                        x="9"
+                                        y="5"
+                                        width="5"
+                                        height="4"
+                                        fill="#ffff00"
+                                    />
+                                    <rect
+                                        x="8"
+                                        y="9"
+                                        width="5"
+                                        height="4"
+                                        fill="#ffff00"
+                                    />
+                                    <rect
+                                        x="11"
+                                        y="4"
+                                        width="2"
+                                        height="1"
+                                        fill="#ffff00"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="6"
+                                        width="5"
+                                        height="4"
+                                        fill="#008000"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="10"
+                                        width="5"
+                                        height="3"
+                                        fill="#008000"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="13"
+                                        width="5"
+                                        height="1"
+                                        fill="#008000"
+                                    />
+                                    <rect
+                                        x="6"
+                                        y="6"
+                                        width="4"
+                                        height="4"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="7"
+                                        y="7"
+                                        width="2"
+                                        height="2"
+                                        fill="#0000a8"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="2"
+                                        width="4"
+                                        height="1"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="3"
+                                        width="1"
+                                        height="2"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="5"
+                                        width="1"
+                                        height="3"
+                                        fill="#fff"
+                                    />
+                                </svg>
+                                <span data-i18n="index.download_chrome"
+                                    >Chrome</span
+                                >
+                            </a>
+
+                            <a
+                                href="/dist/extension-firefox.zip"
+                                class="btn primary win95-btn"
+                            >
+                                <svg
+                                    class="btn-ic"
+                                    viewBox="0 0 16 16"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    shape-rendering="crispEdges"
+                                    aria-hidden="true"
+                                >
+                                    <rect
+                                        x="5"
+                                        y="1"
+                                        width="6"
+                                        height="14"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="2"
+                                        width="10"
+                                        height="12"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="3"
+                                        width="12"
+                                        height="10"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="1"
+                                        y="5"
+                                        width="14"
+                                        height="6"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="2"
+                                        width="6"
+                                        height="12"
+                                        fill="#008080"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="3"
+                                        width="10"
+                                        height="10"
+                                        fill="#008080"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="4"
+                                        width="12"
+                                        height="8"
+                                        fill="#008080"
+                                    />
+                                    <rect
+                                        x="6"
+                                        y="3"
+                                        width="4"
+                                        height="8"
+                                        fill="#00ffff"
+                                    />
+                                    <rect
+                                        x="4"
+                                        y="5"
+                                        width="8"
+                                        height="4"
+                                        fill="#00ffff"
+                                    />
+                                    <rect
+                                        x="7"
+                                        y="2"
+                                        width="4"
+                                        height="2"
+                                        fill="#ff8000"
+                                    />
+                                    <rect
+                                        x="9"
+                                        y="2"
+                                        width="2"
+                                        height="1"
+                                        fill="#ffff00"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="3"
+                                        width="3"
+                                        height="4"
+                                        fill="#ff8000"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="5"
+                                        width="3"
+                                        height="6"
+                                        fill="#ff8000"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="9"
+                                        width="7"
+                                        height="4"
+                                        fill="#ff8000"
+                                    />
+                                    <rect
+                                        x="9"
+                                        y="6"
+                                        width="4"
+                                        height="4"
+                                        fill="#ff8000"
+                                    />
+                                    <rect
+                                        x="11"
+                                        y="6"
+                                        width="1"
+                                        height="1"
+                                        fill="#ffff00"
+                                    />
+                                    <rect
+                                        x="11"
+                                        y="8"
+                                        width="2"
+                                        height="1"
+                                        fill="#ffff00"
+                                    />
+                                    <rect
+                                        x="12"
+                                        y="8"
+                                        width="1"
+                                        height="1"
+                                        fill="#000"
+                                    />
+                                </svg>
+                                <span data-i18n="index.download_firefox"
+                                    >Firefox</span
+                                >
+                            </a>
+
+                            <a
+                                href="/dist/extension-safari.zip"
+                                class="btn primary win95-btn"
+                            >
+                                <svg
+                                    class="btn-ic"
+                                    viewBox="0 0 16 16"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    shape-rendering="crispEdges"
+                                    aria-hidden="true"
+                                >
+                                    <rect
+                                        x="5"
+                                        y="1"
+                                        width="6"
+                                        height="14"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="2"
+                                        width="10"
+                                        height="12"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="3"
+                                        width="12"
+                                        height="10"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="1"
+                                        y="5"
+                                        width="14"
+                                        height="6"
+                                        fill="#000"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="2"
+                                        width="6"
+                                        height="12"
+                                        fill="#c0c0c0"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="3"
+                                        width="10"
+                                        height="10"
+                                        fill="#c0c0c0"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="4"
+                                        width="12"
+                                        height="8"
+                                        fill="#c0c0c0"
+                                    />
+                                    <rect
+                                        x="1"
+                                        y="6"
+                                        width="14"
+                                        height="4"
+                                        fill="#c0c0c0"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="2"
+                                        width="6"
+                                        height="1"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="3"
+                                        y="3"
+                                        width="3"
+                                        height="1"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="2"
+                                        y="4"
+                                        width="1"
+                                        height="4"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="13"
+                                        width="6"
+                                        height="1"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="11"
+                                        y="12"
+                                        width="2"
+                                        height="1"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="13"
+                                        y="5"
+                                        width="1"
+                                        height="7"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="4"
+                                        width="6"
+                                        height="8"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="4"
+                                        y="5"
+                                        width="8"
+                                        height="6"
+                                        fill="#fff"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="5"
+                                        width="6"
+                                        height="6"
+                                        fill="#00ffff"
+                                    />
+                                    <rect
+                                        x="7"
+                                        y="4"
+                                        width="2"
+                                        height="1"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="7"
+                                        y="11"
+                                        width="2"
+                                        height="1"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="4"
+                                        y="7"
+                                        width="1"
+                                        height="2"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="11"
+                                        y="7"
+                                        width="1"
+                                        height="2"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="9"
+                                        y="5"
+                                        width="2"
+                                        height="2"
+                                        fill="#ff0000"
+                                    />
+                                    <rect
+                                        x="8"
+                                        y="6"
+                                        width="2"
+                                        height="2"
+                                        fill="#ff0000"
+                                    />
+                                    <rect
+                                        x="5"
+                                        y="9"
+                                        width="2"
+                                        height="2"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="6"
+                                        y="8"
+                                        width="2"
+                                        height="2"
+                                        fill="#808080"
+                                    />
+                                    <rect
+                                        x="7"
+                                        y="7"
+                                        width="2"
+                                        height="2"
+                                        fill="#ffff00"
+                                    />
+                                </svg>
+                                <span data-i18n="index.download_safari"
+                                    >Safari</span
+                                >
+                            </a>
+                        </div>
+                        <div
+                            id="build-variants"
+                            style="
+                                margin-top: 10px;
+                                font-size: 12px;
+                                color: var(--sub);
+                                line-height: 1.6;
+                            "
+                        >
+                            <!-- filled by the version script below; hidden when signature.json is absent -->
+                        </div>
+                        <p
+                            style="
+                                margin-top: 10px;
+                                font-size: 13px;
+                                color: var(--sub);
+                            "
+                        >
+                            <span data-i18n="index.source_label">source:</span>
+                            <a
+                                href="https://github.com/Vadim-Khristenko"
+                                class="link"
+                                >GitHub</a
+                            >
+                            · API:
+                            <a href="/api-docs/" class="link">/api-docs/</a> ·
+                            <a href="/openapi.yaml" class="link"
+                                >openapi.yaml</a
+                            >
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FEATURES -->
+            <div class="win wide">
+                <div class="titlebar">
+                    <span>features.txt</span
+                    ><span class="tbtns"><span class="tbtn">_</span></span>
+                </div>
+                <div class="content">
+                    <div class="group">
+                        <div class="legend">
+                            <span data-i18n="index.what_inside"
+                                >What's inside</span
+                            >
+                        </div>
+                        <div class="feat-grid">
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">📐</span>
+                                    <span
+                                        data-i18n="features.overlay.title"
+                                    ></span></b
+                                ><span data-i18n="features.overlay.body"></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">🛡</span>
+                                    <span
+                                        data-i18n="features.clan.title"
+                                    ></span></b
+                                ><span data-i18n="features.clan.body"></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">📬</span>
+                                    <span
+                                        data-i18n="features.mailbox.title"
+                                    ></span></b
+                                ><span data-i18n="features.mailbox.body"></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">🚨</span>
+                                    <span
+                                        data-i18n="features.grief.title"
+                                    ></span></b
+                                ><span data-i18n="features.grief.body"></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">📸</span>
+                                    <span
+                                        data-i18n="features.snapshots.title"
+                                    ></span></b
+                                ><span
+                                    data-i18n="features.snapshots.body"
+                                ></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">🏆</span>
+                                    <span
+                                        data-i18n="features.achievements.title"
+                                    ></span></b
+                                ><span
+                                    data-i18n="features.achievements.body"
+                                ></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">🌙</span>
+                                    <span
+                                        data-i18n="features.themes.title"
+                                    ></span></b
+                                ><span data-i18n="features.themes.body"></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">🔗</span>
+                                    <span
+                                        data-i18n="features.accounts.title"
+                                    ></span></b
+                                ><span
+                                    data-i18n="features.accounts.body"
+                                ></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="group">
+                        <div class="legend">
+                            <span data-i18n="index.fair_play_title"
+                                >Fair-Play</span
+                            >
+                        </div>
+                        <p data-i18n="index.fair_play_body"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INSTALL -->
+            <div class="win wide">
+                <div class="titlebar">
+                    <span>install.hlp</span
+                    ><span class="tbtns"><span class="tbtn">_</span></span>
+                </div>
+                <div class="content">
+                    <div class="group">
+                        <div class="legend">
+                            <svg
+                                class="legend-ic"
+                                viewBox="0 0 16 16"
+                                xmlns="http://www.w3.org/2000/svg"
+                                shape-rendering="crispEdges"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="2"
+                                    y="3"
+                                    width="14"
+                                    height="12"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="1"
+                                    y="2"
+                                    width="14"
+                                    height="12"
+                                    fill="#c0c0c0"
+                                />
+                                <rect
+                                    x="1"
+                                    y="2"
+                                    width="14"
+                                    height="1"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="1"
+                                    y="2"
+                                    width="1"
+                                    height="12"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="14"
+                                    y="3"
+                                    width="1"
+                                    height="11"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="2"
+                                    y="13"
+                                    width="13"
+                                    height="1"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="3"
+                                    y="4"
+                                    width="10"
+                                    height="2"
+                                    fill="#0000a8"
+                                />
+                                <rect
+                                    x="11"
+                                    y="4"
+                                    width="2"
+                                    height="2"
+                                    fill="#c0c0c0"
+                                />
+                                <rect
+                                    x="11.5"
+                                    y="4.5"
+                                    width="1"
+                                    height="1"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="3"
+                                    y="7"
+                                    width="10"
+                                    height="5"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="5"
+                                    y="8"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                                <rect
+                                    x="4"
+                                    y="9"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                                <rect
+                                    x="5"
+                                    y="10"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                                <rect
+                                    x="9"
+                                    y="8"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                                <rect
+                                    x="8"
+                                    y="9"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                                <rect
+                                    x="7"
+                                    y="10"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                                <rect
+                                    x="11"
+                                    y="8"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                                <rect
+                                    x="12"
+                                    y="9"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                                <rect
+                                    x="11"
+                                    y="10"
+                                    width="1"
+                                    height="1"
+                                    fill="#00ff00"
+                                />
+                            </svg>
+                            Tampermonkey
+                        </div>
+                        <ol class="steps">
+                            <li data-i18n="install.tampermonkey_step1"></li>
+                            <li data-i18n="install.tampermonkey_step2"></li>
+                            <li data-i18n="install.tampermonkey_step3"></li>
+                        </ol>
+                    </div>
+
+                    <div class="group">
+                        <div class="legend">
+                            <svg
+                                class="legend-ic"
+                                viewBox="0 0 16 16"
+                                xmlns="http://www.w3.org/2000/svg"
+                                shape-rendering="crispEdges"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="5"
+                                    y="1"
+                                    width="6"
+                                    height="14"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="3"
+                                    y="2"
+                                    width="10"
+                                    height="12"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="2"
+                                    y="3"
+                                    width="12"
+                                    height="10"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="1"
+                                    y="5"
+                                    width="14"
+                                    height="6"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="5"
+                                    y="2"
+                                    width="6"
+                                    height="4"
+                                    fill="#ff0000"
+                                />
+                                <rect
+                                    x="3"
+                                    y="3"
+                                    width="10"
+                                    height="3"
+                                    fill="#ff0000"
+                                />
+                                <rect
+                                    x="2"
+                                    y="5"
+                                    width="5"
+                                    height="1"
+                                    fill="#ff0000"
+                                />
+                                <rect
+                                    x="9"
+                                    y="5"
+                                    width="5"
+                                    height="4"
+                                    fill="#ffff00"
+                                />
+                                <rect
+                                    x="8"
+                                    y="9"
+                                    width="5"
+                                    height="4"
+                                    fill="#ffff00"
+                                />
+                                <rect
+                                    x="11"
+                                    y="4"
+                                    width="2"
+                                    height="1"
+                                    fill="#ffff00"
+                                />
+                                <rect
+                                    x="2"
+                                    y="6"
+                                    width="5"
+                                    height="4"
+                                    fill="#008000"
+                                />
+                                <rect
+                                    x="3"
+                                    y="10"
+                                    width="5"
+                                    height="3"
+                                    fill="#008000"
+                                />
+                                <rect
+                                    x="5"
+                                    y="13"
+                                    width="5"
+                                    height="1"
+                                    fill="#008000"
+                                />
+                                <rect
+                                    x="6"
+                                    y="6"
+                                    width="4"
+                                    height="4"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="7"
+                                    y="7"
+                                    width="2"
+                                    height="2"
+                                    fill="#0000a8"
+                                />
+                                <rect
+                                    x="5"
+                                    y="2"
+                                    width="4"
+                                    height="1"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="3"
+                                    y="3"
+                                    width="1"
+                                    height="2"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="2"
+                                    y="5"
+                                    width="1"
+                                    height="3"
+                                    fill="#fff"
+                                />
+                            </svg>
+                            Chrome / Edge / Brave
+                        </div>
+                        <ol class="steps">
+                            <li data-i18n="install.chrome_step1"></li>
+                            <li data-i18n="install.chrome_step2"></li>
+                            <li data-i18n="install.chrome_step3"></li>
+                        </ol>
+                    </div>
+
+                    <div class="group">
+                        <div class="legend">
+                            <svg
+                                class="legend-ic"
+                                viewBox="0 0 16 16"
+                                xmlns="http://www.w3.org/2000/svg"
+                                shape-rendering="crispEdges"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="5"
+                                    y="1"
+                                    width="6"
+                                    height="14"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="3"
+                                    y="2"
+                                    width="10"
+                                    height="12"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="2"
+                                    y="3"
+                                    width="12"
+                                    height="10"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="1"
+                                    y="5"
+                                    width="14"
+                                    height="6"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="5"
+                                    y="2"
+                                    width="6"
+                                    height="12"
+                                    fill="#008080"
+                                />
+                                <rect
+                                    x="3"
+                                    y="3"
+                                    width="10"
+                                    height="10"
+                                    fill="#008080"
+                                />
+                                <rect
+                                    x="2"
+                                    y="4"
+                                    width="12"
+                                    height="8"
+                                    fill="#008080"
+                                />
+                                <rect
+                                    x="6"
+                                    y="3"
+                                    width="4"
+                                    height="8"
+                                    fill="#00ffff"
+                                />
+                                <rect
+                                    x="4"
+                                    y="5"
+                                    width="8"
+                                    height="4"
+                                    fill="#00ffff"
+                                />
+                                <rect
+                                    x="7"
+                                    y="2"
+                                    width="4"
+                                    height="2"
+                                    fill="#ff8000"
+                                />
+                                <rect
+                                    x="9"
+                                    y="2"
+                                    width="2"
+                                    height="1"
+                                    fill="#ffff00"
+                                />
+                                <rect
+                                    x="3"
+                                    y="3"
+                                    width="3"
+                                    height="4"
+                                    fill="#ff8000"
+                                />
+                                <rect
+                                    x="2"
+                                    y="5"
+                                    width="3"
+                                    height="6"
+                                    fill="#ff8000"
+                                />
+                                <rect
+                                    x="3"
+                                    y="9"
+                                    width="7"
+                                    height="4"
+                                    fill="#ff8000"
+                                />
+                                <rect
+                                    x="9"
+                                    y="6"
+                                    width="4"
+                                    height="4"
+                                    fill="#ff8000"
+                                />
+                                <rect
+                                    x="11"
+                                    y="6"
+                                    width="1"
+                                    height="1"
+                                    fill="#ffff00"
+                                />
+                                <rect
+                                    x="11"
+                                    y="8"
+                                    width="2"
+                                    height="1"
+                                    fill="#ffff00"
+                                />
+                                <rect
+                                    x="12"
+                                    y="8"
+                                    width="1"
+                                    height="1"
+                                    fill="#000"
+                                />
+                            </svg>
+                            Firefox
+                        </div>
+                        <ol class="steps">
+                            <li data-i18n="install.firefox_step1"></li>
+                            <li data-i18n="install.firefox_step2"></li>
+                            <li data-i18n="install.firefox_step3"></li>
+                        </ol>
+                        <div
+                            class="note"
+                            data-i18n="install.firefox_note"
+                        ></div>
+                    </div>
+
+                    <div class="group">
+                        <div class="legend">
+                            <svg
+                                class="legend-ic"
+                                viewBox="0 0 16 16"
+                                xmlns="http://www.w3.org/2000/svg"
+                                shape-rendering="crispEdges"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="5"
+                                    y="1"
+                                    width="6"
+                                    height="14"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="3"
+                                    y="2"
+                                    width="10"
+                                    height="12"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="2"
+                                    y="3"
+                                    width="12"
+                                    height="10"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="1"
+                                    y="5"
+                                    width="14"
+                                    height="6"
+                                    fill="#000"
+                                />
+                                <rect
+                                    x="5"
+                                    y="2"
+                                    width="6"
+                                    height="12"
+                                    fill="#c0c0c0"
+                                />
+                                <rect
+                                    x="3"
+                                    y="3"
+                                    width="10"
+                                    height="10"
+                                    fill="#c0c0c0"
+                                />
+                                <rect
+                                    x="2"
+                                    y="4"
+                                    width="12"
+                                    height="8"
+                                    fill="#c0c0c0"
+                                />
+                                <rect
+                                    x="1"
+                                    y="6"
+                                    width="14"
+                                    height="4"
+                                    fill="#c0c0c0"
+                                />
+                                <rect
+                                    x="5"
+                                    y="2"
+                                    width="6"
+                                    height="1"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="3"
+                                    y="3"
+                                    width="3"
+                                    height="1"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="2"
+                                    y="4"
+                                    width="1"
+                                    height="4"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="5"
+                                    y="13"
+                                    width="6"
+                                    height="1"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="11"
+                                    y="12"
+                                    width="2"
+                                    height="1"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="13"
+                                    y="5"
+                                    width="1"
+                                    height="7"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="5"
+                                    y="4"
+                                    width="6"
+                                    height="8"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="4"
+                                    y="5"
+                                    width="8"
+                                    height="6"
+                                    fill="#fff"
+                                />
+                                <rect
+                                    x="5"
+                                    y="5"
+                                    width="6"
+                                    height="6"
+                                    fill="#00ffff"
+                                />
+                                <rect
+                                    x="7"
+                                    y="4"
+                                    width="2"
+                                    height="1"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="7"
+                                    y="11"
+                                    width="2"
+                                    height="1"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="4"
+                                    y="7"
+                                    width="1"
+                                    height="2"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="11"
+                                    y="7"
+                                    width="1"
+                                    height="2"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="9"
+                                    y="5"
+                                    width="2"
+                                    height="2"
+                                    fill="#ff0000"
+                                />
+                                <rect
+                                    x="8"
+                                    y="6"
+                                    width="2"
+                                    height="2"
+                                    fill="#ff0000"
+                                />
+                                <rect
+                                    x="5"
+                                    y="9"
+                                    width="2"
+                                    height="2"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="6"
+                                    y="8"
+                                    width="2"
+                                    height="2"
+                                    fill="#808080"
+                                />
+                                <rect
+                                    x="7"
+                                    y="7"
+                                    width="2"
+                                    height="2"
+                                    fill="#ffff00"
+                                />
+                            </svg>
+                            Safari (macOS)
+                        </div>
+                        <ol class="steps">
+                            <li data-i18n="install.safari_step1"></li>
+                            <li data-i18n="install.safari_step2"></li>
+                            <li data-i18n="install.safari_step3"></li>
+                            <li data-i18n="install.safari_step4"></li>
+                        </ol>
+                        <div class="note" data-i18n="install.safari_note"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LINKS to other landing pages -->
+            <div class="win wide">
+                <div class="titlebar">
+                    <span>more.lnk</span
+                    ><span class="tbtns"><span class="tbtn">_</span></span>
+                </div>
+                <div class="content">
+                    <div class="group">
+                        <div class="btn-row">
+                            <a href="/docs.html" class="btn"
+                                ><span data-i18n="nav.docs">Docs</span></a
+                            >
+                            <a href="/feed.html" class="btn"
+                                ><span data-i18n="nav.feed">Feed</span></a
+                            >
+                            <a href="/achievements.html" class="btn"
+                                ><span data-i18n="nav.achievements"
+                                    >Achievements</span
+                                ></a
+                            >
+                            <a href="/changelog.html" class="btn"
+                                ><span data-i18n="nav.changelog"
+                                    >Changelog</span
+                                ></a
+                            >
+                            <a href="/api-docs/" class="btn"
+                                ><span data-i18n="nav.api_docs">API</span></a
+                            >
+                            <a href="/vai-auth.html" class="btn"
+                                ><span data-i18n="nav.vai_auth"
+                                    >VAI Account</span
+                                ></a
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="footer-root"></div>
+        <script src="/assets/i18n.js"></script>
+        <script src="/assets/app.js"></script>
+        <script>
+            // Live versions + build-variant downloads. Sources:
+            //   /api/meta            — backend version, extension_version, deployed_at
+            //   /dist/signature.json — what `bun run publish` actually shipped
+            (async () => {
+                const pill = document.getElementById("version-pill");
+                const box = document.getElementById("build-variants");
+                let meta = null,
+                    sig = null;
+                try {
+                    meta = await (
+                        await fetch("/api/meta", { cache: "no-store" })
+                    ).json();
+                } catch {}
+                try {
+                    sig = await (
+                        await fetch("/dist/signature.json", {
+                            cache: "no-store",
+                        })
+                    ).json();
+                } catch {}
+
+                if (pill) {
+                    const ext =
+                        (sig && sig.version) ||
+                        (meta &&
+                            (meta.extension_version || "").replace(
+                                /^Version\s*/i,
+                                "",
+                            ));
+                    const back = meta && meta.version;
+                    const deployed =
+                        meta && meta.deployed_at
+                            ? new Date(meta.deployed_at)
+                            : null;
+                    pill.textContent =
+                        (ext ? "Extension v" + ext : "Extension —") +
+                        " · " +
+                        (back ? "Backend v" + back : "Backend offline") +
+                        (deployed
+                            ? " · " + deployed.toLocaleDateString()
+                            : "");
+                }
+
+                if (box && sig && sig.variants) {
+                    const kb = (n) =>
+                        n ? " (" + Math.round(n) + " KB)" : "";
+                    const link = (url, label) =>
+                        '<a class="link" href="' +
+                        url +
+                        '">' +
+                        label +
+                        "</a>";
+                    const row = (key, title, hintEn) => {
+                        const v = sig.variants[key];
+                        if (!v) return "";
+                        const zips = ["chrome", "firefox", "safari"]
+                            .filter((b) => v.zips && v.zips[b])
+                            .map((b) =>
+                                link(
+                                    v.zips[b].url,
+                                    b[0].toUpperCase() +
+                                        b.slice(1) +
+                                        kb(v.zips[b].kb),
+                                ),
+                            )
+                            .join(" · ");
+                        return (
+                            "<div><b>" +
+                            title +
+                            "</b> <span style='opacity:.75'>" +
+                            hintEn +
+                            "</span><br>" +
+                            zips +
+                            " · " +
+                            link(
+                                v.userscript,
+                                "userscript" + kb(v.userscript_kb),
+                            ) +
+                            "</div>"
+                        );
+                    };
+                    const html =
+                        row(
+                            "release",
+                            "Release",
+                            "— recommended, readable build",
+                        ) +
+                        row(
+                            "smallest",
+                            "Smallest",
+                            "— max-compressed, same features",
+                        );
+                    if (html) {
+                        box.innerHTML =
+                            html +
+                            '<div style="opacity:.6">build ' +
+                            (sig.hash || "") +
+                            " · " +
+                            (sig.built_at
+                                ? new Date(sig.built_at).toLocaleString()
+                                : "") +
+                            "</div>";
+                    }
+                }
+            })();
+        </script>
+    </body>
+</html>

@@ -1,0 +1,157 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "about": "À propos",
+    "docs": "Doc",
+    "feed": "Flux",
+    "achievements": "Succès",
+    "changelog": "Historique",
+    "vai_auth": "Compte VAI",
+    "privacy": "Confidentialité",
+    "dashboard": "Tableau",
+    "me": "Profil",
+    "api_docs": "API"
+  },
+  "footer": {
+    "contact": "contact",
+    "made_by": "Créé par <b>VAI_PROG (vai sur le mur)</b> pour la communauté russophone Filian."
+  },
+  "common": {
+    "loading": "Chargement…",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "back": "Retour",
+    "open": "Ouvrir",
+    "yes": "Oui",
+    "no": "Non",
+    "sign_in": "Connexion",
+    "sign_out": "Déconnexion",
+    "auth_required": "Connectez-vous d'abord.",
+    "copy": "Copier",
+    "copied": "Copié !",
+    "more": "Plus"
+  },
+  "index": {
+    "title_suffix": "Superposition Win95 pour ",
+    "tagline_en": "Aides au dessin, chat de clan, modèles, sync Discord et Telegram — NE modifie PAS le code du site. Utilise uniquement l'API publique intégrée du site.",
+    "version_pill": "Extension v4 · Backend v2",
+    "download_tampermonkey": "Tampermonkey",
+    "download_chrome": "Chrome",
+    "download_firefox": "Firefox",
+    "download_safari": "Safari",
+    "source_label": "code source :",
+    "what_inside": "À l'intérieur",
+    "fair_play_title": "Fair-Play · Aucune modification du code",
+    "fair_play_body": "Cette extension NE modifie PAS le code source du site. Chaque pixel est placé par votre clic via l'API publique du site — le même endpoint que l'interface du site appelle. Nous lisons la couche de tuiles publique et votre cookie de session existant (celui que le site a défini lors de votre connexion). Pas de patching, pas de hooking, pas d'injection WebSocket, pas de contournement de captcha. Le JavaScript du site s'exécute exactement tel que livré par ses développeurs."
+  },
+  "features": {
+    "overlay": {
+      "title": "Calque pixel-perfect",
+      "body": "Déposez un PNG, échelle 5%–1000%."
+    },
+    "clan": {
+      "title": "Boîte à outils Clan",
+      "body": "Chat live, liste, modèles, modmail, alertes."
+    },
+    "mailbox": {
+      "title": "Boîte unifiée",
+      "body": "Annonces, alertes, DMs, modmail, events."
+    },
+    "grief": {
+      "title": "Anti-grief",
+      "body": "Épingler un modèle, surveillance toutes 4 min."
+    },
+    "snapshots": {
+      "title": "Snapshots serveur",
+      "body": "Toutes 4 min, 3 qualités → Discord + Telegram."
+    },
+    "achievements": {
+      "title": "Succès",
+      "body": "20+ badges, certains secrets."
+    },
+    "themes": {
+      "title": "Thèmes & échelle",
+      "body": "Sombre/Clair/CRT, UI 80–160%, 4 langues."
+    },
+    "accounts": {
+      "title": "Comptes liés",
+      "body": "VAI SSO, Discord & Telegram OIDC, email via support."
+    }
+  },
+  "install": {
+    "title": "Installation",
+    "tampermonkey_step1": "Installer Tampermonkey.",
+    "tampermonkey_step2": "Cliquer le lien userscript → Install.",
+    "tampermonkey_step3": "Ouvrir filianislost.com.",
+    "chrome_step1": "Télécharger & décompresser extension-chrome.zip.",
+    "chrome_step2": "Ouvrir chrome://extensions, activer le mode développeur.",
+    "chrome_step3": "« Charger l'extension non empaquetée » → dossier.",
+    "firefox_step1": "Télécharger extension-firefox.zip.",
+    "firefox_step2": "about:debugging#/runtime/this-firefox.",
+    "firefox_step3": "« Charger un module temporaire » → manifest.json.",
+    "firefox_note": "Build Firefox non signé — chargé jusqu'au redémarrage.",
+    "safari_step1": "Téléchargez extension-safari.zip sur macOS et décompressez.",
+    "safari_step2": "Dans le Terminal : xcrun safari-web-extension-converter ./extension-safari",
+    "safari_step3": "Xcode ouvre un projet wrapper — compilez et lancez une fois pour installer l'extension.",
+    "safari_step4": "Safari → Réglages → Extensions, activez « The Wall Dev », puis ouvrez filianislost.com.",
+    "safari_note": "Safari nécessite macOS + Xcode pour le wrap et un Apple Developer ID (99 $/an) pour la distribution App Store. L'installation locale est gratuite. Compatible Safari 16.4+."
+  },
+  "docs": {
+    "title": "Documentation",
+    "intro": "Guides pas-à-pas.",
+    "sections": {
+      "getting_started": "Démarrage",
+      "anti_grief": "Anti-grief",
+      "linked_accounts": "Comptes liés",
+      "api": "Référence API",
+      "troubleshooting": "Dépannage",
+      "self_host": "Auto-hébergement"
+    }
+  },
+  "feed": {
+    "title": "Flux",
+    "intro": "Snapshots du serveur + signaux miroirs.",
+    "snapshots": "Snapshots récents",
+    "signals": "Derniers signaux",
+    "no_snapshots": "Aucun snapshot.",
+    "no_signals": "Aucun signal."
+  },
+  "achievements": {
+    "title": "Succès",
+    "intro": "Débloquez des badges.",
+    "loading": "Chargement…",
+    "category": "Catégorie",
+    "points": "Points",
+    "locked": "Verrouillé",
+    "unlocked": "Débloqué",
+    "secret": "Caché"
+  },
+  "changelog": { "title": "Historique", "intro": "Points forts par version." },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "subtitle": "Votre panneau.",
+    "auth_gate": "Non connecté.",
+    "my_clans": "Mes clans",
+    "my_templates": "Mes modèles",
+    "linked_accounts": "Comptes liés",
+    "notifications": "Préférences",
+    "links_count": "{n} liés"
+  },
+  "vai": {
+    "title": "Compte VAI",
+    "subtitle": "Une identité pour tous les services VAI-PROG.",
+    "sign_in_tab": "Connexion",
+    "sign_up_tab": "Créer un compte",
+    "ecosystem_title": "Écosystème",
+    "ecosystem_now": "The Wall Dev — disponible.",
+    "ecosystem_soon": "Autres outils VAI-PROG — même compte."
+  },
+  "api_docs": {
+    "title": "Documentation API",
+    "intro": "API V2 publique. Spec : /openapi.yaml.",
+    "swagger": "Swagger UI",
+    "redoc": "ReDoc"
+  }
+}
