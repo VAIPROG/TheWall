@@ -2,15 +2,21 @@ declare const __INJECT_VERSION__: string;
 declare const __INJECT_DEV__: boolean;
 
 /**
- * Compile-time version flag injected by build.ts.
+ * Compile-time version flag injected by build.ts. esbuild replaces the
+ * identifier at build time; the `typeof` guard keeps the module importable in
+ * contexts without that define (e.g. running a test file directly under Bun),
+ * where it falls back to a dev marker instead of throwing a ReferenceError.
  */
-export const VERSION: string = __INJECT_VERSION__;
+export const VERSION: string =
+  typeof __INJECT_VERSION__ !== "undefined" ? __INJECT_VERSION__ : "0.0.0-dev";
 
 /**
  * Compile-time build-mode flag injected by build.ts.
  * `false` in release/smallest → the whole dev-tools module tree-shakes out.
+ * Guarded like VERSION so the module imports cleanly without the define.
  */
-export const __WALLDEV_DEV__: boolean = __INJECT_DEV__;
+export const __WALLDEV_DEV__: boolean =
+  typeof __INJECT_DEV__ !== "undefined" ? __INJECT_DEV__ : false;
 
 export const WALL_W = 6000;
 export const WALL_H = 4200;

@@ -2,11 +2,14 @@ import { cfg, saveCfg, loadCfg, resetCfg } from "./config";
 import {
   SITE,
   WS_HOST,
+  WALL_W,
+  WALL_H,
   WINDOW_MIN_WIDTH_PX,
   WINDOW_MIN_HEIGHT_PX,
   WINDOW_MAX_WIDTH_PX,
   WINDOW_MAX_HEIGHT_PX,
 } from "./constants";
+import { teleport } from "./coords";
 import { $, esc, errMsg } from "./helpers";
 import { ic, achIcon as achIconHelper } from "./icons";
 import { t } from "./i18n";
@@ -20,13 +23,19 @@ import {
   isPicking,
   setIsPicking,
   setOverlayPos,
-  applyOverlayScale,
+  renderOverlay,
   togglePick,
   updateLockBtn,
-  setOverlaySrc,
+  clearOverlay,
   restartCompactMarkersRefresh,
 } from "./overlay";
-import { quantize, templateProgress } from "./templates";
+import { insertTemplate } from "./template-insert";
+import {
+  wireOverlayPersistence,
+  clearPersistedOverlay,
+  flushOverlaySave,
+} from "./overlay-persist";
+import { templateProgress } from "./template-progress";
 import { importShare, genShare } from "./share";
 import { applyTheme, applyUiScale, applyCozy } from "./theme";
 import { applyCursorMode } from "./cursors";
@@ -248,19 +257,18 @@ export function wireUI(win: HTMLElement): void {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (!f) return;
     const rd = new FileReader();
-    rd.onload = (ev) => {
-      const img = new Image();
-      img.onload = () =>
-        quantize(img, (q) => {
-          setOverlaySrc(q, img.naturalWidth, img.naturalHeight);
-          setIsLocked(false);
-          updateLockBtn();
-          toast(
-            "Template",
-            `${img.naturalWidth}×${img.naturalHeight} quantized`,
-          );
-        });
-      img.src = (ev.target as FileReader).result as string;
+    rd.onload = async (ev) => {
+      // A raw upload is palette-quantised on the way in; it keeps the
+      // overlay's current position (uploading doesn't move it).
+      const { w, h } = await insertTemplate({
+        imageDataUrl: (ev.target as FileReader).result as string,
+        x: overlayData.x,
+        y: overlayData.y,
+        quantize: true,
+      });
+      setIsLocked(false);
+      updateLockBtn();
+      toast("Template", `${w}×${h} quantized`);
     };
     rd.readAsDataURL(f);
   });
@@ -545,20 +553,13 @@ export function wireUI(win: HTMLElement): void {
         return true;
       case "data-url-image": {
         if (!d.dataUrl) return false;
-        const dims = await new Promise<{ w: number; h: number }>(
-          (resolve, reject) => {
-            const img = new Image();
-            img.onload = () =>
-              resolve({ w: img.naturalWidth, h: img.naturalHeight });
-            img.onerror = () => reject(new Error("decode failed"));
-            img.src = d.dataUrl!;
-          },
-        );
-        setOverlaySrc(d.dataUrl, dims.w, dims.h);
-        toast(
-          "Import",
-          `Loaded image (${dims.w}×${dims.h}) from ${sourceLabel}`,
-        );
+        const { w, h } = await insertTemplate({
+          imageDataUrl: d.dataUrl,
+          x: overlayData.x,
+          y: overlayData.y,
+          quantize: true,
+        });
+        toast("Import", `Loaded image (${w}×${h}) from ${sourceLabel}`);
         return true;
       }
       default:
@@ -847,6 +848,43 @@ export function wireUI(win: HTMLElement): void {
   $("coord-x")!.addEventListener("input", onCoords);
   $("coord-y")!.addEventListener("input", onCoords);
   $("btn-pick")!.addEventListener("click", () => togglePick(!isPicking));
+  $("btn-teleport")?.addEventListener("click", async () => {
+    const x = parseInt(($("coord-x") as HTMLInputElement).value) || 0;
+    const y = parseInt(($("coord-y") as HTMLInputElement).value) || 0;
+    if (x < 0 || x >= WALL_W || y < 0 || y >= WALL_H) {
+      await errorDlg(t("teleportRange", { w: WALL_W - 1, h: WALL_H - 1 }));
+      return;
+    }
+    // Teleport rides the site's URL deep-link, which only takes effect on a
+    // reload. The overlay is persisted and auto-restored after the reload, so
+    // there's nothing to lose — just flush the latest state first.
+    await flushOverlaySave();
+    teleport(x, y);
+  });
+  $("btn-clear-overlay")?.addEventListener("click", async () => {
+    if (overlayData.src && !(await confirmDlg(t("clearOverlayConfirm")))) return;
+    clearOverlay();
+    await clearPersistedOverlay();
+    toast(t("file"), t("clearOverlayDone"));
+  });
+
+  // Keep the scale controls + clear button in step with the live overlay
+  // state (coords are already synced by setOverlayPos). Fires on load, move,
+  // scale, animation, clear and restore.
+  const syncOverlayControls = () => {
+    const loaded = !!overlayData.src;
+    const clearBtn = $("btn-clear-overlay") as HTMLButtonElement | null;
+    if (clearBtn) clearBtn.disabled = !loaded;
+    const pct = Math.round((cfg.overlayScale || 1) * 100);
+    const sval = $("scale-val");
+    if (sval) sval.textContent = `${pct}%`;
+    for (const id of ["scale-range", "scale-input"]) {
+      const el = $(id) as HTMLInputElement | null;
+      if (el && document.activeElement !== el) el.value = String(pct);
+    }
+  };
+  document.addEventListener("wd:overlay-changed", syncOverlayControls);
+  wireOverlayPersistence();
   // Overlay scale (5% – 1000%). Apply is heavy (resize + quantize a possibly
   // huge image), so debounce slider drags. Direct number-input and presets
   // apply immediately because they're discrete clicks.
@@ -864,11 +902,11 @@ export function wireUI(win: HTMLElement): void {
     if (inputEl && parseInt(inputEl.value) !== clamped)
       inputEl.value = String(clamped);
     if (scaleTimer != null) clearTimeout(scaleTimer);
-    if (immediate) applyOverlayScale();
+    if (immediate) renderOverlay();
     else
       scaleTimer = window.setTimeout(() => {
         scaleTimer = null;
-        applyOverlayScale();
+        renderOverlay();
       }, 220);
   };
   $("scale-range")!.addEventListener("input", (e: Event) => {
@@ -914,7 +952,7 @@ export function wireUI(win: HTMLElement): void {
       overlayImg.style.opacity = cfg.compactMarkers
         ? "1"
         : String(cfg.defaultOpacity);
-    applyOverlayScale();
+    renderOverlay();
     log(
       "OVERLAY",
       "INFO",
@@ -940,7 +978,7 @@ export function wireUI(win: HTMLElement): void {
     saveCfg();
   });
   $("cfg-compact-size")?.addEventListener("change", () => {
-    if (cfg.compactMarkers) applyOverlayScale();
+    if (cfg.compactMarkers) renderOverlay();
   });
   $("btn-progress")!.addEventListener("click", () => templateProgress(false));
   $("btn-progress-guide")!.addEventListener("click", () =>

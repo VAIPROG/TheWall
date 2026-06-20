@@ -212,7 +212,7 @@ const BOX_W = 60;
 console.log(`\n  ${BOLD}${FG_CYAN}╔${"═".repeat(BOX_W)}╗${RESET}`);
 const titleStr = `${BOLD}THE WALL DEV${RESET} ${DIM}v${VERSION}${RESET}`;
 const titleVisibleLen = 12 + 2 + VERSION.length;
-const spaces = Math.max(1, BOX_W - titleVisibleLen - 14);
+const spaces = Math.max(1, BOX_W - titleVisibleLen - 15);
 console.log(
   `  ${BOLD}${FG_CYAN}║${RESET}  ${titleStr}${" ".repeat(spaces)}${headBadge}  ${BOLD}${FG_CYAN}║${RESET}`,
 );

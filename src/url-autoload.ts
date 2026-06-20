@@ -32,14 +32,15 @@ import { importShare } from "./share";
 import { showImportMetaDialog } from "./overlay-share-dialogs";
 
 const PARAM = "the_wall_dev";
+const CHARITY_PARAM = "charity";
 
-/** Cleanly strip our param from the URL after consuming it, so a refresh
+/** Cleanly strip a param from the URL after consuming it, so a refresh
  *  doesn't re-import the same template forever. */
-function stripParam(): void {
+function stripParam(name: string): void {
   try {
     const u = new URL(window.location.href);
-    if (u.searchParams.has(PARAM)) {
-      u.searchParams.delete(PARAM);
+    if (u.searchParams.has(name)) {
+      u.searchParams.delete(name);
       window.history.replaceState({}, "", u.toString());
     }
   } catch { /* ignore — URL API not available */ }
@@ -156,20 +157,47 @@ async function tryValue(raw: string): Promise<boolean> {
   return false;
 }
 
-/** Inspect the current URL and run the appropriate importer when needed.
- *  Idempotent — only the first call within a page-life does work, because
- *  we strip the param after handling it. */
-export async function maybeAutoloadFromUrl(): Promise<void> {
-  let raw: string | null = null;
+/**
+ * Inspect the current URL and load a template from it, in priority order:
+ *
+ *   1. `?the_wall_dev=…` — our own share link / export (consumed + stripped).
+ *   2. `?charity=<url>`  — a Charity config URL (e.g. filianislost's own
+ *      `?charity=https://…/template.json`). Left in the URL so the site /
+ *      Charity overlay can read it too.
+ *
+ * Returns true when a template was loaded, so the caller can fall back to the
+ * remembered overlay only when neither param applied.
+ */
+export async function maybeAutoloadFromUrl(): Promise<boolean> {
+  let params: URLSearchParams;
   try {
-    raw = new URL(window.location.href).searchParams.get(PARAM);
-  } catch { return; }
-  if (!raw) return;
-  log.info("AUTOLOAD", `the_wall_dev=${raw.slice(0, 80)}…`);
-  stripParam();
-  try {
-    await tryValue(raw);
-  } catch (e: any) {
-    log.err("AUTOLOAD", e?.message || String(e));
+    params = new URL(window.location.href).searchParams;
+  } catch {
+    return false;
   }
+
+  const tw = params.get(PARAM);
+  if (tw) {
+    log.info("AUTOLOAD", `the_wall_dev=${tw.slice(0, 80)}…`);
+    stripParam(PARAM);
+    try {
+      return await tryValue(tw);
+    } catch (e: any) {
+      log.err("AUTOLOAD", errMsg(e));
+      return false;
+    }
+  }
+
+  const charity = params.get(CHARITY_PARAM);
+  if (charity) {
+    log.info("AUTOLOAD", `charity=${charity.slice(0, 80)}…`);
+    try {
+      return await tryValue(charity);
+    } catch (e: any) {
+      log.err("AUTOLOAD", errMsg(e));
+      return false;
+    }
+  }
+
+  return false;
 }

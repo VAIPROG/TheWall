@@ -13,11 +13,56 @@ use sqlx::PgPool;
 use tokio::time::{MissedTickBehavior, interval};
 use uuid::Uuid;
 
-use crate::telegram_rich::{esc, send_rich_html};
 use crate::OAuthConfig;
+use crate::telegram_rich::{esc, send_rich_html};
 
 const TICK: Duration = Duration::from_secs(10);
 const BATCH: i64 = 20;
+
+use rand::Rng;
+
+const TITLES: &[&str] = &[
+    "🎨 Can refilled",
+    "🎨 Tank full",
+    "🎨 Fresh load",
+    "🎨 Paint reloaded",
+    "🎨 Spray ready",
+];
+
+const BODIES: &[&str] = &[
+    "Your spray can is full.\nThe wall is waiting.",
+    "Ink tank topped up.\nGo make your mark.",
+    "Can is heavy again.\nThe streets are calling.",
+    "Fresh paint loaded.\nTime to hit the wall.",
+    "Tank full.\nThe blocks are empty.",
+];
+
+fn tg_refill_html(note: &str) -> String {
+    let mut rng = rand::thread_rng();
+    let title = TITLES[rng.gen_range(0..TITLES.len())];
+    let body = BODIES[rng.gen_range(0..BODIES.len())].replace('\n', "<br>");
+
+    let footer = if note.is_empty() {
+        String::new()
+    } else {
+        format!("<footer>{}</footer>", esc(note))
+    };
+
+    format!("<h3>{}</h3><p>{}</p>{}", title, body, footer)
+}
+
+fn dc_refill_message(note: &str) -> String {
+    let mut rng = rand::thread_rng();
+    let title = TITLES[rng.gen_range(0..TITLES.len())];
+    let body = BODIES[rng.gen_range(0..BODIES.len())];
+    let mut message = format!("# {}\n{}", title, body);
+
+    if !note.is_empty() {
+        message.push_str(&format!("\n> {}", note));
+    }
+
+    message
+}
 
 #[derive(Debug, sqlx::FromRow)]
 struct DueReminder {
@@ -66,11 +111,11 @@ async fn tick(
         if let Err(ref e) = delivered {
             tracing::warn!("reminder {} for {}: {e}", r.id, r.username);
         }
-        // Mark regardless — see module doc.
-        let _ = sqlx::query("UPDATE paint_reminders SET sent = TRUE, sent_at = NOW() WHERE id = $1")
-            .bind(r.id)
-            .execute(pool)
-            .await;
+        let _ =
+            sqlx::query("UPDATE paint_reminders SET sent = TRUE, sent_at = NOW() WHERE id = $1")
+                .bind(r.id)
+                .execute(pool)
+                .await;
     }
     Ok(())
 }
@@ -86,14 +131,7 @@ async fn deliver(
     if try_tg {
         if let Some(tok) = oauth.telegram_bot_token.as_deref() {
             let chat = r.telegram_user_id.as_deref().unwrap();
-            let html = format!(
-                "<h3>🎨 Paint refilled!</h3><p>Your spray can is full again — the wall awaits.</p>{}",
-                if r.note.is_empty() {
-                    String::new()
-                } else {
-                    format!("<footer>{}</footer>", esc(&r.note))
-                }
-            );
+            let html = tg_refill_html(&r.note);
             match send_rich_html(client, tok, chat, &html, false).await {
                 Ok(()) => return Ok(()),
                 Err(e) if r.channel == "telegram" => return Err(e),
@@ -131,11 +169,9 @@ async fn discord_dm(
         .get("id")
         .and_then(|i| i.as_str())
         .ok_or_else(|| format!("DM channel open failed: {dm}"))?;
-    let content = if note.is_empty() {
-        "🎨 **Paint refilled!** Your spray can is full again — the wall awaits.".to_string()
-    } else {
-        format!("🎨 **Paint refilled!** Your spray can is full again.\n> {note}")
-    };
+
+    let content = dc_refill_message(note);
+
     let r = client
         .post(format!(
             "https://discord.com/api/v10/channels/{channel_id}/messages"
@@ -145,6 +181,7 @@ async fn discord_dm(
         .send()
         .await
         .map_err(|e| e.to_string())?;
+
     if r.status().is_success() {
         Ok(())
     } else {

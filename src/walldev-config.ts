@@ -13,14 +13,9 @@
  *   applyWallDevExport(json)   — apply an envelope (incl. animation)
  */
 import { log } from "./log";
-import {
-  setOverlaySrc,
-  setOverlayPos,
-  setOverlayAnimation,
-  getOverlayAnimation,
-  overlayData,
-} from "./overlay";
-import { cfg, saveCfg } from "./config";
+import { getOverlayAnimation, overlayData, type AnimSource } from "./overlay";
+import { insertTemplate } from "./template-insert";
+import { cfg } from "./config";
 import { VERSION } from "./constants";
 import {
   animationBlockOf,
@@ -159,16 +154,10 @@ export async function applyWallDevExport(
 ): Promise<void> {
   const t = payload.template;
   if (!t?.image_data_url) throw new Error("export missing image_data_url");
-  const dims = await new Promise<{ w: number; h: number }>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = () => reject(new Error("decode failed"));
-    img.src = t.image_data_url;
-  });
-  cfg.overlayScale = t.scale || 1;
-  saveCfg();
-  setOverlaySrc(t.image_data_url, dims.w, dims.h);
-  setOverlayPos(t.x, t.y);
+
+  // Resolve the animation (if any) before inserting so the whole template
+  // applies through one insertTemplate call.
+  let animation: AnimSource | null = null;
   if (t.animation) {
     const animCfg = configFromEnvelope({
       name: t.name,
@@ -179,11 +168,20 @@ export async function applyWallDevExport(
       animation: t.animation,
     });
     if (animCfg && animCfg.sheet.frameCount > 1) {
-      setOverlayAnimation({ kind: "wall-anim", config: animCfg });
+      animation = { kind: "wall-anim", config: animCfg };
     } else {
       log.warn("WALLDEV", "export carried a malformed animation block — loaded static");
     }
   }
+
+  await insertTemplate({
+    imageDataUrl: t.image_data_url,
+    x: t.x,
+    y: t.y,
+    scale: t.scale || 1,
+    animation,
+  });
+
   if (onMeta && (payload.author || payload.note)) {
     onMeta({ author: payload.author, note: payload.note });
   }

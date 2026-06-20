@@ -272,9 +272,9 @@ async function testDiscord(token: string, targetId?: string) {
 
 async function main() {
   if (isTelegram) {
-    await testTelegram(token);
+    await testTelegram(token!);
   } else {
-    await testDiscord(token, targetUserId);
+    await testDiscord(token!, targetUserId);
   }
 
   console.log(

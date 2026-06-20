@@ -33,6 +33,7 @@ import { PAINT_REFILL_AWAY_THRESHOLD_MS } from "./constants";
 import { playPaintRefillSound } from "./paint-sound";
 import { startSignalsCache } from "./signals-cache";
 import { maybeAutoloadFromUrl } from "./url-autoload";
+import { restoreLastOverlay } from "./overlay-persist";
 import { startInboxWatcher } from "./inbox-watcher";
 import { installDevTools } from "./dev-tools";
 
@@ -84,9 +85,17 @@ import { t, pluralize } from "./i18n";
     startSiteProfileInject();
     startPaintWatch();
     startSignalsCache();
-    // Honour `?the_wall_dev=…` after the overlay layer has been mounted —
-    // we need setOverlaySrc / setOverlayPos to be live before applying.
-    setTimeout(() => maybeAutoloadFromUrl().catch(() => {}), 500);
+    // Load priority once the overlay layer is mounted (setOverlaySrc /
+    // setOverlayPos must be live first):
+    //   1. ?the_wall_dev=…  share link / export
+    //   2. ?charity=<url>   Charity config URL
+    //   3. the last overlay remembered from a previous session
+    // maybeAutoloadFromUrl handles 1 & 2 and reports whether it loaded
+    // anything; only then do we skip the remembered overlay.
+    setTimeout(async () => {
+      const loaded = await maybeAutoloadFromUrl().catch(() => false);
+      if (!loaded) await restoreLastOverlay().catch(() => {});
+    }, 500);
     document.addEventListener("wd:paint-refilled", (ev: any) => {
       // The CustomEvent detail carries a fully-derived PaintRefillDetail
       // (px + totalCans + extraCans + partial + awayMs). Read totalCans

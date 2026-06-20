@@ -39,7 +39,7 @@ import {
   overlayData,
   setOverlayAnimation,
   getOverlayAnimation,
-  applyOverlayScale,
+  renderOverlay,
 } from "./overlay";
 import { Backend, getMe } from "./backend";
 import { PALETTE, quantizeBuffer } from "./palette";
@@ -112,7 +112,7 @@ export function installDevTools(): void {
     setScale: (s: number) => {
       cfg.overlayScale = s;
       saveCfg();
-      applyOverlayScale(true);
+      renderOverlay(true);
       return s;
     },
 

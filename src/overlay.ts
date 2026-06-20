@@ -146,83 +146,113 @@ export function setOverlayPos(x: number, y: number): void {
   if (cx) cx.value = String(x);
   const cy = getElCoordY();
   if (cy) cy.value = String(y);
+  emitOverlayChanged();
 }
 
-export function applyOverlayScale(forceTemplateRebuild = false): void {
-  if (!overlayImg) return;
-  const src = overlayData.srcOrig || overlayData.src;
-  if (!src) return;
-  // Animated template: one frame of the sheet is the template unit; static:
-  // the whole image.
+/**
+ * The "template unit" to rasterise at the current scale:
+ *   - static template → the whole image
+ *   - animation       → the current frame's footprint of the sprite sheet
+ * The source sub-rect needs the decoded image's natural size, so it is
+ * resolved later in rasteriseFrame(); here we compute only what's known up
+ * front — the output footprint and which animation frame is due.
+ */
+interface FrameTarget {
+  outW: number;
+  outH: number;
+  animFrame: number;
+}
+
+function frameTarget(): FrameTarget | null {
   const anim = _animRt;
   const animFrame = anim ? anim.frameAt(Date.now()) : 0;
-  const ow = (anim && anim.frameWidth) || overlayData.origW || overlayData.w;
-  const oh = (anim && anim.frameHeight) || overlayData.origH || overlayData.h;
-  if (!ow || !oh) return;
-
-  // Animation scaling policy: native/Charity forces 100%; "scaled" configs
-  // carry their own factor; otherwise the user's overlay scale applies.
+  const unitW = (anim && anim.frameWidth) || overlayData.origW || overlayData.w;
+  const unitH = (anim && anim.frameHeight) || overlayData.origH || overlayData.h;
+  if (!unitW || !unitH) return null;
+  // Animation scaling policy: a "scaled" config carries its own factor and
+  // native/Charity pins 100%; otherwise the user's overlay scale wins.
   const scale = Math.max(
     0.05,
     Math.min(10, anim?.scaleOverride ?? (cfg.overlayScale || 1)),
   );
-  const newW = Math.max(1, Math.round(ow * scale));
-  const newH = Math.max(1, Math.round(oh * scale));
+  return {
+    outW: Math.max(1, Math.round(unitW * scale)),
+    outH: Math.max(1, Math.round(unitH * scale)),
+    animFrame,
+  };
+}
 
-  const templateChanged =
+/**
+ * Decode the source image, draw the current unit (whole image, or one sprite
+ * frame) into the offscreen canvas at outW×outH, quantise it to the wall
+ * palette, cache it, and kick the diff/markers pass. Async on image decode;
+ * `gen` drops the result if a newer render started meanwhile.
+ */
+function rasteriseFrame(outW: number, outH: number, animFrame: number): void {
+  const gen = ++_renderGen;
+  const img = new Image();
+  img.onload = () => {
+    if (gen !== _renderGen) return;
+    if (!_offCanvas || _offW !== outW || _offH !== outH) {
+      _offCanvas = document.createElement("canvas");
+      _offCanvas.width = outW;
+      _offCanvas.height = outH;
+      _offCtx = _offCanvas.getContext("2d", { willReadFrequently: true });
+      _offW = outW;
+      _offH = outH;
+    }
+    const cx = _offCtx;
+    if (!cx) return;
+    cx.imageSmoothingEnabled = false;
+    (cx as any).imageSmoothingQuality = "low";
+    const fr = _animRt
+      ? _animRt.rectOf(img.naturalWidth, img.naturalHeight, animFrame)
+      : { sx: 0, sy: 0, sw: img.naturalWidth, sh: img.naturalHeight };
+    cx.clearRect(0, 0, outW, outH);
+    cx.drawImage(img, fr.sx, fr.sy, fr.sw, fr.sh, 0, 0, outW, outH);
+    const data = cx.getImageData(0, 0, outW, outH);
+    quantizeImageData(data);
+    cx.putImageData(data, 0, 0);
+
+    _cachedTemplateData = data;
+    _cachedTemplateW = outW;
+    _cachedTemplateH = outH;
+    _cachedAnimFrame = animFrame;
+    overlayData.w = outW;
+    overlayData.h = outH;
+    overlayData.cleanSrc = undefined; // template changed → drop clean-PNG cache
+
+    renderDiffOnly(data, outW, outH, cx);
+  };
+  img.src = overlayData.srcOrig || overlayData.src;
+}
+
+/**
+ * Re-render the overlay for the current source, scale and (if any) animation
+ * frame. Rasterises a fresh frame only when the footprint or the frame index
+ * changed; otherwise it re-runs the cheap diff/markers pass over the cached
+ * template. This is the thin orchestrator that replaced the old overloaded
+ * `applyOverlayScale` — the work now lives in frameTarget + rasteriseFrame +
+ * renderDiffOnly.
+ */
+export function renderOverlay(forceTemplateRebuild = false): void {
+  if (!overlayImg) return;
+  if (!(overlayData.srcOrig || overlayData.src)) return;
+  const tgt = frameTarget();
+  if (!tgt) return;
+  const { outW, outH, animFrame } = tgt;
+  const changed =
     forceTemplateRebuild ||
     _cachedTemplateData === null ||
-    _cachedTemplateW !== newW ||
-    _cachedTemplateH !== newH ||
-    (anim !== null && _cachedAnimFrame !== animFrame);
-
-  if (templateChanged) {
-    const gen = ++_renderGen;
-    const img = new Image();
-    img.onload = () => {
-      if (gen !== _renderGen) return;
-      if (!_offCanvas || _offW !== newW || _offH !== newH) {
-        _offCanvas = document.createElement("canvas");
-        _offCanvas.width = newW;
-        _offCanvas.height = newH;
-        _offCtx = _offCanvas.getContext("2d", { willReadFrequently: true });
-        _offW = newW;
-        _offH = newH;
-      }
-      const cx = _offCtx;
-      if (!cx) return;
-      cx.imageSmoothingEnabled = false;
-      (cx as any).imageSmoothingQuality = "low";
-      // For sprite sheets draw only the current frame's sub-rect; for static
-      // templates the rect is the whole image.
-      const fr = anim
-        ? anim.rectOf(img.naturalWidth, img.naturalHeight, animFrame)
-        : { sx: 0, sy: 0, sw: img.naturalWidth, sh: img.naturalHeight };
-      cx.clearRect(0, 0, newW, newH);
-      cx.drawImage(img, fr.sx, fr.sy, fr.sw, fr.sh, 0, 0, newW, newH);
-      const data = cx.getImageData(0, 0, newW, newH);
-      quantizeImageData(data);
-
-      cx.putImageData(data, 0, 0);
-
-      _cachedTemplateData = data;
-      _cachedTemplateW = newW;
-      _cachedTemplateH = newH;
-      _cachedAnimFrame = animFrame;
-
-      overlayData.w = newW;
-      overlayData.h = newH;
-
-      // Template itself changed — invalidate the clean-PNG cache.
-      overlayData.cleanSrc = undefined;
-
-      renderDiffOnly(data, newW, newH, cx);
-    };
-    img.src = src;
+    _cachedTemplateW !== outW ||
+    _cachedTemplateH !== outH ||
+    (_animRt !== null && _cachedAnimFrame !== animFrame);
+  if (changed) {
+    rasteriseFrame(outW, outH, animFrame);
   } else {
-    overlayData.w = newW;
-    overlayData.h = newH;
-    renderDiffOnly(_cachedTemplateData!, newW, newH, _offCtx);
+    overlayData.w = outW;
+    overlayData.h = outH;
+    renderDiffOnly(_cachedTemplateData!, outW, outH, _offCtx);
   }
 }
 
@@ -272,7 +302,8 @@ export function setOverlayAnimation(src: AnimSource | null): void {
     _animRt = null;
     log.info("OVERLAY_ANIM", "animation off");
   }
-  if (overlayData.srcOrig) applyOverlayScale(true);
+  if (overlayData.srcOrig) renderOverlay(true);
+  emitOverlayChanged();
 }
 
 function animationTick(): void {
@@ -281,7 +312,7 @@ function animationTick(): void {
   const idx = _animRt.frameAt(Date.now());
   if (idx === _cachedAnimFrame) return;
   log.trace("OVERLAY_ANIM", `frame ${_cachedAnimFrame} → ${idx}`);
-  applyOverlayScale();
+  renderOverlay();
 }
 
 /**
@@ -548,7 +579,7 @@ function compactMarkersTick(): void {
     `live region changed (hash ${lastCanvasHash}→${h}) — redraw`,
   );
   lastCanvasHash = h;
-  applyOverlayScale();
+  renderOverlay();
 }
 
 function effectiveDotsRefreshMs(): number {
@@ -623,7 +654,7 @@ function onCameraSettled(): void {
   const key = currentCullKey();
   if (key === _lastCullKey) return;
   _lastCullKey = key;
-  applyOverlayScale();
+  renderOverlay();
 }
 
 function startCameraCulling(): void {
@@ -684,7 +715,7 @@ function readLiveRegion(
   }
 }
 
-export function setOverlaySrc(src: string, w: number, h: number): void {
+export function setOverlayImage(src: string, w: number, h: number): void {
   overlayData.srcOrig = src;
   overlayData.origW = w;
   overlayData.origH = h;
@@ -701,7 +732,38 @@ export function setOverlaySrc(src: string, w: number, h: number): void {
     overlayImg.src = src;
     overlayImg.style.display = "block";
   }
-  applyOverlayScale(true);
+  renderOverlay(true);
+  emitOverlayChanged();
+}
+
+/**
+ * Broadcast that the overlay's persistable state changed (image, position,
+ * scale, animation, or cleared). The persistence layer debounces a save and
+ * the UI re-syncs its controls — see overlay-persist.ts / ui-wire.ts. Not
+ * emitted from the camera-cull re-render, which isn't a state change.
+ */
+export function emitOverlayChanged(): void {
+  document.dispatchEvent(new CustomEvent("wd:overlay-changed"));
+}
+
+/**
+ * Tear the current overlay down completely — image, animation, markers and
+ * cached pixels — while leaving the layers mounted so a new template can be
+ * loaded right away.
+ */
+export function clearOverlay(): void {
+  setOverlayAnimation(null);
+  overlayData = { x: 0, y: 0, w: 0, h: 0, src: "" };
+  _cachedTemplateData = null;
+  _cachedTemplateW = 0;
+  _cachedTemplateH = 0;
+  _lastCullKey = "";
+  if (overlayImg) {
+    overlayImg.removeAttribute("src");
+    overlayImg.style.display = "none";
+  }
+  if (guideCtx) guideCtx.clearRect(0, 0, WALL_W, WALL_H);
+  emitOverlayChanged();
 }
 
 function bindOverlayDrag(): void {

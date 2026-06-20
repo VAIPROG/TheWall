@@ -1,6 +1,6 @@
 {
   "name": "the-wall-dev",
-  "version": "5.1.1",
+  "version": "5.2.0",
   "type": "module",
   "description": "Win95 overlay, drawing assists, Discord/clan sync, VAI-PROG backend chat & templates for The Wall",
   "author": "VAI_PROG",

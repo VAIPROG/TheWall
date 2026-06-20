@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "The Wall Dev",
-  "version": "5.1.1",
+  "version": "5.2.0",
   "description": "Win95 overlay, drawing assists, Discord/clan sync, VAI-PROG backend chat & templates for The Wall (filianislost.com).",
   "author": "VAI_PROG",
   "icons": {

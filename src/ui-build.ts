@@ -6,7 +6,7 @@ import { VERSION } from "./constants";
 import { PALETTE, activeColor } from "./palette";
 import { injectStyle } from "./styles";
 import { applyTheme, applyUiScale, applyCozy, watchSiteTheme } from "./theme";
-import { applyOverlayScale, updateLockBtn } from "./overlay";
+import { renderOverlay, updateLockBtn } from "./overlay";
 import { wireUI } from "./ui-wire";
 import { syncProfile, loadGuilds, refreshNotifications } from "./data";
 
@@ -65,6 +65,7 @@ export function buildUI(): void {
               <div class="wp-pane active" data-p="ov">
                   <div class="wp-group"><div class="wp-legend">${ic("disk")}${t("file")}</div>
                       <input type="file" id="file-upload" accept="image/*" class="wp-input" style="font:11px sans-serif">
+                      <button class="wp-btn" id="btn-clear-overlay" style="margin-top:4px" title="${esc(t("clearOverlay"))}">${ic("trash")}${t("clearOverlay")}</button>
                   </div>
                   <div class="wp-group"><div class="wp-legend">${ic("send")}${t("ovShareLegend")}</div>
                       <button class="wp-btn primary" id="btn-jump-share" style="width:100%">${ic("send")}${t("ovShareGo")} →</button>
@@ -73,7 +74,10 @@ export function buildUI(): void {
                   <div class="wp-group"><div class="wp-legend">${ic("pin")}${t("coords")}</div>
                       <div class="wp-row"><div>X<input type="number" id="coord-x" name="coord_x" autocomplete="off" class="wp-input" value="0"></div>
                       <div>Y<input type="number" id="coord-y" name="coord_y" autocomplete="off" class="wp-input" value="0"></div></div>
-                      <button class="wp-btn" id="btn-pick">${ic("pin")}${t("pickPoint")}</button>
+                      <div style="display:flex;gap:4px;margin-top:4px">
+                          <button class="wp-btn" id="btn-pick" style="flex:1;margin:0">${ic("pin")}${t("pickPoint")}</button>
+                          <button class="wp-btn" id="btn-teleport" style="flex:1;margin:0" title="${esc(t("teleportHint"))}">${ic("send")}${t("teleport")}</button>
+                      </div>
                   </div>
                   <div class="wp-group"><div class="wp-legend">${t("scale")}: <span id="scale-val">${Math.round((cfg.overlayScale || 1) * 100)}%</span></div>
                       <input type="range" id="scale-range" min="5" max="1000" step="5" value="${Math.round((cfg.overlayScale || 1) * 100)}" style="width:100%">
@@ -621,6 +625,6 @@ export function buildUI(): void {
   syncProfile();
   loadGuilds();
   refreshNotifications();
-  applyOverlayScale();
+  renderOverlay();
   updateLockBtn();
 }

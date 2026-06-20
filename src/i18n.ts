@@ -15,6 +15,15 @@ export const DICT: Record<string, Record<string, string>> = {
     coords: "Position (canvas px)",
     scale: "Pixel scale",
     pickPoint: "Pick point on canvas",
+    teleport: "Teleport",
+    teleportHint:
+      "Jump the wall view to the X/Y coordinates above (reloads; your overlay is restored)",
+    teleportRange:
+      "Coordinates out of range. X must be 0-{w}, Y must be 0-{h}.",
+    clearOverlay: "Clear overlay",
+    clearOverlayConfirm:
+      "Remove the current overlay? It won't be restored on reload.",
+    clearOverlayDone: "Overlay cleared",
     opacity: "Opacity",
     lock: "Edit mode (movable)",
     unlock: "Locked (click-through)",
@@ -281,7 +290,8 @@ export const DICT: Record<string, Record<string, string>> = {
     animStatusOff: "no animation — static template",
     animStop: "Stop animation",
     animAdvanced: "Advanced",
-    animHint: "Load an animated config via Share → Import (auto-detected: ours or Charity), or set up the sheet manually under Advanced.",
+    animHint:
+      "Load an animated config via Share → Import (auto-detected: ours or Charity), or set up the sheet manually under Advanced.",
     animAutosplit: "Auto-split sheet (derive grid)",
     animLayoutGrid: "Grid sheet",
     animLayoutLine: "Single line",
@@ -302,7 +312,8 @@ export const DICT: Record<string, Record<string, string>> = {
     animUpload: "Upload config",
     animBrowse: "Browse shared",
     animPublishLegend: "Publish animation",
-    animPublishMoved: "Publishing lives in the Share tab now (Share → Publish animation).",
+    animPublishMoved:
+      "Publishing lives in the Share tab now (Share → Publish animation).",
     animPublishNote:
       "Uploads the currently applied animation. Private configs are visible only to you; set a password to hand access to anyone via code + password.",
     animByCodeLegend: "Access by code",
@@ -338,8 +349,10 @@ export const DICT: Record<string, Record<string, string>> = {
     linksNotLinked: "not linked",
     linksUnlinkTg: "Unlink Telegram",
     linksUnlinkDc: "Unlink Discord",
-    linksHint: "Connect opens the account page with your session attached — approve the provider there and come back; status refreshes automatically.",
-    paintReminderRemote: "DM me on Telegram/Discord when paint refills (works with browser closed)",
+    linksHint:
+      "Connect opens the account page with your session attached — approve the provider there and come back; status refreshes automatically.",
+    paintReminderRemote:
+      "DM me on Telegram/Discord when paint refills (works with browser closed)",
     animTplList: "Animated templates",
     hideAnimatedTpl: "Hide animated templates",
     linksConnect: "Connect",
@@ -361,6 +374,14 @@ export const DICT: Record<string, Record<string, string>> = {
     coords: "Позиция (px холста)",
     scale: "Масштаб пикселя",
     pickPoint: "Указать точку на холсте",
+    teleport: "Телепорт",
+    teleportHint:
+      "Переместить вид стены к координатам X/Y выше (перезагрузка; оверлей восстановится)",
+    teleportRange: "Координаты вне диапазона. X: 0-{w}, Y: 0-{h}.",
+    clearOverlay: "Очистить оверлей",
+    clearOverlayConfirm:
+      "Удалить текущий оверлей? После перезагрузки он не восстановится.",
+    clearOverlayDone: "Оверлей очищен",
     opacity: "Непрозрачность",
     lock: "Режим правки (двигать)",
     unlock: "Заблокировано (сквозь клик)",
@@ -634,7 +655,8 @@ export const DICT: Record<string, Record<string, string>> = {
     animStatusOff: "анимации нет — статичный шаблон",
     animStop: "Остановить анимацию",
     animAdvanced: "Продвинутые",
-    animHint: "Грузите анимационный конфиг через Share → Импорт (формат определяется сам: наш или Charity), либо настройте лист вручную в Продвинутых.",
+    animHint:
+      "Грузите анимационный конфиг через Share → Импорт (формат определяется сам: наш или Charity), либо настройте лист вручную в Продвинутых.",
     animAutosplit: "Автоделение листа (вычислить сетку)",
     animLayoutGrid: "Сетка",
     animLayoutLine: "Одна линия",
@@ -655,7 +677,8 @@ export const DICT: Record<string, Record<string, string>> = {
     animUpload: "Выгрузить конфиг",
     animBrowse: "Смотреть общие",
     animPublishLegend: "Публикация анимации",
-    animPublishMoved: "Публикация переехала во вкладку Share (Share → Публикация анимации).",
+    animPublishMoved:
+      "Публикация переехала во вкладку Share (Share → Публикация анимации).",
     animPublishNote:
       "Выгружает текущую применённую анимацию. Личные конфиги видны только вам; задайте пароль — и доступ получит любой, у кого есть код + пароль.",
     animByCodeLegend: "Доступ по коду",
@@ -691,8 +714,10 @@ export const DICT: Record<string, Record<string, string>> = {
     linksNotLinked: "не привязан",
     linksUnlinkTg: "Отвязать Telegram",
     linksUnlinkDc: "Отвязать Discord",
-    linksHint: "Кнопка открывает страницу аккаунта с вашей сессией — подтвердите провайдера там и возвращайтесь; статус обновится сам.",
-    paintReminderRemote: "Писать в Telegram/Discord, когда краска пополнится (работает при закрытом браузере)",
+    linksHint:
+      "Кнопка открывает страницу аккаунта с вашей сессией — подтвердите провайдера там и возвращайтесь; статус обновится сам.",
+    paintReminderRemote:
+      "Писать в Telegram/Discord, когда краска пополнится (работает при закрытом браузере)",
     animTplList: "Анимированные шаблоны",
     hideAnimatedTpl: "Скрыть анимационные шаблоны",
     linksConnect: "Привязать",

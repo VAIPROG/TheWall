@@ -46,14 +46,8 @@
  * caller can fall back to asking the user to download manually.
  */
 import { log } from "./log";
-import {
-  setOverlaySrc,
-  setOverlayPos,
-  setOverlayAnimation,
-  getOverlayAnimation,
-  overlayData,
-} from "./overlay";
-import { cfg, saveCfg } from "./config";
+import { getOverlayAnimation, overlayData, type AnimSource } from "./overlay";
+import { insertTemplate } from "./template-insert";
 import { parseCharityTemplate, autoSplitSheet } from "./animated-template";
 import { fromCharity } from "./wall-anim";
 
@@ -81,9 +75,19 @@ export interface CharityConfig {
   whitelist?: string[];
 }
 
-/** Normalise a raw upstream template into our shape. We accept the various
- *  field aliases the upstream code does (`frameRate`, `frameSpeed`,
- *  `startTime`) so any sane Charity JSON loads without manual editing. */
+/**
+ * Normalise a raw upstream entry into a Charity *config* template (the shape
+ * stored in / exported to a Charity JSON document). Accepts the same field
+ * aliases (`frameRate`, `frameSpeed`, `startTime`) as the upstream loader so
+ * any sane Charity JSON loads without hand-editing.
+ *
+ * Sibling: `animated-template.ts#parseCharityTemplate` reads the same aliases
+ * but produces an `AnimatedTemplate` *runtime* (defaults tuned for playback —
+ * `secondsPerFrame: Infinity`, `startTimestamp: 0`). They are deliberately
+ * separate: this one feeds config parse + export (where `undefined` means
+ * "omit from JSON"); that one feeds the animation engine. Keep both in sync
+ * when adding a new alias.
+ */
 function normaliseTemplate(t: any): CharityTemplate | null {
   if (typeof t?.x !== "number" || typeof t?.y !== "number") return null;
   const sources = Array.isArray(t.sources)
@@ -187,14 +191,10 @@ export async function importCharityTemplate(
   });
   let note: string | undefined;
 
-  // Charity templates assume 1:1 with canvas pixels.
-  cfg.overlayScale = 1;
-  saveCfg();
-  setOverlaySrc(dataUrl, dims.w, dims.h);
-  setOverlayPos(item.x, item.y);
-
-  // Sprite-sheet animation. parseCharityTemplate re-normalises the entry into
-  // the tested AnimatedTemplate shape (alias handling lives there).
+  // Resolve sprite-sheet animation up front (if any) so the whole template
+  // goes in through one insertTemplate call. parseCharityTemplate re-normalises
+  // the entry into the tested AnimatedTemplate shape (alias handling there).
+  let animation: AnimSource | null = null;
   if ((item.frameCount ?? 1) > 1) {
     const tpl = parseCharityTemplate(item);
     if (tpl) {
@@ -207,7 +207,7 @@ export async function importCharityTemplate(
         }
       }
       if (tpl.frameWidth && tpl.frameHeight) {
-        setOverlayAnimation({ kind: "charity", template: tpl });
+        animation = { kind: "charity", template: tpl };
         note = `Animated: ${tpl.frameCount} frames @ ${tpl.secondsPerFrame}s/frame.`;
       } else {
         note = `Animated template (${item.frameCount} frames) — could not derive frame grid; loaded static.`;
@@ -215,6 +215,9 @@ export async function importCharityTemplate(
       }
     }
   }
+
+  // Charity templates assume 1:1 with canvas pixels (scale 1).
+  await insertTemplate({ imageDataUrl: dataUrl, x: item.x, y: item.y, scale: 1, animation });
   log.ok("CHARITY", `"${item.name}" applied (${dims.w}×${dims.h})`);
   return { w: dims.w, h: dims.h, note };
 }

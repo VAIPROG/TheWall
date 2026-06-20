@@ -1,38 +1,39 @@
-import { cfg, saveCfg } from "./config";
+import { cfg } from "./config";
 import { $ } from "./helpers";
 import { log } from "./log";
 import { toast } from "./notify";
-import { overlayData, setOverlaySrc, setOverlayPos, isLocked, setIsLocked, updateLockBtn, applyOverlayScale } from "./overlay";
+import { overlayData, setIsLocked, updateLockBtn } from "./overlay";
+import { insertTemplate } from "./template-insert";
 
+/** Apply a `the-wall-dev://` share link: insert its (static) image and jump
+ *  the view to its coordinates. `scale` is optional — when absent we keep the
+ *  current overlay scale (newer "recipient picks scale" links). */
 export function importShare(str: string): void {
+  let parsed: any;
   try {
-    const parsed = JSON.parse(
-      atob(str.trim().replace("the-wall-dev://", "")),
-    );
-    if (parsed.x == null || parsed.y == null || !parsed.src)
-      throw new Error("bad payload");
-    const img = new Image();
-    img.onload = () => {
-      // Old share links may carry a scale field. Apply it first so the
-      // resize that setOverlaySrc triggers picks it up.
-      if (parsed.scale) {
-        cfg.overlayScale = Math.max(0.05, Math.min(10, parsed.scale));
-        saveCfg();
-      }
-      // setOverlaySrc treats its src as the *original*, and the scale config
-      // determines the on-canvas pixel size.
-      setOverlaySrc(parsed.src, img.naturalWidth, img.naturalHeight);
-      setOverlayPos(parsed.x, parsed.y);
+    parsed = JSON.parse(atob(str.trim().replace("the-wall-dev://", "")));
+  } catch (e: any) {
+    log("IMPORT", "ERR", e.toString());
+    alert("Invalid the-wall-dev:// link");
+    return;
+  }
+  if (parsed.x == null || parsed.y == null || !parsed.src) {
+    alert("Invalid the-wall-dev:// link");
+    return;
+  }
+  const scale =
+    parsed.scale != null ? Math.max(0.05, Math.min(10, parsed.scale)) : undefined;
+  insertTemplate({ imageDataUrl: parsed.src, x: parsed.x, y: parsed.y, scale })
+    .then(() => {
       location.hash = `#${parsed.x},${parsed.y}`;
       setIsLocked(true);
       updateLockBtn();
       log("IMPORT", "OK", `teleported #${parsed.x},${parsed.y}`);
-    };
-    img.src = parsed.src;
-  } catch (e: any) {
-    log("IMPORT", "ERR", e.toString());
-    alert("Invalid the-wall-dev:// link");
-  }
+    })
+    .catch((e: any) => {
+      log("IMPORT", "ERR", e.toString());
+      alert("Invalid the-wall-dev:// link");
+    });
 }
 
 /**

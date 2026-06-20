@@ -83,6 +83,23 @@ export function screenToCanvas(clientX: number, clientY: number): { x: number; y
   };
 }
 
+/**
+ * Teleport the site camera to centre on wall (x, y).
+ *
+ * The site deep-links the camera through the URL hash — `#x,y` holds the
+ * centre wall coordinate. It reads the hash once at init and frames that
+ * point, then rewrites the hash from the live camera every second. There is
+ * no `hashchange` listener and the camera state isn't exposed, so the only
+ * robust entry point is to set the hash and reload — exactly what following a
+ * shared `#x,y` link does. Caller is responsible for warning about the reload.
+ */
+export function teleport(x: number, y: number): void {
+  const cx = Math.max(0, Math.min(Math.round(x), WALL_W - 1));
+  const cy = Math.max(0, Math.min(Math.round(y), WALL_H - 1));
+  location.hash = `${cx},${cy}`;
+  location.reload();
+}
+
 /** Inverse of screenToCanvas — wall pixel → screen point. */
 export function canvasToScreen(px: number, py: number): { x: number; y: number } | null {
   const cont = canvasContainer();
