@@ -49,15 +49,12 @@ import {
   getEmotesGrouped,
   reloadEmotes,
 } from "./emoji";
-import { openEmojiPicker } from "./emoji-picker";
-import { attachMentions } from "./mentions";
 import { wireMailUI, loadMail } from "./mail";
 import {
   loadTemplates,
   loadPublicTemplates,
   loadRoster,
   shareCurrentTemplate,
-  sendClanMessage,
   markAllRead,
   loadClanChat,
   loadAnnouncements,
@@ -70,7 +67,6 @@ import {
 import {
   loadAdminUsers,
   loadModApps,
-  broadcastNotification,
   loadAdminTemplates,
   loadAdminNotifs,
 } from "./admin-ui";
@@ -82,12 +78,6 @@ import {
   triggerEvent,
   recheckMine,
   listMine,
-  listCatalogue,
-  adminGrant,
-  adminRevoke,
-  adminGrantByName,
-  adminRevokeByName,
-  adminCreate,
 } from "./achievements";
 import { runSellAll, runSellPrompt } from "./sell-all";
 import { getPaintInfo } from "./paint-state";
@@ -103,6 +93,7 @@ import { applyParsedJson } from "./url-autoload";
 import { pluralize } from "./i18n";
 import { encode } from "./formats/shared/format-registry";
 import { applyLayer } from "./formats/apply-layer";
+import { wireAdmin, wireChats } from "./ui";
 
 export function wireUI(win: HTMLElement): void {
   // Animation + region-protection groups live in their own wiring module.
@@ -1580,113 +1571,10 @@ export function wireUI(win: HTMLElement): void {
 
   // mail tab
   wireMailUI();
-  // DM mention autocomplete
-  const dmTa = $("dm-body") as HTMLTextAreaElement | null;
-  const dmMention = $("dm-mention-suggest");
-  if (dmTa && dmMention) {
-    attachMentions(dmTa, dmMention, async () => {
-      try {
-        const roster = (await Backend.req("GET", "/clan/members")) as any[];
-        return (roster || []).map((r) => ({ username: r.username, id: r.id }));
-      } catch {
-        return [];
-      }
-    });
-  }
+  wireChats(win);
   // Load mail when user clicks the mail tab
   document.querySelectorAll('.wp-tab[data-p="ma"]').forEach((b) => {
     b.addEventListener("click", () => loadMail());
-  });
-
-  // clan tab
-  $("btn-clan-send")!.addEventListener("click", sendClanMessage);
-
-  // Announcement send (admin/mod only)
-  $("btn-announce-send")?.addEventListener("click", async () => {
-    const title = ($("announce-title") as HTMLInputElement)?.value.trim();
-    const body = ($("announce-body") as HTMLTextAreaElement)?.value.trim();
-    if (!title || !body) {
-      toast("Announce", "Title and body required");
-      return;
-    }
-    try {
-      const clanId = (window as any).__wallClanId;
-      if (!clanId) {
-        toast("Announce", "No clan found");
-        return;
-      }
-      await Backend.req("POST", `/v2/clans/${clanId}/announcements`, {
-        title,
-        body,
-      });
-      ($("announce-title") as HTMLInputElement).value = "";
-      ($("announce-body") as HTMLTextAreaElement).value = "";
-      toast("Announce", "Sent!");
-    } catch (e: any) {
-      toast("Announce", "Failed: " + errMsg(e));
-    }
-  });
-
-  // Emoji picker — delegate to the shared module so the same UI works for the
-  // clan chat and the site chat injection.
-  $("btn-emoji")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const btn = $("btn-emoji");
-    const ta = $("clan-chat-input") as HTMLTextAreaElement | null;
-    if (!btn || !ta) return;
-    btn.setAttribute("data-wd-emoji-anchor", "1");
-    openEmojiPicker(ta, btn);
-  });
-
-  // Mentions autocomplete in clan chat textarea
-  const chatTa = $("clan-chat-input") as HTMLTextAreaElement | null;
-  const mentionEl = $("mention-suggest");
-  if (chatTa && mentionEl) {
-    attachMentions(chatTa, mentionEl, async () => {
-      try {
-        const roster = (await Backend.req("GET", "/clan/members")) as any[];
-        return (roster || []).map((r) => ({
-          username: r.username,
-          id: r.id,
-          avatar_url: r.id
-            ? `${Backend.base}/avatar?userId=${encodeURIComponent(r.id)}`
-            : undefined,
-        }));
-      } catch {
-        return [];
-      }
-    });
-  }
-  // Click @mention or username → open public profile
-  document.addEventListener("click", (e) => {
-    const t = e.target as HTMLElement;
-    const u = t.dataset?.user;
-    if (
-      u &&
-      (t.classList.contains("wp-mention") || t.classList.contains("au"))
-    ) {
-      e.preventDefault();
-      (window as any).__wallOpenProfile?.(u);
-    }
-  });
-
-  $("btn-mod-apply")!.addEventListener("click", async () => {
-    if (!Backend.on) {
-      await errorDlg("Connect to VAI-PROG backend first (Settings)");
-      return;
-    }
-    const msg = await promptDlg(
-      t("modApplyPrompt"),
-      "",
-      "Moderator Application",
-    );
-    if (msg == null || !String(msg).trim()) return;
-    try {
-      await Backend.moderationApply(String(msg).trim());
-      toast("moderation", t("modSubmittedToast"));
-    } catch (e: any) {
-      await errorDlg("Apply failed: " + errMsg(e));
-    }
   });
 
   // settings tab
@@ -1901,153 +1789,7 @@ export function wireUI(win: HTMLElement): void {
     }
   });
 
-  // admin
-  $("btn-admin-reload")?.addEventListener("click", () => {
-    loadAdminUsers();
-    loadModApps();
-    loadAdminTemplates();
-    loadAdminNotifs();
-  });
-  $("btn-broadcast")?.addEventListener("click", broadcastNotification);
-
-  // Admin: achievement grant/revoke. Populate the picker from the catalogue
-  // the first time the tab is opened (we lazy-load so non-admins never see it).
-  let achCatalogueLoaded = false;
-  async function loadAchCatalogue(): Promise<void> {
-    if (achCatalogueLoaded) return;
-    achCatalogueLoaded = true;
-    const sel = $("admin-ach-id") as HTMLSelectElement | null;
-    if (!sel) return;
-    const cat = await listCatalogue();
-    if (!cat.length) {
-      achCatalogueLoaded = false;
-      return;
-    }
-    const byCat = new Map<string, typeof cat>();
-    for (const a of cat) {
-      const arr = byCat.get(a.category) || [];
-      arr.push(a);
-      byCat.set(a.category, arr);
-    }
-    sel.innerHTML =
-      `<option value="" disabled selected>${esc(t("achAdminPickAch"))}</option>` +
-      [...byCat.entries()]
-        .map(
-          ([cat, items]) =>
-            `<optgroup label="${esc(cat)}">${items
-              .map(
-                (a) =>
-                  `<option value="${esc(a.id)}">${esc(a.name)} · ${a.points} pts${a.secret ? " 🔒" : ""}</option>`,
-              )
-              .join("")}</optgroup>`,
-        )
-        .join("");
-  }
-  document
-    .querySelectorAll('.wp-tab[data-p="ad"]')
-    .forEach((b) => b.addEventListener("click", () => loadAchCatalogue()));
-  // The same input field accepts either a UUID (legacy direct path) or a
-  // username (looked up server-side). We pick the route by sniffing for a
-  // standard UUID v4 shape — anything that doesn't match goes through the
-  // username endpoint, which 404s for unknown names.
-  const UUID_RE =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-  $("btn-admin-ach-grant")?.addEventListener("click", async () => {
-    const who = ($("admin-ach-uid") as HTMLInputElement)?.value.trim();
-    const aid = ($("admin-ach-id") as HTMLSelectElement)?.value;
-    if (!who || !aid) {
-      await errorDlg("Enter a username or UUID and pick an achievement");
-      return;
-    }
-    try {
-      const r = UUID_RE.test(who)
-        ? await adminGrant(who, aid)
-        : await adminGrantByName(who, aid);
-      if (r) {
-        toast("Admin", `granted "${r.achievement.name}" (new=${r.was_new})`);
-      } else {
-        await errorDlg("Grant failed (see console)");
-      }
-    } catch (e: any) {
-      const msg = e?.message || String(e);
-      await errorDlg(
-        msg.includes("no such user")
-          ? `No such user: ${who}`
-          : `Grant failed: ${msg}`,
-      );
-    }
-  });
-  $("btn-admin-ach-revoke")?.addEventListener("click", async () => {
-    const who = ($("admin-ach-uid") as HTMLInputElement)?.value.trim();
-    const aid = ($("admin-ach-id") as HTMLSelectElement)?.value;
-    if (!who || !aid) {
-      await errorDlg("Enter a username or UUID and pick an achievement");
-      return;
-    }
-    if (!(await confirmDlg(`Revoke "${aid}" from ${who}?`, "Revoke"))) return;
-    try {
-      const ok = UUID_RE.test(who)
-        ? await adminRevoke(who, aid)
-        : await adminRevokeByName(who, aid);
-      if (ok) toast("Admin", "revoked");
-      else await errorDlg("Revoke failed");
-    } catch (e: any) {
-      const msg = e?.message || String(e);
-      await errorDlg(
-        msg.includes("no such user")
-          ? `No such user: ${who}`
-          : `Revoke failed: ${msg}`,
-      );
-    }
-  });
-  $("btn-admin-ach-create")?.addEventListener("click", async () => {
-    const id = ($("admin-ach-new-id") as HTMLInputElement)?.value.trim();
-    const name = ($("admin-ach-new-name") as HTMLInputElement)?.value.trim();
-    const desc = ($("admin-ach-new-desc") as HTMLInputElement)?.value.trim();
-    const icon =
-      ($("admin-ach-new-icon") as HTMLSelectElement)?.value || "medal";
-    const category =
-      ($("admin-ach-new-cat") as HTMLSelectElement)?.value || "general";
-    const points = Number(
-      ($("admin-ach-new-pts") as HTMLInputElement)?.value || "10",
-    );
-    const secret =
-      ($("admin-ach-new-secret") as HTMLInputElement)?.checked || false;
-    if (!id || !name || !desc) {
-      await errorDlg("ID, name and description are required");
-      return;
-    }
-    if (!/^[a-z0-9_]+$/.test(id)) {
-      await errorDlg("ID must be lowercase snake_case (a–z, 0–9, _)");
-      return;
-    }
-    try {
-      const row = await adminCreate({
-        id,
-        name,
-        description: desc,
-        icon,
-        category,
-        points,
-        secret,
-      });
-      if (row) {
-        toast("Admin", `${t("achAdminCreated")}: ${row.name}`);
-        // Refresh the grant dropdown.
-        const opt = document.createElement("option");
-        opt.value = row.id;
-        opt.textContent = `${row.name} · ${row.points} pts${row.secret ? " 🔒" : ""}`;
-        ($("admin-ach-id") as HTMLSelectElement | null)?.appendChild(opt);
-        // Reset the form.
-        ($("admin-ach-new-id") as HTMLInputElement).value = "";
-        ($("admin-ach-new-name") as HTMLInputElement).value = "";
-        ($("admin-ach-new-desc") as HTMLInputElement).value = "";
-      }
-    } catch (e: any) {
-      await errorDlg("Create failed: " + errMsg(e));
-    }
-  });
+  wireAdmin(win);
 
   // ------- Paint helpers: refill toggle, current paint display, sell-all -------
   const updatePaintCurrent = (): void => {
@@ -2180,42 +1922,6 @@ export function wireUI(win: HTMLElement): void {
   });
   // Also pull it once on boot so the first open of the tab paints with data.
   setTimeout(() => updateProfileBalance().catch(() => {}), 3000);
-
-  $("btn-backfill-previews")?.addEventListener("click", async () => {
-    const ok = await confirmDlg(
-      "Generate previews for every template that doesn't have one yet?\nThis can take a while on a large catalog.",
-      "Backfill previews",
-    );
-    if (!ok) return;
-    const btn = $("btn-backfill-previews") as HTMLButtonElement | null;
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = "Working…";
-    }
-    try {
-      const r = await Backend.req(
-        "POST",
-        "/v2/admin/templates/backfill-previews",
-        {},
-      );
-      log("ADMIN", "OK", "backfill: " + JSON.stringify(r));
-      await infoDlg(
-        `Scanned ${r.scanned}\n` +
-          `Generated ${r.generated}\n` +
-          `Skipped (undecodable share) ${r.skipped_undecodable}\n` +
-          `Skipped (already cached) ${r.skipped_already_cached}\n` +
-          `Failed ${r.failed}`,
-        "Backfill complete",
-      );
-    } catch (e: any) {
-      await errorDlg("Backfill failed: " + errMsg(e));
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = ic("scan") + "Backfill missing previews";
-      }
-    }
-  });
 
   // backend meta
   const loadMeta = async () => {
