@@ -10,15 +10,14 @@
  *      embedded in an incoming WallDevExport so the receiver knows where
  *      the template came from BEFORE they start drawing.
  *
- * Both dialogs follow the same skin as `pickCharityTemplate` in ui-wire.ts
- * (light bezel, gradient title bar, theme-aware). Kept separate from the
- * core `dialog.ts` because they need multi-field layouts that the standard
- * info/prompt helpers don't compose well.
+ * Both dialogs follow the same skin (light bezel, gradient title bar,
+ * theme-aware). Kept separate from the core `dialog.ts` because they need
+ * multi-field layouts that the standard info/prompt helpers don't compose
+ * well.
  */
 import { esc } from "./helpers";
 import { t } from "./i18n";
 import { isWalldevDark } from "./theme";
-import { WallDevExport } from "./walldev-config";
 import type { WallTemplateSet, TemplateLayer } from "./formats/shared/template-model";
 import { isAnimated, summarize } from "./formats/shared/template-set";
 
@@ -185,7 +184,7 @@ export function openExportOptionsDialog(
  * already loaded by the time we surface it.
  */
 export function showImportMetaDialog(meta: {
-  author?: WallDevExport["author"];
+  author?: { username: string; clan_name?: string; clan_role?: string };
   note?: string;
 }): Promise<void> {
   return new Promise((resolve) => {

@@ -95,7 +95,7 @@ import { playPaintRefillSound } from "./paint-sound";
 import { fetchCoinBalance } from "./site-api";
 import { openCursorShop } from "./open-cursor-shop";
 import { fetchCharityConfig } from "./charity-import";
-import { exportToWallDevJson, exportCurrentOverlay } from "./walldev-config";
+import { exportCurrentOverlay } from "./walldev-config";
 import { wireAnimAndProtect } from "./anim-protect-wire";
 import { wireLinks } from "./links-wire";
 import { openExportOptionsDialog, pickLayer } from "./overlay-share-dialogs";
@@ -309,6 +309,10 @@ export function wireUI(win: HTMLElement): void {
       // Decode into a canonical set and use the generic layer picker.
       const { decodeCharity } = await import("./formats/charity/decode");
       const charitySet = decodeCharity(charityCfg as any);
+      if (!charitySet.layers[0]) {
+        await errorDlg("Config parsed but no usable templates.");
+        return;
+      }
       const chosenLayer = charitySet.layers.length === 1
         ? charitySet.layers[0]
         : await pickLayer(charitySet);

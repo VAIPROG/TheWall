@@ -53,12 +53,9 @@ function stripParam(name: string): void {
  */
 export async function applyParsedJson(j: any, sourceLabel: string): Promise<boolean> {
   let set;
-  let id;
   try {
     // decodeAny accepts either a string or a parsed object.
-    const result = decodeAny(j);
-    set = result.set;
-    id = result.id;
+    ({ set } = decodeAny(j));
   } catch (e: any) {
     if (e instanceof UnknownFormatError) {
       log.warn("AUTOLOAD", `unrecognised JSON shape from ${sourceLabel}: ${e.message}`);
@@ -67,11 +64,38 @@ export async function applyParsedJson(j: any, sourceLabel: string): Promise<bool
     throw e;
   }
 
-  // Surface author / notes before applying (same UX as before).
   const sum = summarize(set);
+
+  if (layerCount(set) === 1) {
+    const layer = primaryLayer(set)!;
+    const dims = await applyLayer(layer);
+    const authorTag = sum.author?.name ? ` by ${sum.author.name}` : "";
+    toast("Auto-load", `Imported ${layer.name}${authorTag} (${dims.w}×${dims.h}) from ${sourceLabel}`);
+    // Surface author / notes AFTER the overlay is applied, matching the
+    // original applyWallDevExport(onMeta) behaviour where the dialog was
+    // shown post-mount.
+    if (sum.author || sum.notes.length) {
+      const legacyMeta: {
+        author?: { username: string; clan_name?: string; clan_role?: string };
+        note?: string;
+      } = {};
+      if (sum.author?.name) {
+        legacyMeta.author = { username: sum.author.name };
+        if (sum.author.clanName) legacyMeta.author.clan_name = sum.author.clanName;
+      }
+      if (sum.notes.length) legacyMeta.note = sum.notes.join("\n");
+      await showImportMetaDialog(legacyMeta);
+    }
+    return true;
+  }
+
+  // Multiple layers — open the picker first (no overlay yet), then apply.
+  const chosen = await pickLayer(set);
+  if (!chosen) return false;
+  const dims = await applyLayer(chosen);
+  toast("Auto-load", `Imported "${chosen.name}" (${dims.w}×${dims.h}) from ${sourceLabel}`);
+  // Surface author / notes AFTER the chosen layer is applied.
   if (sum.author || sum.notes.length) {
-    // Map back to the legacy showImportMetaDialog interface:
-    // author.name → username; notes[0] → note.
     const legacyMeta: {
       author?: { username: string; clan_name?: string; clan_role?: string };
       note?: string;
@@ -83,20 +107,6 @@ export async function applyParsedJson(j: any, sourceLabel: string): Promise<bool
     if (sum.notes.length) legacyMeta.note = sum.notes.join("\n");
     await showImportMetaDialog(legacyMeta);
   }
-
-  if (layerCount(set) === 1) {
-    const layer = primaryLayer(set)!;
-    const dims = await applyLayer(layer);
-    const authorTag = sum.author?.name ? ` by ${sum.author.name}` : "";
-    toast("Auto-load", `Imported ${layer.name}${authorTag} (${dims.w}×${dims.h}) from ${sourceLabel}`);
-    return true;
-  }
-
-  // Multiple layers — open the picker.
-  const chosen = await pickLayer(set);
-  if (!chosen) return false;
-  const dims = await applyLayer(chosen);
-  toast("Auto-load", `Imported "${chosen.name}" (${dims.w}×${dims.h}) from ${sourceLabel}`);
   return true;
 }
 
