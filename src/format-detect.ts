@@ -27,6 +27,9 @@
  *
  * Public API:
  *   detectPayload(textOrJson)
+ *
+ * @deprecated Shim — delegates to src/formats/shared/format-identify.ts.
+ *   Call sites will be rewired to the formats barrel in Task 17.
  */
 
 export type DetectedKind =
@@ -46,93 +49,28 @@ export interface Detected {
   dataUrl?: string;
 }
 
-/** Lightweight base64 sniff. We don't try to decode every base64-looking
- *  string — that would be expensive — only ones that pass a cheap length +
- *  alphabet check. The minimum length keeps short tokens (e.g. "abc")
- *  from triggering the heavier image-decode path. */
-const BASE64_RE = /^[A-Za-z0-9+/=_-]+$/;
-const MIN_BASE64_LEN = 64;
+import {
+  looksLikeBase64,
+  base64ToBytes,
+  sniffImageMime,
+  bytesToBase64,
+} from "./formats/shared/binary-codec";
+import { identifyJson } from "./formats/shared/format-identify";
 
-/** Map of file magic numbers (first bytes) → MIME type. Used after a
- *  base64 decode succeeds so we can build a proper data URL. */
-const MAGIC: Array<[Uint8Array, string]> = [
-  [new Uint8Array([0x89, 0x50, 0x4e, 0x47]), "image/png"],
-  [new Uint8Array([0xff, 0xd8, 0xff]),       "image/jpeg"],
-  [new Uint8Array([0x47, 0x49, 0x46, 0x38]), "image/gif"],
-  // WebP: "RIFF????WEBP" — check the first 4 bytes (RIFF) and bytes 8-11
-  // ("WEBP") via a separate helper because the magic isn't contiguous.
-];
-
-function bytesStartWith(buf: Uint8Array, prefix: Uint8Array): boolean {
-  if (buf.length < prefix.length) return false;
-  for (let i = 0; i < prefix.length; i++) {
-    if (buf[i] !== prefix[i]) return false;
-  }
-  return true;
-}
-
-function isWebp(buf: Uint8Array): boolean {
-  return (
-    buf.length >= 12 &&
-    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
-    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
-  );
-}
-
-function detectImageMime(buf: Uint8Array): string | null {
-  for (const [magic, mime] of MAGIC) {
-    if (bytesStartWith(buf, magic)) return mime;
-  }
-  if (isWebp(buf)) return "image/webp";
-  return null;
-}
-
-function bytesToBase64(buf: Uint8Array): string {
-  // btoa expects a binary string. Build one in chunks to avoid the
-  // "Maximum call stack" trap on large buffers.
-  let s = "";
-  const CHUNK = 0x8000;
-  for (let i = 0; i < buf.length; i += CHUNK) {
-    s += String.fromCharCode(...buf.subarray(i, i + CHUNK));
-  }
-  return btoa(s);
-}
-
-function tryAtob(s: string): Uint8Array | null {
-  // Tolerate URL-safe alphabet + missing padding.
-  let b = s.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = b.length % 4;
-  if (pad) b += "=".repeat(4 - pad);
-  try {
-    const binary = atob(b);
-    const out = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-    return out;
-  } catch {
-    return null;
-  }
-}
-
-/** Try interpreting a JSON value (already parsed) as one of our schemas. */
+/** Map an already-parsed JSON object to a Detected result, preserving the
+ *  legacy bare-entry normalisation (single charity entry → {templates:[j]}). */
 function classifyJson(j: any, raw: string): Detected | null {
-  if (j && typeof j === "object") {
-    if (j.format === "the-wall-dev/1" && j.template) {
-      return { kind: "wall-dev-export", raw, json: j };
-    }
-    if (Array.isArray(j.templates)) {
-      return { kind: "charity-config", raw, json: j };
-    }
-    // Bare Charity entry (the commonly-shared shape — one template object
-    // with x/y/sources at top level, like the CFRB animation sample).
-    // Normalise to a single-entry manifest so downstream code has ONE shape.
-    if (
-      typeof j.x === "number" &&
-      typeof j.y === "number" &&
-      Array.isArray(j.sources) &&
-      !j.format
-    ) {
-      return { kind: "charity-config", raw, json: { templates: [j] } };
-    }
+  if (!j || typeof j !== "object") return null;
+  const id = identifyJson(j);
+  if (!id) return null;
+
+  if (id.standard === "wall-dev") {
+    return { kind: "wall-dev-export", raw, json: j };
+  }
+  if (id.standard === "charity") {
+    // Preserve legacy normalisation: bare entry → {templates:[j]}
+    const json = Array.isArray(j.templates) ? j : { templates: [j] };
+    return { kind: "charity-config", raw, json };
   }
   return null;
 }
@@ -162,8 +100,8 @@ export function detectPayload(input: string): Detected {
   } catch { /* not JSON — fall through */ }
 
   // 5 + 6. Base64.
-  if (trimmed.length >= MIN_BASE64_LEN && BASE64_RE.test(trimmed)) {
-    const bytes = tryAtob(trimmed);
+  if (looksLikeBase64(trimmed)) {
+    const bytes = base64ToBytes(trimmed);
     if (bytes) {
       // Try JSON inside the decoded bytes.
       try {
@@ -173,7 +111,7 @@ export function detectPayload(input: string): Detected {
         if (hit) return hit;
       } catch { /* not JSON */ }
       // Try image.
-      const mime = detectImageMime(bytes);
+      const mime = sniffImageMime(bytes);
       if (mime) {
         // Re-encode to canonical base64 so the data URL is portable even
         // when the source used URL-safe alphabet.

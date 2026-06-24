@@ -11,18 +11,22 @@
  * Public API:
  *   exportToWallDevJson(opts)  — envelope from the current overlay state
  *   applyWallDevExport(json)   — apply an envelope (incl. animation)
+ *
+ * @deprecated Shim — delegates to src/formats/ layer.
+ *   Call sites will be rewired to the formats barrel in Task 17.
  */
 import { log } from "./log";
-import { getOverlayAnimation, overlayData, type AnimSource } from "./overlay";
-import { insertTemplate } from "./template-insert";
+import { getOverlayAnimation, overlayData } from "./overlay";
 import { cfg } from "./config";
 import { VERSION } from "./constants";
 import {
   animationBlockOf,
-  configFromEnvelope,
   fromCharity,
   type AnimationBlock,
 } from "./wall-anim";
+import { decodeWallDev } from "./formats/wall-dev/decode";
+import { applyLayer } from "./formats/apply-layer";
+import { primaryLayer, createSet } from "./formats/shared/template-set";
 
 /** Our internal export wrapper. Includes a small version stamp so a future
  *  schema change can be detected without sniffing fields.
@@ -147,7 +151,9 @@ export function exportToWallDevJson(
  *  us a JSON of our own format. The optional `onMeta` hook lets the caller
  *  surface the embedded note / author block in the UI before the overlay
  *  becomes visible — the autoload pipeline uses this to show a small
- *  "Imported from …" modal. */
+ *  "Imported from …" modal.
+ *
+ *  Delegates to decodeWallDev + applyLayer from the formats layer. */
 export async function applyWallDevExport(
   payload: WallDevExport,
   onMeta?: (meta: { author?: WallDevExport["author"]; note?: string }) => void,
@@ -155,32 +161,12 @@ export async function applyWallDevExport(
   const t = payload.template;
   if (!t?.image_data_url) throw new Error("export missing image_data_url");
 
-  // Resolve the animation (if any) before inserting so the whole template
-  // applies through one insertTemplate call.
-  let animation: AnimSource | null = null;
-  if (t.animation) {
-    const animCfg = configFromEnvelope({
-      name: t.name,
-      image_data_url: t.image_data_url,
-      x: t.x,
-      y: t.y,
-      scale: t.scale,
-      animation: t.animation,
-    });
-    if (animCfg && animCfg.sheet.frameCount > 1) {
-      animation = { kind: "wall-anim", config: animCfg };
-    } else {
-      log.warn("WALLDEV", "export carried a malformed animation block — loaded static");
-    }
-  }
+  // Decode via the new formats layer and apply the primary layer.
+  const set = decodeWallDev(payload);
+  const layer = primaryLayer(set);
+  if (!layer) throw new Error("decodeWallDev produced no layers");
 
-  await insertTemplate({
-    imageDataUrl: t.image_data_url,
-    x: t.x,
-    y: t.y,
-    scale: t.scale || 1,
-    animation,
-  });
+  await applyLayer(layer);
 
   if (onMeta && (payload.author || payload.note)) {
     onMeta({ author: payload.author, note: payload.note });
@@ -191,4 +177,22 @@ export async function applyWallDevExport(
       (payload.author ? ` from ${payload.author.username}` : "") +
       (t.animation ? ` [animated ${t.animation.sheet.frameCount}f]` : ""),
   );
+}
+
+/**
+ * Export the current overlay state as a canonical WallTemplateSet model.
+ * Added for Task 17 callers that want the model rather than the v1 envelope.
+ */
+export function exportCurrentOverlay() {
+  return createSet({
+    layers: [{
+      name: "overlay",
+      image: [overlayData.srcOrig || overlayData.src || ""],
+      x: overlayData.x,
+      y: overlayData.y,
+      scale: cfg.overlayScale || 1,
+      width: overlayData.origW || overlayData.w,
+      height: overlayData.origH || overlayData.h,
+    }],
+  });
 }

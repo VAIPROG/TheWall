@@ -44,12 +44,18 @@
  *
  * No site code is modified. CORS errors are surfaced as plain warnings; the
  * caller can fall back to asking the user to download manually.
+ *
+ * @deprecated Shim — delegates to src/formats/ layer.
+ *   Call sites will be rewired to the formats barrel in Task 17.
  */
 import { log } from "./log";
-import { getOverlayAnimation, overlayData, type AnimSource } from "./overlay";
-import { insertTemplate } from "./template-insert";
-import { parseCharityTemplate, autoSplitSheet } from "./animated-template";
+import { getOverlayAnimation, overlayData } from "./overlay";
 import { fromCharity } from "./wall-anim";
+import { decodeCharity } from "./formats/charity/decode";
+import { encodeCharity } from "./formats/charity/encode";
+import { applyLayer } from "./formats/apply-layer";
+import { primaryLayer, createSet } from "./formats/shared/template-set";
+import { cfg } from "./config";
 
 export interface CharityTemplate {
   name: string;
@@ -173,53 +179,22 @@ export async function imageUrlToDataUrl(url: string): Promise<string> {
  * Forces scale to 1 — Charity templates are stored at native canvas
  * resolution.
  *
- * Animated entries (frameCount > 1) get the full sprite-sheet runtime: the
- * overlay renders the wall-clock-synchronised current frame, exactly like
- * Charity itself would. When the entry has frameCount but no frame size, the
- * grid is derived via autoSplitSheet.
+ * Delegates to decodeCharity + applyLayer from the formats layer.
  */
 export async function importCharityTemplate(
   item: CharityTemplate,
 ): Promise<{ w: number; h: number; note?: string }> {
   log.info("CHARITY", `import "${item.name}" @ (${item.x},${item.y})`);
-  const dataUrl = await imageUrlToDataUrl(item.sources[0]);
-  const dims = await new Promise<{ w: number; h: number }>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = () => reject(new Error("decode failed"));
-    img.src = dataUrl;
-  });
-  let note: string | undefined;
 
-  // Resolve sprite-sheet animation up front (if any) so the whole template
-  // goes in through one insertTemplate call. parseCharityTemplate re-normalises
-  // the entry into the tested AnimatedTemplate shape (alias handling there).
-  let animation: AnimSource | null = null;
-  if ((item.frameCount ?? 1) > 1) {
-    const tpl = parseCharityTemplate(item);
-    if (tpl) {
-      if ((!tpl.frameWidth || !tpl.frameHeight) && tpl.frameCount > 1) {
-        const best = autoSplitSheet(dims.w, dims.h, { frameCount: tpl.frameCount })[0];
-        if (best) {
-          tpl.frameWidth = best.frameWidth;
-          tpl.frameHeight = best.frameHeight;
-          log.ok("CHARITY", `auto-split → ${best.cols}×${best.rows} of ${best.frameWidth}×${best.frameHeight}`);
-        }
-      }
-      if (tpl.frameWidth && tpl.frameHeight) {
-        animation = { kind: "charity", template: tpl };
-        note = `Animated: ${tpl.frameCount} frames @ ${tpl.secondsPerFrame}s/frame.`;
-      } else {
-        note = `Animated template (${item.frameCount} frames) — could not derive frame grid; loaded static.`;
-        log.warn("CHARITY", note);
-      }
-    }
-  }
+  // Wrap the single entry in a config object so decodeCharity can parse it,
+  // then apply the primary layer through the new formats layer.
+  const set = decodeCharity({ templates: [item as any] });
+  const layer = primaryLayer(set);
+  if (!layer) throw new Error("decodeCharity produced no layers");
 
-  // Charity templates assume 1:1 with canvas pixels (scale 1).
-  await insertTemplate({ imageDataUrl: dataUrl, x: item.x, y: item.y, scale: 1, animation });
-  log.ok("CHARITY", `"${item.name}" applied (${dims.w}×${dims.h})`);
-  return { w: dims.w, h: dims.h, note };
+  const result = await applyLayer(layer);
+  log.ok("CHARITY", `"${item.name}" applied (${result.w}×${result.h})`);
+  return result;
 }
 
 /**
@@ -228,6 +203,8 @@ export async function importCharityTemplate(
  * insert a placeholder data URL when none is given, but upstream Charity
  * rejects data URLs, so the operator usually uploads the PNG somewhere
  * first (see `/v2/templates/{id}/png` on the backend).
+ *
+ * Delegates to encodeCharity from the formats layer.
  */
 export function exportToCharityConfig(opts: {
   faction?: string;
@@ -236,31 +213,52 @@ export function exportToCharityConfig(opts: {
   imageUrl?: string;
 }): CharityConfig {
   const url = opts.imageUrl || overlayData.srcOrig || overlayData.src || "";
-  // Static templates emit ONLY the fields Charity needs — missing keys mean
-  // "no animation" upstream, and bogus placeholders polluted round-trips.
-  // With a live animation we emit the real frame config (uniform timing,
-  // row-major, 100% scale — Charity's model; richer WallAnim features are
-  // flattened, see wall-anim.ts#toCharityEntry).
-  const entry: CharityTemplate = {
+
+  // Build a minimal WallTemplateSet from the current overlay state.
+  const layer: import("./formats/shared/template-model").TemplateLayer = {
     name: opts.templateName || "Untitled",
-    sources: url ? [url] : [],
+    image: url ? [url] : [],
     x: overlayData.x,
     y: overlayData.y,
+    scale: 1,
+    width: overlayData.origW || overlayData.w,
+    height: overlayData.origH || overlayData.h,
   };
+
+  // Attach animation when the overlay is animated.
   const anim = getOverlayAnimation();
   if (anim) {
     const animCfg = anim.kind === "wall-anim" ? anim.config : fromCharity(anim.template);
-    entry.frameWidth = animCfg.sheet.frameWidth;
-    entry.frameHeight = animCfg.sheet.frameHeight;
-    entry.frameCount = animCfg.sheet.frameCount;
-    entry.secondsPerFrame = animCfg.timing.defaultFrameMs / 1000;
-    entry.startTimestamp = Math.round(animCfg.timing.startTime / 1000);
-    entry.looping = animCfg.timing.looping;
+    layer.animation = {
+      sheet: {
+        frameWidth: animCfg.sheet.frameWidth,
+        frameHeight: animCfg.sheet.frameHeight,
+        frameCount: animCfg.sheet.frameCount,
+        layout: animCfg.sheet.layout,
+        order: animCfg.sheet.order,
+      },
+      timing: {
+        startTime: animCfg.timing.startTime,
+        defaultFrameMs: animCfg.timing.defaultFrameMs,
+        looping: animCfg.timing.looping,
+      },
+      scaleMode: animCfg.scaling.mode,
+    };
   }
+
+  const set = createSet({ layers: [layer] });
+  const { config } = encodeCharity(set, {
+    faction: opts.faction,
+    contact: opts.contact,
+    embedIdentity: false,
+  });
+
+  // Project from CharityEntry[] to legacy CharityTemplate[] shape.
+  // The structures are compatible for all fields; assert as the legacy type.
   return {
-    faction: opts.faction || "the-wall-dev export",
-    contact: opts.contact || "anonymous",
-    templates: [entry],
-    whitelist: [],
+    faction: config.faction,
+    contact: config.contact,
+    templates: config.templates as unknown as CharityTemplate[],
+    whitelist: config.whitelist ?? [],
   };
 }
