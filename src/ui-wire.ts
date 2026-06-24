@@ -94,18 +94,15 @@ import { getPaintInfo } from "./paint-state";
 import { playPaintRefillSound } from "./paint-sound";
 import { fetchCoinBalance } from "./site-api";
 import { openCursorShop } from "./open-cursor-shop";
-import {
-  fetchCharityConfig,
-  importCharityTemplate,
-  exportToCharityConfig,
-  CharityTemplate,
-} from "./charity-import";
-import { exportToWallDevJson } from "./walldev-config";
+import { fetchCharityConfig } from "./charity-import";
+import { exportToWallDevJson, exportCurrentOverlay } from "./walldev-config";
 import { wireAnimAndProtect } from "./anim-protect-wire";
 import { wireLinks } from "./links-wire";
-import { openExportOptionsDialog } from "./overlay-share-dialogs";
+import { openExportOptionsDialog, pickLayer } from "./overlay-share-dialogs";
 import { applyParsedJson } from "./url-autoload";
 import { pluralize } from "./i18n";
+import { encode } from "./formats/shared/format-registry";
+import { applyLayer } from "./formats/apply-layer";
 
 export function wireUI(win: HTMLElement): void {
   // Animation + region-protection groups live in their own wiring module.
@@ -309,22 +306,25 @@ export function wireUI(win: HTMLElement): void {
         );
         return;
       }
-      const picked = await pickCharityTemplate(charityCfg);
-      if (!picked) return;
+      // Decode into a canonical set and use the generic layer picker.
+      const { decodeCharity } = await import("./formats/charity/decode");
+      const charitySet = decodeCharity(charityCfg as any);
+      const chosenLayer = charitySet.layers.length === 1
+        ? charitySet.layers[0]
+        : await pickLayer(charitySet);
+      if (!chosenLayer) return;
       try {
-        const dims = await importCharityTemplate(picked);
+        const dims = await applyLayer(chosenLayer);
         // Charity templates carry no scale field — they're stored at native
-        // canvas resolution. `importCharityTemplate` forces `cfg.overlayScale
-        // = 1`; mirror that into the UI controls so the slider, % input, and
-        // label all read 100% (otherwise the user sees a stale value from
-        // before the import).
+        // canvas resolution. `applyLayer` sets scale 1; mirror that into the
+        // UI controls so the slider, % input, and label all read 100%.
         applyScalePct(100, true);
         toast(
           "Charity",
           t("charityImported", {
-            name: picked.name,
-            x: picked.x,
-            y: picked.y,
+            name: chosenLayer.name,
+            x: chosenLayer.x,
+            y: chosenLayer.y,
             w: dims.w,
             h: dims.h,
           }),
@@ -407,22 +407,21 @@ export function wireUI(win: HTMLElement): void {
     const opts = await openExportOptionsDialog(defaults);
     if (!opts) return;
     try {
-      // "Anonymise" wins over "show username" — when both are checked the
-      // anonymise flag turns the username into the literal "anonymous"
-      // string so the file still has SOMETHING in the author block (which
-      // the importer can surface). The clan field is dropped in that case
-      // because revealing it would defeat the anonymisation.
-      const includeAuthor = opts.includeAuthor;
-      const username = opts.anonymise ? "anonymous" : defaults.username;
-      const json = exportToWallDevJson({
-        templateName: opts.templateName,
-        includeAuthor,
-        showClan: opts.showClan && !opts.anonymise,
-        usernameOverride: username,
-        clanName: defaults.clanName || undefined,
-        clanRole: defaults.clanRole || undefined,
-        note: opts.note,
-      });
+      // Build the canonical set from current overlay state, then encode as v2.
+      const set = exportCurrentOverlay();
+      // Apply author choices to the set.
+      if (opts.includeAuthor) {
+        const username = opts.anonymise ? "anonymous" : defaults.username;
+        if (username) {
+          set.author = {
+            name: username,
+            ...(opts.showClan && !opts.anonymise && defaults.clanName ? { clanName: defaults.clanName } : {}),
+          };
+        }
+      }
+      if (opts.note) set.notes = [opts.note];
+      if (opts.templateName) set.layers[0] = { ...set.layers[0], name: opts.templateName };
+      const json = encode(set, "wall-dev/2");
       const blob = new Blob([JSON.stringify(json, null, 2)], {
         type: "application/json",
       });
@@ -462,13 +461,22 @@ export function wireUI(win: HTMLElement): void {
     );
     if (name == null) return;
     try {
-      const cfg = exportToCharityConfig({
+      const set = exportCurrentOverlay();
+      set.layers[0] = { ...set.layers[0], name: String(name), image: [String(url)] };
+      const charityResult = encode(set, "charity", {
         faction: String(faction),
         contact: String(contact),
-        templateName: String(name),
-        imageUrl: String(url),
-      });
-      const blob = new Blob([JSON.stringify(cfg, null, 2)], {
+        embedIdentity: !cfg.charityNoIdentity,
+      }) as { config: any; report: { lostFields: string[] } };
+      const { config: charityOut, report } = charityResult;
+      if (report.lostFields.length) {
+        const proceed = await confirmDlg(
+          `Some fields cannot be represented in Charity format and will be dropped:\n• ${report.lostFields.join("\n• ")}\n\nProceed with export?`,
+          "Charity export — data loss warning",
+        );
+        if (!proceed) return;
+      }
+      const blob = new Blob([JSON.stringify(charityOut, null, 2)], {
         type: "application/json",
       });
       downloadBlob(blob, `charity-${Date.now()}.json`);
@@ -767,15 +775,19 @@ export function wireUI(win: HTMLElement): void {
     const defaults = await resolveAuthorDefaults();
     const opts = await openExportOptionsDialog(defaults);
     if (!opts) return;
-    const json = exportToWallDevJson({
-      templateName: opts.templateName,
-      includeAuthor: opts.includeAuthor,
-      showClan: opts.showClan && !opts.anonymise,
-      usernameOverride: opts.anonymise ? "anonymous" : defaults.username,
-      clanName: defaults.clanName || undefined,
-      clanRole: defaults.clanRole || undefined,
-      note: opts.note,
-    });
+    const set = exportCurrentOverlay();
+    if (opts.includeAuthor) {
+      const username = opts.anonymise ? "anonymous" : defaults.username;
+      if (username) {
+        set.author = {
+          name: username,
+          ...(opts.showClan && !opts.anonymise && defaults.clanName ? { clanName: defaults.clanName } : {}),
+        };
+      }
+    }
+    if (opts.note) set.notes = [opts.note];
+    if (opts.templateName) set.layers[0] = { ...set.layers[0], name: opts.templateName };
+    const json = encode(set, "wall-dev/2");
     const blob = new Blob([JSON.stringify(json, null, 2)], {
       type: "application/json",
     });
@@ -827,13 +839,22 @@ export function wireUI(win: HTMLElement): void {
     );
     if (entered == null) return;
     const me = getMe();
-    const cfgOut = exportToCharityConfig({
+    const set = exportCurrentOverlay();
+    set.layers[0] = { ...set.layers[0], image: [String(entered)] };
+    const shareResult = encode(set, "charity", {
       faction: me?.username ? `${me.username}'s clan` : "the-wall-dev export",
       contact: me?.username || "anonymous",
-      templateName: "Untitled",
-      imageUrl: String(entered),
-    });
-    const blob = new Blob([JSON.stringify(cfgOut, null, 2)], {
+      embedIdentity: !cfg.charityNoIdentity,
+    }) as { config: any; report: { lostFields: string[] } };
+    const { config: charityOutFallback, report: fallbackReport } = shareResult;
+    if (fallbackReport.lostFields.length) {
+      const proceed = await confirmDlg(
+        `Some fields cannot be represented in Charity format and will be dropped:\n• ${fallbackReport.lostFields.join("\n• ")}\n\nProceed with export?`,
+        "Charity export — data loss warning",
+      );
+      if (!proceed) return;
+    }
+    const blob = new Blob([JSON.stringify(charityOutFallback, null, 2)], {
       type: "application/json",
     });
     downloadBlob(blob, `charity-${Date.now()}.json`);
@@ -1829,6 +1850,10 @@ export function wireUI(win: HTMLElement): void {
     saveCfg();
     toast("WS tap", "reload page to (de)activate");
   });
+  $("cfg-charity-no-identity")?.addEventListener("change", (e: Event) => {
+    cfg.charityNoIdentity = (e.target as HTMLInputElement).checked;
+    saveCfg();
+  });
 
   // update checker
   $("btn-check-update")!.addEventListener("click", async () => {
@@ -2322,76 +2347,5 @@ async function loadAchievementList(): Promise<void> {
   list.innerHTML = html;
 }
 
-/**
- * Modal picker for a Charity config. Reuses the dialog system's wd-dlg
- * skin via openDialog so it follows the active theme automatically. We
- * could compose a custom layout but the standard prompt is enough for a
- * scrollable radio list.
- */
-function pickCharityTemplate(cfg: {
-  faction?: string;
-  templates: CharityTemplate[];
-}): Promise<CharityTemplate | null> {
-  return new Promise((resolve) => {
-    const wrap = document.createElement("div");
-    wrap.id = "wd-charity-picker";
-    wrap.style.cssText =
-      'position:fixed;inset:0;z-index:1000004;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font:11px "MS Sans Serif",Tahoma,sans-serif';
-    const dark = document.body.classList.contains("dark");
-    const bg = dark ? "#2c2c2c" : "#c0c0c0";
-    const text = dark ? "#fff" : "#000";
-    const accent = dark ? "#2889ff" : "#000080";
-    wrap.innerHTML = `
-      <div style="background:${bg};color:${text};width:420px;max-width:92vw;border:2px solid #fff;border-color:#fff #404040 #404040 #fff;box-shadow:4px 4px 0 rgba(0,0,0,.5)">
-        <div style="background:linear-gradient(90deg,${accent},#1084d0);color:#fff;font-weight:bold;padding:4px 6px">${esc(t("charityPickTitle"))}</div>
-        <div style="padding:10px">
-          <div style="font-size:11px;color:${dark ? "#aaa" : "#555"};margin-bottom:6px">${esc(t("charityPickBody", { faction: cfg.faction || "?", count: cfg.templates.length }))}</div>
-          <div id="wd-charity-list" style="max-height:300px;overflow-y:auto;border:2px inset #808080;background:${dark ? "#0f0f0f" : "#fff"};color:${dark ? "#fff" : "#000"};padding:4px">
-            ${cfg.templates
-              .map(
-                (tpl, i) => `
-              <div class="wd-ch-row" data-i="${i}" style="padding:4px 6px;cursor:pointer;border-bottom:1px dashed ${dark ? "#3a3a3a" : "#dfdfdf"}">
-                <b>${esc(tpl.name)}</b>
-                <br><span style="font-size:10px;color:${dark ? "#aaa" : "#555"}">@${tpl.x}, ${tpl.y} · ${esc(tpl.sources[0])}</span>
-              </div>
-            `,
-              )
-              .join("")}
-          </div>
-        </div>
-        <div style="padding:6px 10px 10px;text-align:right">
-          <button id="wd-ch-cancel" style="background:${bg};color:${text};border:2px solid #fff;border-color:#fff #404040 #404040 #fff;padding:4px 14px;font:11px sans-serif;cursor:pointer">Cancel</button>
-        </div>
-      </div>`;
-    document.body.appendChild(wrap);
-    const finish = (val: CharityTemplate | null) => {
-      wrap.remove();
-      window.removeEventListener("keydown", onKey, true);
-      resolve(val);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        finish(null);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    wrap
-      .querySelector("#wd-ch-cancel")
-      ?.addEventListener("click", () => finish(null));
-    wrap.querySelectorAll(".wd-ch-row").forEach((row) => {
-      (row as HTMLElement).addEventListener("click", () => {
-        const idx = parseInt((row as HTMLElement).dataset.i || "0", 10);
-        finish(cfg.templates[idx] || null);
-      });
-      (row as HTMLElement).addEventListener("mouseenter", () => {
-        (row as HTMLElement).style.background = dark ? "#3838aa" : "#000080";
-        (row as HTMLElement).style.color = "#fff";
-      });
-      (row as HTMLElement).addEventListener("mouseleave", () => {
-        (row as HTMLElement).style.background = "";
-        (row as HTMLElement).style.color = "";
-      });
-    });
-  });
-}
+// pickCharityTemplate removed — generic pickLayer() in overlay-share-dialogs.ts
+// now handles all multi-template selection for any WallTemplateSet.

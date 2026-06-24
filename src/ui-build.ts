@@ -245,6 +245,7 @@ export function buildUI(): void {
                       <div class="wp-note" style="color:var(--sub);font-size:10px;margin:2px 0 0">
                           ${t("shareExportNoteJson")}<br>${t("shareExportNoteCharity")}
                       </div>
+                      <label class="wp-check" style="margin-top:6px"><input type="checkbox" id="cfg-charity-no-identity" ${cfg.charityNoIdentity ? "checked" : ""}> Omit identity tag from Charity export (no TheWallDev ID embedded)</label>
                   </div>
               </div>
               <!-- TEMPLATES (catalog only — upload moved to Share tab) -->

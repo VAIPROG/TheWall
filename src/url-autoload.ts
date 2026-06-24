@@ -7,15 +7,10 @@
  * if present, decode it through a small chain of strategies:
  *
  *   1. If the value is a `the-wall-dev://` share link, defer to importShare().
- *   2. If the value starts with `http(s)://`, fetch it. Try parsing the body
- *      as a Charity config first; fall back to our own WallDevExport.
- *   3. Otherwise treat it as a base64-encoded JSON. Decode + try Charity,
- *      then WallDevExport.
- *   4. Last-ditch: try interpreting the value itself as raw JSON.
- *
- * Strategy ordering matters: a Charity config is structurally distinct
- * (`templates: []`) from our export (`format: "the-wall-dev/1"`), so a
- * single value can't be both — we never have to guess.
+ *   2. If the value starts with `http(s)://`, fetch it and dispatch through
+ *      decodeAny (handles charity + wall-dev v1/v2/multi-template).
+ *   3. Otherwise try decodeAny on the raw value (handles base64-JSON, raw JSON,
+ *      bare charity entries, etc.).
  *
  * We surface failures as toasts so the user knows the URL was malformed
  * rather than silently ignoring it.
@@ -26,10 +21,12 @@
 import { log } from "./log";
 import { toast } from "./notify";
 import { errMsg } from "./helpers";
-import { parseCharityConfig, importCharityTemplate } from "./charity-import";
-import { applyWallDevExport, WallDevExport } from "./walldev-config";
 import { importShare } from "./share";
-import { showImportMetaDialog } from "./overlay-share-dialogs";
+import { showImportMetaDialog, pickLayer } from "./overlay-share-dialogs";
+import { decodeAny } from "./formats/shared/format-registry";
+import { applyLayer } from "./formats/apply-layer";
+import { layerCount, primaryLayer, summarize } from "./formats/shared/template-set";
+import { UnknownFormatError } from "./formats/shared/parse-errors";
 
 const PARAM = "the_wall_dev";
 const CHARITY_PARAM = "charity";
@@ -46,66 +43,61 @@ function stripParam(name: string): void {
   } catch { /* ignore — URL API not available */ }
 }
 
-/** Base64-decode with URL-safe alphabet support and tolerant padding. */
-function tryBase64ToJson(s: string): any | null {
-  try {
-    // URL-safe → standard alphabet, restore stripped padding.
-    let b = s.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = b.length % 4;
-    if (pad) b += "=".repeat(4 - pad);
-    const decoded = atob(b);
-    return JSON.parse(decoded);
-  } catch { return null; }
-}
-
-/** Detect whether a JSON value looks like our format (vs Charity). */
-function isWallDevExport(j: any): j is WallDevExport {
-  return j && typeof j === "object" && j.format === "the-wall-dev/1" && j.template;
-}
-
-/** Detect whether a JSON value looks like a Charity config. */
-function looksLikeCharity(j: any): boolean {
-  return j && typeof j === "object" && Array.isArray(j.templates);
-}
-
 /**
- * Dispatch a parsed JSON value to the right importer. The first template
- * in a Charity config wins automatically — power users with multi-template
- * configs are expected to use the in-extension picker anyway.
+ * Dispatch a parsed JSON value (or raw string) to the right importer via the
+ * formats barrel. When the decoded set has exactly 1 layer it applies directly;
+ * when it has >1 layers the user is shown a picker. Returns true on success.
  *
  * Exposed so the in-extension UI (file picker / URL field on the Overlay
  * tab) can reuse the same dispatching pipeline as the URL auto-loader.
  */
 export async function applyParsedJson(j: any, sourceLabel: string): Promise<boolean> {
-  if (isWallDevExport(j)) {
-    // The onMeta callback runs after the overlay is mounted but before we
-    // toast — we want the author + note in front of the user before the
-    // brief "Imported …" confirmation slides in.
-    await applyWallDevExport(j, async (meta) => {
-      if (meta.author || meta.note) {
-        await showImportMetaDialog(meta);
-      }
-    });
-    const authorTag = j.author?.username ? ` by ${j.author.username}` : "";
-    toast("Auto-load", `Imported overlay${authorTag} from ${sourceLabel}`);
-    return true;
-  }
-  if (looksLikeCharity(j)) {
-    const cfg = parseCharityConfig(j);
-    const first = cfg.templates[0];
-    if (!first) {
-      toast("Auto-load", "Charity config has no templates");
+  let set;
+  let id;
+  try {
+    // decodeAny accepts either a string or a parsed object.
+    const result = decodeAny(j);
+    set = result.set;
+    id = result.id;
+  } catch (e: any) {
+    if (e instanceof UnknownFormatError) {
+      log.warn("AUTOLOAD", `unrecognised JSON shape from ${sourceLabel}: ${e.message}`);
       return false;
     }
-    const dims = await importCharityTemplate(first);
-    toast(
-      "Auto-load",
-      `Imported "${first.name}" (${dims.w}×${dims.h}) from ${sourceLabel}`,
-    );
+    throw e;
+  }
+
+  // Surface author / notes before applying (same UX as before).
+  const sum = summarize(set);
+  if (sum.author || sum.notes.length) {
+    // Map back to the legacy showImportMetaDialog interface:
+    // author.name → username; notes[0] → note.
+    const legacyMeta: {
+      author?: { username: string; clan_name?: string; clan_role?: string };
+      note?: string;
+    } = {};
+    if (sum.author?.name) {
+      legacyMeta.author = { username: sum.author.name };
+      if (sum.author.clanName) legacyMeta.author.clan_name = sum.author.clanName;
+    }
+    if (sum.notes.length) legacyMeta.note = sum.notes.join("\n");
+    await showImportMetaDialog(legacyMeta);
+  }
+
+  if (layerCount(set) === 1) {
+    const layer = primaryLayer(set)!;
+    const dims = await applyLayer(layer);
+    const authorTag = sum.author?.name ? ` by ${sum.author.name}` : "";
+    toast("Auto-load", `Imported ${layer.name}${authorTag} (${dims.w}×${dims.h}) from ${sourceLabel}`);
     return true;
   }
-  log.warn("AUTOLOAD", `unrecognised JSON shape from ${sourceLabel}`);
-  return false;
+
+  // Multiple layers — open the picker.
+  const chosen = await pickLayer(set);
+  if (!chosen) return false;
+  const dims = await applyLayer(chosen);
+  toast("Auto-load", `Imported "${chosen.name}" (${dims.w}×${dims.h}) from ${sourceLabel}`);
+  return true;
 }
 
 /**
@@ -134,22 +126,11 @@ async function tryValue(raw: string): Promise<boolean> {
     }
   }
 
-  // 3. Base64.
-  const fromB64 = tryBase64ToJson(raw);
-  if (fromB64) {
-    try {
-      return await applyParsedJson(fromB64, "base64 param");
-    } catch (e: any) {
-      log.warn("AUTOLOAD", `base64 payload failed: ${errMsg(e)}`);
-    }
-  }
-
-  // 4. Raw JSON as last resort.
+  // 3. Try raw string directly through decodeAny (handles base64-JSON + raw JSON).
   try {
-    const j = JSON.parse(raw);
-    return await applyParsedJson(j, "inline JSON");
-  } catch {
-    /* not JSON — give up */
+    return await applyParsedJson(raw, "inline param");
+  } catch (e: any) {
+    log.warn("AUTOLOAD", `param decode failed: ${errMsg(e)}`);
   }
 
   toast("Auto-load failed", `Could not decode the_wall_dev= value`);

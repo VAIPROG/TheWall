@@ -19,6 +19,8 @@ import { esc } from "./helpers";
 import { t } from "./i18n";
 import { isWalldevDark } from "./theme";
 import { WallDevExport } from "./walldev-config";
+import type { WallTemplateSet, TemplateLayer } from "./formats/shared/template-model";
+import { isAnimated, summarize } from "./formats/shared/template-set";
 
 export interface ExportOptionsResult {
   templateName: string;
@@ -255,5 +257,103 @@ export function showImportMetaDialog(meta: {
     };
     window.addEventListener("keydown", onKey, true);
     wrap.querySelector("#wd-im-ok")?.addEventListener("click", finish);
+  });
+}
+
+/**
+ * Generic multi-layer picker for any WallTemplateSet. Shows set-level
+ * author/notes/contacts from summarize(), then lists every layer with name,
+ * coordinates, and an "animated" badge. Returns the chosen layer or null when
+ * the user cancels.
+ */
+export function pickLayer(set: WallTemplateSet): Promise<TemplateLayer | null> {
+  return new Promise((resolve) => {
+    const c = themeColors();
+    const sum = summarize(set);
+
+    const authorLine = sum.author?.name
+      ? `<div style="margin-bottom:4px;font-weight:bold">Author: ${esc(sum.author.name)}</div>`
+      : "";
+    const notesBlock = sum.notes.length
+      ? `<div style="margin-bottom:4px;font-size:10px;color:${c.sub}">${sum.notes.map(esc).join("<br>")}</div>`
+      : "";
+    const contactsBlock = sum.contactPlatforms.length
+      ? `<div style="margin-bottom:6px;font-size:10px;color:${c.sub}">Contacts: ${esc(sum.contactPlatforms.join(", "))}</div>`
+      : "";
+
+    const layerRows = set.layers
+      .map((layer, i) => {
+        const animBadge = isAnimated(layer)
+          ? `<span style="margin-left:4px;padding:1px 4px;font-size:9px;background:${c.accent};color:#fff;border-radius:2px">animated</span>`
+          : "";
+        return `<div class="wd-pk-row" data-i="${i}"
+          style="padding:5px 7px;cursor:pointer;border-bottom:1px dashed ${c.dark ? "#3a3a3a" : "#dfdfdf"}">
+          <b>${esc(layer.name)}</b>${animBadge}
+          <br><span style="font-size:10px;color:${c.sub}">@${layer.x}, ${layer.y}</span>
+        </div>`;
+      })
+      .join("");
+
+    const wrap = document.createElement("div");
+    wrap.id = "wd-layer-picker";
+    wrap.style.cssText =
+      "position:fixed;inset:0;z-index:1000007;background:rgba(0,0,0,.55);" +
+      "display:flex;align-items:center;justify-content:center;" +
+      "font:12px W95FA,\"MS Sans Serif\",Tahoma,sans-serif";
+
+    wrap.innerHTML = `
+      <div style="background:${c.bg};color:${c.text};width:440px;max-width:92vw;
+                  border:2px solid;border-color:#fff #404040 #404040 #fff;
+                  box-shadow:4px 4px 0 rgba(0,0,0,.5)">
+        <div style="background:linear-gradient(90deg,${c.accent},#1084d0);
+                    color:#fff;font-weight:bold;padding:4px 8px">
+          Choose a layer to import
+        </div>
+        <div style="padding:10px 12px">
+          ${authorLine}${notesBlock}${contactsBlock}
+          <div style="font-size:11px;color:${c.sub};margin-bottom:6px">
+            ${set.layers.length} layer(s) — pick one to load:
+          </div>
+          <div id="wd-pk-list" style="max-height:300px;overflow-y:auto;
+            border:2px inset #808080;background:${c.dark ? "#0f0f0f" : "#fff"};
+            color:${c.dark ? "#fff" : "#000"};padding:4px">
+            ${layerRows}
+          </div>
+        </div>
+        <div style="padding:6px 12px 10px;text-align:right">
+          <button id="wd-pk-cancel" style="min-width:80px;padding:4px 12px;
+            background:${c.bg};color:${c.text};
+            border:2px solid;border-color:#fff #404040 #404040 #fff;
+            font:12px W95FA,sans-serif;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(wrap);
+
+    const finish = (val: TemplateLayer | null) => {
+      wrap.remove();
+      window.removeEventListener("keydown", onKey, true);
+      resolve(val);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); finish(null); }
+    };
+    window.addEventListener("keydown", onKey, true);
+    wrap.querySelector("#wd-pk-cancel")?.addEventListener("click", () => finish(null));
+
+    wrap.querySelectorAll<HTMLElement>(".wd-pk-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        const idx = parseInt(row.dataset.i || "0", 10);
+        finish(set.layers[idx] ?? null);
+      });
+      row.addEventListener("mouseenter", () => {
+        row.style.background = c.dark ? "#3838aa" : "#000080";
+        row.style.color = "#fff";
+      });
+      row.addEventListener("mouseleave", () => {
+        row.style.background = "";
+        row.style.color = "";
+      });
+    });
   });
 }

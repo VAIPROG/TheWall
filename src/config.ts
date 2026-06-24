@@ -47,6 +47,9 @@ export interface WallConfig {
   windowHeight: number;
   /** How often the dots overlay re-checks the canvas in ms (default 500). */
   dotsRefreshMs: number;
+  /** When true, Charity exports omit the (TheWallDev: ID:…;BACKEND:…) identity
+   *  tag from the template name. Default false (identity is embedded). */
+  charityNoIdentity: boolean;
 }
 
 const CFG_KEY = "walldev_cfg";
@@ -84,6 +87,7 @@ const DEFAULT_CFG: WallConfig = {
   windowWidth: 0,
   windowHeight: 0,
   dotsRefreshMs: 500,
+  charityNoIdentity: false,
 };
 
 export function loadCfg(): WallConfig {
