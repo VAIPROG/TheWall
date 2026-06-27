@@ -432,6 +432,38 @@ Template:
     version:
       type: integer
       description: Optimistic concurrency token. Incremented on each update. Pass as `expectedVersion` in TemplatePatch to guard against lost updates.
+    verifiedBy:
+      type: string
+      format: uuid
+      nullable: true
+      description: Account UUID of the moderator who approved or rejected this template. Null until a moderation decision is made.
+    verifiedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the moderation decision was recorded. Null until a decision is made.
+    rejectionReason:
+      type: string
+      nullable: true
+      description: Human-readable reason supplied by the moderator when the template was rejected. Null if not rejected or no reason was provided.
+    viewer:
+      type: object
+      readOnly: true
+      nullable: true
+      description: |
+        Caller's allowed actions on this template. Null when unauthenticated.
+        Clients should use these flags to gate UI affordances rather than
+        inferring from role alone.
+      properties:
+        canEdit:
+          type: boolean
+          description: Whether the caller may patch this template.
+        canDelete:
+          type: boolean
+          description: Whether the caller may delete this template.
+        canVerify:
+          type: boolean
+          description: Whether the caller may approve or reject this template via `POST /templates/{templateId}/verify`.
     bounds:
       type: object
       readOnly: true
@@ -601,6 +633,23 @@ TemplatePage:
   allOf:
     - $ref: "#/Template"
     - $ref: "./common.yaml#/Pagination"
+
+TemplateVerifyRequest:
+  type: object
+  description: Body for the template verification endpoint. Submitted by a moderator to approve or reject a pending template.
+  required:
+    - decision
+  properties:
+    decision:
+      type: string
+      enum:
+        - approve
+        - reject
+      description: Moderation decision — `approve` sets status to `approved`; `reject` sets status to `rejected`.
+    reason:
+      type: string
+      maxLength: 1000
+      description: Optional moderator-supplied reason. Required (by convention) when decision is `reject`; ignored on approval.
 
 CharityEntry:
   type: object

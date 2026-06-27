@@ -428,6 +428,9 @@ paths:
   /templates/{templateId}/pin:
     $ref: "./paths/templates.yaml#/TemplatePin"
 
+  /templates/{templateId}/verify:
+    $ref: "./paths/templates.yaml#/TemplateVerify"
+
   /templates/pinned:
     $ref: "./paths/templates.yaml#/TemplatesPinned"
 

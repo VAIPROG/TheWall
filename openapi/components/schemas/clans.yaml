@@ -177,6 +177,32 @@ ClanUpdate:
       type: string
       nullable: true
       description: New clan description.
+    avatarUrl:
+      type: string
+      format: uri
+      nullable: true
+      description: |
+        URL to the clan's avatar image. Set to null to clear.
+        Rejected with `423 Locked` if `avatar` is in `moderation.lockedFields`.
+    bannerUrl:
+      type: string
+      format: uri
+      nullable: true
+      description: |
+        URL to the clan's banner image. Set to null to clear.
+        Rejected with `423 Locked` if `banner` is in `moderation.lockedFields`.
+    tag:
+      type: string
+      maxLength: 6
+      nullable: true
+      description: |
+        Short unique clan tag (≤ 6 characters), e.g. "PXWRR". Set to null to clear.
+        Rejected with `423 Locked` if `tag` is in `moderation.lockedFields`.
+    discoverable:
+      type: boolean
+      description: |
+        Whether the clan appears in public search and discovery listings.
+        Rejected with `423 Locked` if `discoverable` is in `moderation.lockedFields`.
 
 ClanMember:
   type: object
@@ -489,6 +515,7 @@ ClanModerationPreferences:
     - requireApprovalForTemplates
     - minAccountAgeDays
     - blockReportedUsers
+    - membersCanDeleteOwnTemplates
   properties:
     autoApproveJoins:
       type: boolean
@@ -502,6 +529,13 @@ ClanModerationPreferences:
     blockReportedUsers:
       type: boolean
       description: Automatically block users who have active reports from joining.
+    membersCanDeleteOwnTemplates:
+      type: boolean
+      default: true
+      description: |
+        When true (default), clan members may delete their own clan-scoped templates.
+        When false, only clan moderator+ can delete clan-scoped templates — individual
+        members lose self-delete rights within this clan's template scope.
 
 ClanChatPermissions:
   type: object

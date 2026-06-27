@@ -67,8 +67,30 @@ TemplatesNew:
     summary: Upload a new template
     operationId: createTemplate
     description: |
-      Creates a new template. Enters moderation queue with status
-      `pending` unless uploader has auto-approve privileges.
+      Creates a new template. The resulting `status` depends on scope, caller
+      role, and server configuration:
+
+      **Publish gating by scope**
+      - `private` — any authenticated user; always auto-approved.
+      - `clan` — caller must be a member of the target clan; additionally
+        gated by the clan's `chatPermissions.whoCanPostTemplates`
+        (`everyone` | `members` | `moderators`). Members below the required
+        threshold receive `403 Forbidden`.
+      - `public` — any authenticated user when server
+        `allowPublicTemplatePublishing` is true (default). When false, only
+        admin+ may publish public-scope templates; others receive `403 Forbidden`.
+
+      **Auto-approval**
+      When server `autoApproveModeratorTemplates` is true (default), templates
+      published by a sufficiently privileged caller are set to `approved`
+      immediately, bypassing the moderation queue:
+      - `public` scope → caller is global moderator+.
+      - `clan` scope → caller is clan moderator+ of the target clan, or global
+        moderator+.
+      - `private` scope → always approved regardless of role or server flag.
+
+      All other cases result in `status: pending` and the template enters the
+      moderation queue.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
     security:
@@ -157,6 +179,21 @@ TemplateById:
     tags: [Templates]
     summary: Delete a template
     operationId: deleteTemplate
+    description: |
+      Deletes a template. Authorization rules (evaluated in order):
+
+      1. **Global moderator+** — may delete any template regardless of scope.
+      2. **Clan moderator+** (of the template's clan) — may delete any
+         clan-scoped template in their clan.
+      3. **Author (own template)** — may delete their own template in any scope,
+         subject to the following restriction:
+         - For `clan`-scoped templates, deletion is blocked when the clan's
+           `moderationPreferences.membersCanDeleteOwnTemplates` is false;
+           only clan moderator+ can then delete within that clan. Returns
+           `403 Forbidden` in that case.
+
+      Private and public scopes have no clan-level restriction — authors may
+      always delete their own.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -380,3 +417,54 @@ TemplatesPinned:
               $ref: "../components/schemas/templates.yaml#/TemplatePage"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
+
+TemplateVerify:
+  post:
+    tags: [Templates]
+    summary: Approve or reject a template
+    operationId: verifyTemplate
+    description: |
+      Submit a moderation decision (approve or reject) for a template.
+
+      **Authorization**
+      - Global moderator+ may verify any template regardless of scope.
+      - Clan moderator+ of the template's clan may verify clan-scoped templates
+        in their clan only. Attempting to verify a public or private template
+        without global moderator+ returns `403 Forbidden`.
+
+      **Effect**
+      - `approve` → sets `status: approved`, records `verifiedBy` and `verifiedAt`.
+      - `reject` → sets `status: rejected`, records `verifiedBy`, `verifiedAt`,
+        and `rejectionReason` (from the request `reason` field).
+
+      The response always returns the updated `Template` object so callers can
+      observe the new `status`, `verifiedBy`, `verifiedAt`, and `rejectionReason`
+      in a single round-trip.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/templates.yaml#/TemplateVerifyRequest"
+    responses:
+      "200":
+        description: Moderation decision recorded. Returns the updated template.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/Template"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"

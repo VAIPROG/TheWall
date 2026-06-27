@@ -49,6 +49,8 @@ ServerConfig:
     - rateLimitPerMinute
     - maintenanceMode
     - featureFlags
+    - allowPublicTemplatePublishing
+    - autoApproveModeratorTemplates
   properties:
     maxUsersPerClan:
       type: integer
@@ -73,6 +75,19 @@ ServerConfig:
       additionalProperties:
         type: boolean
       description: Dynamic feature flags — keys are feature names, values are enabled/disabled.
+    allowPublicTemplatePublishing:
+      type: boolean
+      description: |
+        When true (default), any authenticated user may publish templates with `scope: public`.
+        When false, only admin+ may publish public-scope templates; all other users are limited
+        to `clan` or `private` scope.
+    autoApproveModeratorTemplates:
+      type: boolean
+      description: |
+        When true (default), templates published by a moderator or higher at the relevant scope
+        are automatically set to `approved` on creation, bypassing the moderation queue.
+        Scope mapping: `public` → global moderator+; `clan` → clan moderator+ of that clan or
+        global moderator+; `private` → always approved regardless of this flag.
 
 ServerConfigUpdate:
   type: object
@@ -100,6 +115,19 @@ ServerConfigUpdate:
       additionalProperties:
         type: boolean
       description: Dynamic feature flags — keys are feature names, values are enabled/disabled.
+    allowPublicTemplatePublishing:
+      type: boolean
+      description: |
+        When true (default), any authenticated user may publish templates with `scope: public`.
+        When false, only admin+ may publish public-scope templates; all other users are limited
+        to `clan` or `private` scope.
+    autoApproveModeratorTemplates:
+      type: boolean
+      description: |
+        When true (default), templates published by a moderator or higher at the relevant scope
+        are automatically set to `approved` on creation, bypassing the moderation queue.
+        Scope mapping: `public` → global moderator+; `clan` → clan moderator+ of that clan or
+        global moderator+; `private` → always approved regardless of this flag.
 
 AdminNote:
   type: object
