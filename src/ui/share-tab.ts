@@ -1,6 +1,7 @@
 import { cfg } from "../config";
 import { SITE } from "../constants";
-import { $, errMsg } from "../helpers";
+import { $, esc, errMsg } from "../helpers";
+import { scopeOptions } from "./build-shared";
 import { ic } from "../icons";
 import { t } from "../i18n";
 import { toast } from "../notify";
@@ -614,4 +615,93 @@ export function wireShare(win: HTMLElement): void {
     downloadBlob(blob, `charity-${Date.now()}.json`);
     toast("Export", "Charity config saved");
   });
+}
+
+export function buildSharePane(): string {
+  return `<div class="wp-pane" data-p="sh">
+                  <div class="wp-group">
+                      <div class="wp-legend">${ic("dl")}${t("shareLegendImport")}</div>
+                      <input type="file" id="share-import-file" accept=".json,.png,.jpg,.jpeg,.gif,.webp,.txt,application/json,image/*" class="wp-input" style="font:11px sans-serif">
+                      <button class="wp-btn primary" id="btn-share-import-file" style="margin-top:4px;width:100%">${ic("dl")}${t("shareImportFileBtn")}</button>
+                      <input type="text" id="share-import-url" class="wp-input" autocomplete="off" placeholder="${esc(t("shareImportUrlPlaceholder"))}" style="margin-top:6px">
+                      <button class="wp-btn" id="btn-share-import-url" style="margin-top:4px;width:100%">${ic("globe")}${t("shareImportPasteBtn")}</button>
+                      <div id="share-detected" style="font-size:11px;color:var(--sub);margin-top:4px"></div>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("shareImportFileHint")}</div>
+                  </div>
+
+                  <div class="wp-group">
+                      <div class="wp-legend">${ic("plus")}${t("sharePublishLegend")}</div>
+                      <div style="font-size:11px;margin-bottom:4px">${t("shareScope")}:</div>
+                      <select id="share-scope" class="wp-input" style="font:11px sans-serif">${scopeOptions()}</select>
+                      <input type="text" id="share-pass" class="wp-input" autocomplete="off" placeholder="${esc(t("animSharePass"))}" style="margin-top:4px">
+                      <button class="wp-btn primary" id="btn-tpl-share" style="margin-top:4px;width:100%">${ic("plus")}${t("sharePublishBtn")}</button>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("sharePublishNote")}</div>
+                  </div>
+
+                  <div class="wp-group">
+                      <div class="wp-legend">${ic("bolt")}${t("animPublishLegend")}</div>
+                      <div style="font-size:11px;margin-bottom:4px">${t("animShareScope")}:</div>
+                      <select id="anim-share-scope" class="wp-input" style="font:11px sans-serif">${scopeOptions()}</select>
+                      <input type="text" id="anim-share-pass" class="wp-input" autocomplete="off" placeholder="${esc(t("animSharePass"))}" style="margin-top:4px">
+                      <div style="display:flex;gap:4px;margin-top:4px">
+                          <button class="wp-btn primary" id="btn-anim-upload" style="flex:1;margin:0">${t("animUpload")}</button>
+                          <button class="wp-btn" id="btn-anim-browse" style="flex:1;margin:0">${t("animBrowse")}</button>
+                      </div>
+                      <div id="anim-shared-list" style="margin-top:4px;font-size:11px"></div>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("animPublishNote")}</div>
+                      <div style="margin-top:8px;border-top:1px dashed var(--shadow);padding-top:6px">
+                          <div style="font-size:11px;margin-bottom:4px">${t("animByCodeLegend")}:</div>
+                          <input type="text" id="anim-shared-code" class="wp-input" autocomplete="off" placeholder="${esc(t("animByCodePlaceholder"))}">
+                          <input type="text" id="anim-shared-code-pass" class="wp-input" autocomplete="off" placeholder="${esc(t("animSharePass"))}" style="margin-top:4px">
+                          <button class="wp-btn" id="btn-anim-load-shared" style="margin-top:4px;width:100%">${ic("dl")}${t("animByCodeLoad")}</button>
+                          <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("animByCodeNote")}</div>
+                      </div>
+                  </div>
+
+                  <div class="wp-group">
+                      <div class="wp-legend">${ic("send")}${t("shareLegendExport")}</div>
+
+                      <!-- Share URLs -->
+                      <button class="wp-btn primary" id="btn-share-export-url-thewall" style="width:100%"
+                              title="${esc(t("shareExportNoteUrlTheWallDev"))}">
+                          ${ic("globe")}${t("shareExportCopyUrlTheWallDev")}
+                      </button>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin:2px 0 6px">
+                          ${t("shareExportNoteUrlTheWallDev")}
+                      </div>
+
+                      <button class="wp-btn" id="btn-share-export-url-charity" style="width:100%"
+                              title="${esc(t("shareExportNoteUrlCharity"))}">
+                          ${ic("globe")}${t("shareExportCopyUrlCharity")}
+                      </button>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin:2px 0 8px">
+                          ${t("shareExportNoteUrlCharity")}
+                      </div>
+
+                      <!-- Share Link -->
+                      <button class="wp-btn" id="btn-share-export-link" style="width:100%"
+                              title="${esc(t("shareExportNoteLink"))}">
+                          ${ic("bolt")}${t("shareExportCopyShareLink")}
+                      </button>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin:2px 0 8px">
+                          ${t("shareExportNoteLink")}
+                      </div>
+
+                      <!-- Save JSON + Save Charity -->
+                      <div style="display:flex;gap:4px">
+                          <button class="wp-btn" id="btn-share-export-json" style="flex:1;margin:0"
+                                  title="${esc(t("shareExportNoteJson"))}">
+                              ${ic("disk")}${t("shareExportSaveJson")}
+                          </button>
+                          <button class="wp-btn" id="btn-share-export-charity" style="flex:1;margin:0"
+                                  title="${esc(t("shareExportNoteCharity"))}">
+                              ${ic("globe")}${t("shareExportSaveCharity")}
+                          </button>
+                      </div>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin:2px 0 0">
+                          ${t("shareExportNoteJson")}<br>${t("shareExportNoteCharity")}
+                      </div>
+                      <label class="wp-check" style="margin-top:6px"><input type="checkbox" id="cfg-charity-no-identity" ${cfg.charityNoIdentity ? "checked" : ""}> Omit identity tag from Charity export (no TheWallDev ID embedded)</label>
+                  </div>
+              </div>`;
 }

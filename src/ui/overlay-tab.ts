@@ -1,7 +1,8 @@
 import { cfg, saveCfg } from "../config";
 import { WALL_W, WALL_H } from "../constants";
 import { teleport } from "../coords";
-import { $, errMsg } from "../helpers";
+import { $, esc, errMsg } from "../helpers";
+import { ic } from "../icons";
 import { t } from "../i18n";
 import { toast } from "../notify";
 import {
@@ -206,4 +207,106 @@ export function wireOverlay(_win: HTMLElement): void {
       overlayImg.style.display =
         overlayImg.style.display === "none" ? "block" : "none";
   });
+}
+
+export function buildOverlayPane(): string {
+  return `<div class="wp-pane active" data-p="ov">
+                  <div class="wp-group"><div class="wp-legend">${ic("disk")}${t("file")}</div>
+                      <input type="file" id="file-upload" accept="image/*" class="wp-input" style="font:11px sans-serif">
+                      <button class="wp-btn" id="btn-clear-overlay" style="margin-top:4px" title="${esc(t("clearOverlay"))}">${ic("trash")}${t("clearOverlay")}</button>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("send")}${t("ovShareLegend")}</div>
+                      <button class="wp-btn primary" id="btn-jump-share" style="width:100%">${ic("send")}${t("ovShareGo")} →</button>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("ovShareHint")}</div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("pin")}${t("coords")}</div>
+                      <div class="wp-row"><div>X<input type="number" id="coord-x" name="coord_x" autocomplete="off" class="wp-input" value="0"></div>
+                      <div>Y<input type="number" id="coord-y" name="coord_y" autocomplete="off" class="wp-input" value="0"></div></div>
+                      <div style="display:flex;gap:4px;margin-top:4px">
+                          <button class="wp-btn" id="btn-pick" style="flex:1;margin:0">${ic("pin")}${t("pickPoint")}</button>
+                          <button class="wp-btn" id="btn-teleport" style="flex:1;margin:0" title="${esc(t("teleportHint"))}">${ic("send")}${t("teleport")}</button>
+                      </div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${t("scale")}: <span id="scale-val">${Math.round((cfg.overlayScale || 1) * 100)}%</span></div>
+                      <input type="range" id="scale-range" min="5" max="1000" step="5" value="${Math.round((cfg.overlayScale || 1) * 100)}" style="width:100%">
+                      <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
+                          <button class="wp-btn" data-scale-preset="10" style="flex:1;min-width:46px;padding:2px 4px;margin:0">10%</button>
+                          <button class="wp-btn" data-scale-preset="25" style="flex:1;min-width:46px;padding:2px 4px;margin:0">25%</button>
+                          <button class="wp-btn" data-scale-preset="50" style="flex:1;min-width:46px;padding:2px 4px;margin:0">50%</button>
+                          <button class="wp-btn" data-scale-preset="100" style="flex:1;min-width:46px;padding:2px 4px;margin:0">100%</button>
+                          <button class="wp-btn" data-scale-preset="200" style="flex:1;min-width:46px;padding:2px 4px;margin:0">200%</button>
+                          <button class="wp-btn" data-scale-preset="500" style="flex:1;min-width:46px;padding:2px 4px;margin:0">500%</button>
+                      </div>
+                      <input type="number" id="scale-input" min="5" max="1000" step="1" value="${Math.round((cfg.overlayScale || 1) * 100)}" class="wp-input" style="margin-top:4px;font:11px monospace" title="exact %">
+                  </div>
+                  <div class="wp-group" id="opacity-group" style="${cfg.compactMarkers ? "display:none" : ""}"><div class="wp-legend">${t("opacity")}</div>
+                      <input type="range" id="opacity-range" min="0" max="1" step="0.05" value="${cfg.defaultOpacity}" style="width:100%">
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:2px">Opacity has no effect in dots mode — dots are always fully opaque for max readability.</div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("grid")}Compact markers</div>
+                      <label class="wp-check"><input type="checkbox" id="cfg-compact-markers" ${cfg.compactMarkers ? "checked" : ""}> Render every missing pixel as a small opaque dot (canvas stays visible)</label>
+                      <div id="compact-size-wrap" style="margin-top:4px;${cfg.compactMarkers ? "" : "display:none"}">
+                          Dot size: <span id="compact-size-val">${cfg.compactMarkerSize}%</span> of pixel
+                          <input type="range" id="cfg-compact-size" min="10" max="90" step="5" value="${cfg.compactMarkerSize}" style="width:100%">
+                          <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:2px">Marker is centred inside each canvas pixel. Pixels already matching the canvas are skipped.</div>
+                          <div style="margin-top:8px">Live refresh: <span id="dots-refresh-val">${cfg.dotsRefreshMs}ms</span>
+                              <input type="range" id="cfg-dots-refresh" min="200" max="10000" step="100" value="${cfg.dotsRefreshMs}" style="width:100%">
+                              <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:2px">How often the overlay re-checks the canvas. 500 ms = snappy, 2000 ms = quieter.</div>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("bolt")}${t("animLegend")}</div>
+                      <div class="wp-hud" id="anim-status">${t("animStatusOff")}</div>
+                      <div style="display:flex;gap:4px;margin-top:4px">
+                          <button class="wp-btn" id="btn-anim-stop" style="flex:1;margin:0">${t("animStop")}</button>
+                          <button class="wp-btn" id="btn-anim-advanced" style="flex:1;margin:0">${t("animAdvanced")} ▸</button>
+                      </div>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("animHint")}</div>
+                      <div id="anim-advanced-wrap" style="display:none;margin-top:6px">
+                          <div class="wp-row">
+                              <div>W<input type="number" id="anim-frame-w" class="wp-input" min="1"></div>
+                              <div>H<input type="number" id="anim-frame-h" class="wp-input" min="1"></div>
+                              <div>#<input type="number" id="anim-frame-count" class="wp-input" min="1"></div>
+                          </div>
+                          <button class="wp-btn" id="btn-anim-autosplit" style="margin-top:4px;width:100%">${t("animAutosplit")}</button>
+                          <div class="wp-row" style="margin-top:4px">
+                              <select id="anim-layout" class="wp-input" style="font:11px sans-serif">
+                                  <option value="grid">${t("animLayoutGrid")}</option>
+                                  <option value="line">${t("animLayoutLine")}</option>
+                              </select>
+                              <select id="anim-order" class="wp-input" style="font:11px sans-serif">
+                                  <option value="row">${t("animOrderRow")}</option>
+                                  <option value="column">${t("animOrderColumn")}</option>
+                                  <option value="serpentine">${t("animOrderSerp")}</option>
+                              </select>
+                          </div>
+                          <div style="margin-top:4px">${t("animFrameMs")}
+                              <input type="number" id="anim-frame-ms" class="wp-input" min="50" step="50" value="1000">
+                          </div>
+                          <label class="wp-check"><input type="checkbox" id="anim-looping" checked> ${t("animLooping")}</label>
+                          <div style="margin-top:4px">${t("animScaling")}
+                              <select id="anim-scaling" class="wp-input" style="font:11px sans-serif">
+                                  <option value="native">${t("animScalingNative")}</option>
+                                  <option value="scaled">${t("animScalingScaled")}</option>
+                              </select>
+                          </div>
+                          <div style="display:flex;gap:4px;margin-top:6px">
+                              <button class="wp-btn primary" id="btn-anim-apply" style="flex:1;margin:0">${t("animApply")}</button>
+                              <button class="wp-btn" id="btn-anim-start-now" style="flex:1;margin:0">${t("animStartNow")}</button>
+                          </div>
+                          <div style="display:flex;gap:4px;margin-top:4px">
+                              <button class="wp-btn" id="btn-anim-export-walldev" style="flex:1;margin:0">${t("animExportOur")}</button>
+                              <button class="wp-btn" id="btn-anim-export-charity" style="flex:1;margin:0">${t("animExportCharity")}</button>
+                          </div>
+                          <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:6px">${t("animPublishMoved")}</div>
+                      </div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("scan")}${t("progress")}</div>
+                      <div class="wp-hud" id="wp-progress">—</div>
+                      <button class="wp-btn" id="btn-progress">${ic("scan")}${t("progress")}</button>
+                      <button class="wp-btn" id="btn-progress-guide">${t("showRemaining")}</button>
+                  </div>
+                  <button class="wp-btn active-state" id="btn-lock">${t("unlock")}</button>
+                  <button class="wp-btn" id="btn-toggle">${t("visibility")}</button>
+              </div>`;
 }

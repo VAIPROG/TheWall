@@ -206,3 +206,79 @@ export function wireAdmin(_win: HTMLElement): void {
     }
   });
 }
+
+export function buildAdminPane(): string {
+  return `<div class="wp-pane" data-p="ad">
+                  <div class="wp-group"><div class="wp-legend">${ic("user")}Users</div>
+                      <div class="wp-list" id="admin-users" style="max-height:240px"><div style="padding:6px;color:var(--sub)">loading…</div></div>
+                      <button class="wp-btn" id="btn-admin-reload">reload all</button>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("shield")}Moderation requests</div>
+                      <div class="wp-list" id="admin-modapps"><div style="padding:6px;color:var(--sub)">loading…</div></div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("disk")}All templates</div>
+                      <div class="wp-list" id="admin-templates" style="max-height:200px"><div style="padding:6px;color:var(--sub)">loading…</div></div>
+                      <button class="wp-btn" id="btn-backfill-previews" style="margin-top:6px;width:100%">${ic("scan")}Backfill missing previews</button>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px">Generates 64/128/256 thumbnails for every template that doesn't have one yet. Heavy on large catalogs.</div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("bell")}Notifications</div>
+                      <div class="wp-list" id="admin-notifs" style="max-height:200px"><div style="padding:6px;color:var(--sub)">loading…</div></div>
+                      <button class="wp-btn primary" id="btn-broadcast">${ic("bell")}Send broadcast to all users</button>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("user")}${t("achAdminGrantTitle")}</div>
+                      <input id="admin-ach-uid" name="admin_ach_uid" autocomplete="off" type="text" class="wp-input" placeholder="${t("achAdminUserId")}">
+                      <select id="admin-ach-id" name="admin_ach_id" class="wp-input" style="font:11px sans-serif">
+                          <option value="" disabled selected>${t("achAdminPickAch")}</option>
+                      </select>
+                      <div style="display:flex;gap:4px;margin-top:4px">
+                          <button class="wp-btn primary" id="btn-admin-ach-grant" style="flex:1">${ic("plus")}${t("achAdminGrant")}</button>
+                          <button class="wp-btn" id="btn-admin-ach-revoke" style="flex:1">${ic("trash")}${t("achAdminRevoke")}</button>
+                      </div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("plus")}${t("achAdminCreateTitle")}</div>
+                      <input id="admin-ach-new-id" name="admin_ach_new_id" autocomplete="off" type="text" class="wp-input" placeholder="${t("achAdminCreateId")}">
+                      <input id="admin-ach-new-name" name="admin_ach_new_name" autocomplete="off" type="text" class="wp-input" placeholder="${t("achAdminCreateName")}">
+                      <input id="admin-ach-new-desc" name="admin_ach_new_desc" autocomplete="off" type="text" class="wp-input" placeholder="${t("achAdminCreateDesc")}">
+                      <div style="display:flex;gap:4px;margin-top:4px">
+                          <select id="admin-ach-new-icon" name="admin_ach_new_icon" class="wp-input" style="font:11px sans-serif;flex:1">
+                              <option value="medal">medal</option>
+                              <option value="crown">crown</option>
+                              <option value="trophy">trophy</option>
+                              <option value="palette">palette</option>
+                              <option value="spark">spark</option>
+                              <option value="sparkle">sparkle</option>
+                              <option value="shield">shield</option>
+                              <option value="plug">plug</option>
+                              <option value="user">user</option>
+                              <option value="globe">globe</option>
+                              <option value="discord">discord</option>
+                              <option value="telegram">telegram</option>
+                              <option value="moon">moon</option>
+                              <option value="check">check</option>
+                              <option value="bell">bell</option>
+                              <option value="bolt">bolt</option>
+                              <option value="pin">pin</option>
+                              <option value="grid">grid</option>
+                              <option value="scan">scan</option>
+                              <option value="star">star</option>
+                          </select>
+                          <select id="admin-ach-new-cat" name="admin_ach_new_cat" class="wp-input" style="font:11px sans-serif;flex:1">
+                              <option value="general">${t("achCategoryGeneral")}</option>
+                              <option value="pixels">${t("achCategoryPixels")}</option>
+                              <option value="templates">${t("achCategoryTemplates")}</option>
+                              <option value="clan">${t("achCategoryClan")}</option>
+                              <option value="social">${t("achCategorySocial")}</option>
+                              <option value="tools">${t("achCategoryTools")}</option>
+                              <option value="time">${t("achCategoryTime")}</option>
+                              <option value="easter">${t("achCategoryEaster")}</option>
+                          </select>
+                      </div>
+                      <div style="display:flex;gap:4px;margin-top:4px;align-items:center">
+                          <label style="flex:1;font-size:11px">${t("achAdminCreatePoints")} <input id="admin-ach-new-pts" name="admin_ach_new_pts" type="number" class="wp-input" value="10" min="0" max="1000" style="width:60px;display:inline"></label>
+                          <label class="wp-check" style="flex:1.4"><input type="checkbox" id="admin-ach-new-secret"> ${t("achAdminCreateSecret")}</label>
+                      </div>
+                      <button class="wp-btn primary" id="btn-admin-ach-create" style="margin-top:4px;width:100%">${ic("plus")}${t("achAdminCreate")}</button>
+                  </div>
+                  <div class="wp-note" style="color:var(--sub)">Admin actions are server-validated. You see this tab because your backend role is admin/owner.</div>
+              </div>`;
+}

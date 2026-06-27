@@ -1,4 +1,4 @@
-import { $, errMsg } from "../helpers";
+import { $, esc, errMsg } from "../helpers";
 import { t } from "../i18n";
 import { ic } from "../icons";
 import { toast } from "../notify";
@@ -423,4 +423,46 @@ export function wireProfile(_win: HTMLElement): void {
   });
   // Also pull it once on boot so the first open of the tab paints with data.
   setTimeout(() => updateProfileBalance().catch(() => {}), 3000);
+}
+
+export function buildProfilePane(): string {
+  return `<div class="wp-pane" data-p="pr">
+                  <div class="wp-group"><div class="wp-legend">${ic("user")}${t("tabProfile")}</div>
+                      <div id="profile-card"><div style="padding:6px">${t("syncing")}</div></div></div>
+                  <div class="wp-group"><div class="wp-legend">${ic("bolt")}${t("profilePaintHeading")}</div>
+                      <div style="font-size:11px;line-height:1.55">
+                          <div><b>${t("paintCurrentHeading")}:</b> <span id="profile-paint">${t("paintCurrentNone")}</span></div>
+                          <div style="margin-top:2px"><b>${t("profileCoinsHeading")}:</b> <span id="profile-coins">${t("profileCoinsUnknown")}</span></div>
+                      </div>
+                      <button class="wp-btn" id="btn-profile-refresh-balance" style="margin-top:6px;width:100%">${ic("scan", 10)}${t("profileRefreshBalance")}</button>
+                      <div style="display:flex;gap:4px;margin-top:4px">
+                          <button class="wp-btn" id="btn-profile-sell-some" style="flex:1;padding:2px 6px;margin:0" title="${esc(t("sellAllNote"))}">${ic("bolt", 10)}${t("sellSomeBtn")}</button>
+                          <button class="wp-btn" id="btn-profile-sell-all" style="flex:1;padding:2px 6px;margin:0" title="${esc(t("sellAllNote"))}">${ic("bolt", 10)}${t("sellAllBtn")}</button>
+                      </div>
+                      <button class="wp-btn primary" id="btn-profile-shop" style="margin-top:4px;width:100%" title="${esc(t("profileShopHint"))}">${ic("user", 10)}${t("profileOpenShop")}</button>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("user")}Bio</div>
+                      <textarea id="profile-bio" name="profile_bio" class="wp-input" rows="3" autocomplete="off" placeholder="A short bio (markdown supported)"></textarea>
+                      <div class="wp-note" style="color:var(--sub);margin-top:2px">Supports **bold**, *italic*, [link](url), :emote:</div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("globe")}Social Links</div>
+                      <div id="profile-social-list" class="wp-social-list"></div>
+                      <button class="wp-btn" id="btn-social-add" style="margin-top:6px;width:100%">${ic("plus")}Add a link</button>
+                  </div>
+                  <div class="wp-group" style="background:transparent;border:none;padding:0;margin-top:8px">
+                      <button class="wp-btn primary" id="btn-profile-save" style="width:100%">${ic("disk")}Save profile</button>
+                      <div class="wp-note" style="color:var(--sub);text-align:center;margin-top:4px">Bio &amp; links are public on your profile page.</div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("pin")}Pinned templates</div>
+                      <div id="profile-pinned" style="display:flex;gap:6px;flex-wrap:wrap;min-height:60px">
+                          <div style="color:var(--sub);padding:6px">No pinned templates yet — pin from Templates tab.</div>
+                      </div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("user")}${t("customAvatar")}</div>
+                      <input type="file" id="avatar-upload" accept="image/*" class="wp-input" style="font:11px sans-serif">
+                      <button class="wp-btn" id="btn-avatar-reset">${ic("xcom")}Reset to Discord avatar</button>
+                      <button class="wp-btn" id="btn-avatar-refresh-discord">${ic("discord")}Refresh Discord avatar cache</button>
+                      <div class="wp-note" style="color:var(--sub)">${t("avatarNote")}</div>
+                  </div>
+              </div>`;
 }

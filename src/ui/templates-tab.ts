@@ -1,5 +1,6 @@
 import { cfg, saveCfg } from "../config";
-import { $ } from "../helpers";
+import { $, esc } from "../helpers";
+import { ic } from "../icons";
 import { t } from "../i18n";
 import { confirmDlg } from "../dialog";
 import { log } from "../log";
@@ -174,4 +175,37 @@ export function wireTemplates(win: HTMLElement): void {
   const clanList = $("clan-templates");
   if (pubList) tplObserver.observe(pubList, { childList: true });
   if (clanList) tplObserver.observe(clanList, { childList: true });
+}
+
+export function buildTemplatesPane(): string {
+  return `<div class="wp-pane" data-p="tp">
+                  <div class="wp-group"><div class="wp-legend">${ic("scan")}${t("tplSearchLegend")}</div>
+                      <input type="text" id="tpl-search" class="wp-input" autocomplete="off" placeholder="${esc(t("tplSearchPlaceholder"))}">
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:2px">${t("tplSearchHint")}</div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("check")}${t("publicTpl")}</div>
+                      <div class="wp-list" id="pub-templates"><div style="padding:6px;color:var(--sub)">${t("backend")}: ${t("offline")}</div></div>
+                      <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                          <label class="wp-check" style="flex:1;margin:0"><input type="checkbox" id="cfg-unverified" ${cfg.showUnverified ? "checked" : ""}> ${t("unverified")}</label>
+                          <button class="wp-btn" id="btn-reload-pub-tpl" style="padding:2px 8px;margin:0" title="Reload public templates">${ic("scan", 10)}Reload</button>
+                      </div>
+                      <label class="wp-check" style="margin-top:2px"><input type="checkbox" id="cfg-hide-anim-pub" ${cfg.hideAnimatedPub ? "checked" : ""}> ${t("hideAnimatedTpl")}</label>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("shield")}${t("clanTpl")}</div>
+                      <div class="wp-list" id="clan-templates"><div style="padding:6px;color:var(--sub)">${t("backend")}: ${t("offline")}</div></div>
+                      <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                          <label class="wp-check" style="flex:1;margin:0"><input type="checkbox" id="cfg-unverified-clan" ${cfg.showUnverifiedClan ? "checked" : ""}> ${t("unverified")}</label>
+                          <button class="wp-btn" id="btn-reload-clan-tpl" style="padding:2px 8px;margin:0" title="Reload clan templates">${ic("scan", 10)}Reload</button>
+                      </div>
+                      <label class="wp-check" style="margin-top:2px"><input type="checkbox" id="cfg-hide-anim-clan" ${cfg.hideAnimatedClan ? "checked" : ""}> ${t("hideAnimatedTpl")}</label>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("user")}${t("myTpl")}</div>
+                      <div class="wp-list" id="my-templates"><div style="padding:6px;color:var(--sub)">${t("backend")}: ${t("offline")}</div></div>
+                      <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                          <label class="wp-check" style="flex:1;margin:0"><input type="checkbox" id="cfg-hide-anim-mine" ${cfg.hideAnimatedMine ? "checked" : ""}> ${t("hideAnimatedTpl")}</label>
+                          <button class="wp-btn" id="btn-reload-my-tpl" style="padding:2px 8px;margin:0" title="Reload my templates">${ic("scan", 10)}Reload</button>
+                      </div>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("myTplHint")}</div>
+                  </div>
+              </div>`;
 }

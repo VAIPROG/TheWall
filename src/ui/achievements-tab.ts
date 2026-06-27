@@ -1,7 +1,7 @@
 import { $ } from "../helpers";
 import { esc } from "../helpers";
 import { t } from "../i18n";
-import { achIcon as achIconHelper } from "../icons";
+import { ic, achIcon as achIconHelper } from "../icons";
 import { listMine } from "../achievements";
 
 // ---------------------------------------------------------------------------
@@ -90,4 +90,13 @@ export async function loadAchievementList(): Promise<void> {
     }
   }
   list.innerHTML = html;
+}
+
+export function buildAchievementsPane(): string {
+  return `<div class="wp-pane" data-p="ah">
+                  <div class="wp-group"><div class="wp-legend">${ic("star")}${t("achTabTitle")}</div>
+                      <div id="ach-summary" style="padding:4px 0;font-size:10px;color:var(--sub)"></div>
+                      <div id="ach-list" class="wp-list" style="max-height:520px;overflow-y:auto"><div style="padding:6px;color:var(--sub)">${t("syncing")}</div></div>
+                  </div>
+              </div>`;
 }

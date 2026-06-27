@@ -1,4 +1,5 @@
 import { $, errMsg } from "../helpers";
+import { ic } from "../icons";
 import { t } from "../i18n";
 import { toast } from "../notify";
 import { errorDlg, promptDlg } from "../dialog";
@@ -112,4 +113,32 @@ export function wireChats(_win: HTMLElement): void {
       await errorDlg("Apply failed: " + errMsg(e));
     }
   });
+}
+
+export function buildClanPane(): string {
+  return `<div class="wp-pane" data-p="cl">
+                  <div class="wp-group" id="clan-announce-group" style="display:none">
+                      <div class="wp-legend">${ic("bell")}Send Announcement</div>
+                      <input type="text" id="announce-title" name="announce_title" autocomplete="off" class="wp-input" placeholder="Title">
+                      <textarea id="announce-body" name="announce_body" class="wp-input" rows="2" autocomplete="off" placeholder="Body (markdown)"></textarea>
+                      <button class="wp-btn primary" id="btn-announce-send">${ic("bolt")}Send</button>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("shield")}${t("tabClan")}</div>
+                      <div id="clan-card"><div style="padding:6px">${t("syncing")}</div></div></div>
+                  <div class="wp-group"><div class="wp-legend">${ic("chat")}${t("clanChat")} <span class="wp-note" style="color:var(--led);margin:0 0 0 4px">${t("via")}</span></div>
+                      <div class="wp-chat" id="clan-chat"><div style="color:var(--sub)">${t("backend")}: ${t("offline")}</div></div>
+                      <div class="wp-chat-input-row">
+                          <textarea class="wp-input wp-chat-input" id="clan-chat-input" name="clan_chat_input" autocomplete="off" placeholder="markdown: **bold** *italic* \`code\` :emote: @user"></textarea>
+                          <button class="wp-btn wp-emoji-btn" id="btn-emoji" title="Emotes" aria-label="Emotes">${ic("emote")}</button>
+                      </div>
+                      <button class="wp-btn primary" id="btn-clan-send">${ic("send")}${t("sendLong")}</button>
+                      <div id="mention-suggest" class="wp-mention-suggest"></div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("user")}${t("roster")}</div>
+                      <div class="wp-list" id="clan-roster"><div style="padding:6px;color:var(--sub)">${t("backend")}: ${t("offline")}</div></div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("shield")}moderation</div>
+                      <button class="wp-btn" id="btn-mod-apply">${ic("shield")}${t("applyMod")}</button>
+                  </div>
+              </div>`;
 }
