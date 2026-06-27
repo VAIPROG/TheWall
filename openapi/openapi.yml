@@ -155,14 +155,14 @@ paths:
   /auth/site:
     $ref: "./paths/auth.yaml#/AuthSite"
 
+  /auth/oauth/{provider}/start:
+    $ref: "./paths/auth.yaml#/OAuthStart"
+
+  /auth/oauth/{provider}/callback:
+    $ref: "./paths/auth.yaml#/OAuthCallback"
+
   /auth/oauth/telegram:
-    $ref: "./paths/auth.yaml#/OAuthTelegram"
-
-  /auth/oauth/discord:
-    $ref: "./paths/auth.yaml#/OAuthDiscord"
-
-  /auth/oauth/github:
-    $ref: "./paths/auth.yaml#/OAuthGitHub"
+    $ref: "./paths/auth.yaml#/OAuthTelegramLegacy"
 
   /auth/refresh:
     $ref: "./paths/auth.yaml#/AuthRefresh"

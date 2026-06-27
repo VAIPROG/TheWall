@@ -108,6 +108,18 @@ PerPageParam:
     maximum: 100
     default: 20
 
+OAuthProviderPath:
+  name: provider
+  in: path
+  required: true
+  description: "OAuth provider id."
+  schema:
+    type: string
+    enum:
+      - telegram
+      - discord
+      - github
+
 UserRefPath:
   name: userRef
   in: path
