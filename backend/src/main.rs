@@ -812,6 +812,13 @@ async fn main() {
         .route("/api/v3/auth/session", get(routes::v3::auth::session))
         .route("/api/v3/auth/refresh", post(routes::v3::auth::refresh))
         .route("/api/v3/auth/logout", post(routes::v3::auth::logout))
+        // --- templates: V3 CRUD with the-wall-dev/2 canonical document ------
+        .route("/api/v3/templates", get(routes::v3::templates::list))
+        .route("/api/v3/templates/new", post(routes::v3::templates::create))
+        .route(
+            "/api/v3/templates/{id}",
+            get(routes::v3::templates::get).delete(routes::v3::templates::delete),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(TraceLayer::new_for_http())
         .with_state(state);

@@ -5,3 +5,4 @@
 //! connections; `provider_links` hold OAuth connections.
 
 pub mod auth;
+pub mod templates;
