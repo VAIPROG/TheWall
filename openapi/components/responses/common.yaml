@@ -51,6 +51,18 @@ UnprocessableEntity:
       schema:
         $ref: "../schemas/common.yaml#/ErrorResponse"
 
+PayloadTooLarge:
+  description: Payload too large
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+      example:
+        error:
+          code: "PAYLOAD_TOO_LARGE"
+          message: "The request payload exceeds the maximum allowed size."
+          details: null
+
 TooManyRequests:
   description: Rate limit exceeded
   content:

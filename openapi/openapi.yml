@@ -510,6 +510,12 @@ paths:
   /telemetry/metrics:
     $ref: "./paths/telemetry.yaml#/TelemetryMetrics"
 
+  /telemetry/logs:
+    $ref: "./paths/telemetry.yaml#/TelemetryLogs"
+
+  /telemetry/logs/export:
+    $ref: "./paths/telemetry.yaml#/TelemetryLogsExport"
+
 components:
   securitySchemes:
     BearerAuth:
