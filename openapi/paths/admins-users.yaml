@@ -1,0 +1,515 @@
+# ══════════════════════════════════════════════════════════════════════
+# ADMINS — User Management Operations
+# ══════════════════════════════════════════════════════════════════════
+
+AdminUserById:
+  get:
+    tags: [Admins]
+    summary: Get full admin view of a user
+    operationId: adminGetUser
+    description: |
+      Returns the complete user record including internal fields,
+      all sessions, restrictions, and audit history.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Full admin user view.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/admins.yaml#/AdminUserView"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Admins]
+    summary: Update user info (admin override)
+    operationId: adminUpdateUser
+    description: |
+      Directly modifies user fields bypassing normal validation
+      limits. Logged in audit trail.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/AdminUserUpdate"
+    responses:
+      "200":
+        description: User updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/User"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Admins]
+    summary: Permanently delete a user
+    operationId: adminDeleteUser
+    description: |
+      Irreversibly removes the user account and all associated data.
+      Requires confirmation in the request body.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/ConfirmationRequest"
+    responses:
+      "200":
+        description: User deleted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserBan:
+  post:
+    tags: [Admins]
+    summary: Ban a user
+    operationId: adminBanUser
+    description: |
+      Applies a global ban restriction to the user. Optionally
+      specify duration, reason, and whether to wipe their content.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/BanRequest"
+    responses:
+      "200":
+        description: User banned.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/restrictions.yaml#/RestrictionSet"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Admins]
+    summary: Unban a user
+    operationId: adminUnbanUser
+    description: Removes the active ban restriction from the user.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: User unbanned.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserMute:
+  post:
+    tags: [Admins]
+    summary: Mute a user
+    operationId: adminMuteUser
+    description: |
+      Applies a global mute restriction. The user cannot send
+      messages in any chat until the mute expires or is removed.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/MuteRequest"
+    responses:
+      "200":
+        description: User muted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/restrictions.yaml#/RestrictionSet"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Admins]
+    summary: Unmute a user
+    operationId: adminUnmuteUser
+    description: Removes the active mute restriction.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: User unmuted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserPromote:
+  post:
+    tags: [Admins]
+    summary: Promote / demote a user's global role
+    operationId: adminPromoteUser
+    description: |
+      Changes the user's global server role. Only `owner` can
+      promote to `admin`. Admins can promote to `moderator`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/PromoteRequest"
+    responses:
+      "200":
+        description: Role updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/User"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserWipeout:
+  post:
+    tags: [Admins]
+    summary: Wipe all user content
+    operationId: adminWipeoutUser
+    description: |
+      Removes all templates, messages, and uploads created by this
+      user. The user account itself is preserved.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/ConfirmationRequest"
+    responses:
+      "200":
+        description: User content wiped.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserRemoveFromClan:
+  post:
+    tags: [Admins]
+    summary: Force-remove user from their clan
+    operationId: adminRemoveFromClan
+    description: |
+      Removes the user from their current clan regardless of their
+      clan role.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: User removed from clan.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserImpersonate:
+  post:
+    tags: [Admins]
+    summary: Create an impersonation session
+    operationId: adminImpersonate
+    description: |
+      Creates a temporary session acting as the target user.
+      Time-limited (default 1 hour) and clearly marked in audit log.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/ImpersonateRequest"
+    responses:
+      "200":
+        description: Impersonation session created.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/AuthResponse"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserResetAvatar:
+  post:
+    tags: [Admins]
+    summary: Reset user avatar to default
+    operationId: adminResetAvatar
+    description: Removes the user's custom avatar and reverts to default.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Avatar reset.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserResetUsername:
+  post:
+    tags: [Admins]
+    summary: Force-reset username
+    operationId: adminResetUsername
+    description: |
+      Resets the user's username to a generated placeholder.
+      The user will be prompted to choose a new username on next login.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Username reset.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserSessions:
+  get:
+    tags: [Admins]
+    summary: List all sessions for a user
+    operationId: adminGetUserSessions
+    description: Returns all active sessions for the specified user.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: List of sessions.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/auth.yaml#/SessionSummary"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Admins]
+    summary: Terminate all sessions for a user
+    operationId: adminTerminateUserSessions
+    description: |
+      Forcefully invalidates all sessions for the target user,
+      logging them out from every device immediately.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: All sessions terminated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminUserNotes:
+  get:
+    tags: [Admins]
+    summary: Get admin notes about a user
+    operationId: adminGetUserNotes
+    description: |
+      Internal moderator/admin notes attached to a user profile.
+      Not visible to the user.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Admin notes.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/admins.yaml#/AdminNote"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  post:
+    tags: [Admins]
+    summary: Add an admin note to a user
+    operationId: adminAddUserNote
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/AdminNoteCreate"
+    responses:
+      "201":
+        description: Note added.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/admins.yaml#/AdminNote"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"

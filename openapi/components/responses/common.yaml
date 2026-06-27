@@ -1,0 +1,66 @@
+BadRequest:
+  description: Invalid request
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+
+Unauthorized:
+  description: Authentication required
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+
+Forbidden:
+  description: Insufficient permissions
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+
+NotFound:
+  description: Resource not found
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+
+Gone:
+  description: Endpoint removed
+  example:
+    error:
+      code: "ENDPOINT_REMOVED"
+      message: "This endpoint has been removed. Please migrate to the v2 API."
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+
+Conflict:
+  description: Resource conflict
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+
+UnprocessableEntity:
+  description: Semantically incorrect request
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+
+TooManyRequests:
+  description: Rate limit exceeded
+  content:
+    application/json:
+      schema:
+        $ref: "../schemas/common.yaml#/ErrorResponse"
+  headers:
+    X-RateLimit-Limit:
+      $ref: "../headers/rate-limit.yaml#/X-RateLimit-Limit"
+    X-RateLimit-Remaining:
+      $ref: "../headers/rate-limit.yaml#/X-RateLimit-Remaining"
+    X-RateLimit-Reset:
+      $ref: "../headers/rate-limit.yaml#/X-RateLimit-Reset"

@@ -1,0 +1,517 @@
+openapi: 3.1.0
+
+info:
+  title: The Wall Dev API
+  version: "3.0.0"
+  description: |
+    # The Wall Dev API v3
+
+    High-performance, canvas-agnostic backend for pixel-battle overlays,
+    clan coordination, template management, chat, moderation, and telemetry.
+    Designed to be plugged into **any** pixel canvas platform — not limited
+    to a single wall or game.
+
+    ---
+
+    ## Breaking Change: All Traffic Must Target `/api/v3`
+
+    Starting with V3, **all endpoints live exclusively under the
+    `/api/v3/` prefix**. Root-level endpoints (`/api/auth`, `/api/users`,
+    etc.) that existed in V1 and V2 are **no longer maintained**.
+
+    Legacy root-level routes will return `410 Gone` after 2026-09-01.
+
+    ---
+
+    ## Required Headers
+
+    Every request to the V3 API **MUST** include:
+
+    ```
+    X-ClientVersion-TheWallDev-API: 3
+    ```
+
+    | Scenario | Server response |
+    |---|---|
+    | Header missing, endpoint exists in legacy V1/V2 | Best-effort compatible response (may be degraded). |
+    | Header missing, endpoint is V3-only | `400 Bad Request`. |
+    | Header value is unsupported | `400 Bad Request` with supported version info. |
+    | Header present and valid | Normal V3 processing. |
+
+    ---
+
+    ## Authentication
+
+    Two authentication methods via the `Authorization` header:
+
+    ### Bearer Token (Session)
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    ### API Key (Personal Access Token)
+    ```
+    Authorization: ApiKey <key>
+    ```
+
+    > **SECURITY WARNING**: API keys grant **full access** to your account.
+    > NEVER share with untrusted parties. Revoke via
+    > `DELETE /users/me/api-keys/{keyId}` if compromised.
+
+    ---
+
+    ## Rate Limiting
+
+    Per-user and per-IP rate limits enforced via response headers:
+    `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`,
+    `X-RateLimit-AllowedAtPeak`.
+
+    Exceeded limits return `429 Too Many Requests`.
+
+    ---
+
+    ## Error Format
+
+    ```json
+    {
+      "error": {
+        "code": "TEMPLATE_NOT_FOUND",
+        "message": "The requested template does not exist.",
+        "details": null
+      }
+    }
+    ```
+
+    | Field | Description |
+    |---|---|
+    | `code` | Machine-readable identifier (`UPPER_SNAKE_CASE`). |
+    | `message` | Human-readable explanation (English). |
+    | `details` | Optional additional context (object, array, or null). |
+
+  contact:
+    name: The Wall Dev
+    url: https://github.com/Vadim-Khristenko/TheWall
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://the-wall.vai-rice.space/api/v3
+    description: Production
+  - url: http://localhost:8080/api/v3
+    description: Local development
+
+tags:
+  - name: Auth
+    description: |
+      Authentication and session lifecycle. Handles site-token login,
+      token refresh, logout, and session introspection.
+  - name: Admins
+    description: |
+      Server-wide administrative operations. Reserved for `owner` or
+      `admin` global roles. Split into user management and system ops.
+  - name: Users
+    description: |
+      User profiles, settings, identity management, social account
+      linking, API key lifecycle, and public profile lookups.
+  - name: Clans
+    description: |
+      Clan creation, membership, governance. Hierarchical roles:
+      owner, admin, moderator, member.
+  - name: Chats
+    description: |
+      Real-time and asynchronous messaging. Chat rooms, DMs,
+      clan channels, modmail, and message relay.
+  - name: Templates
+    description: |
+      Template upload, discovery, sharing, access control. Core content
+      unit with position, scale, animation, and access metadata.
+  - name: Restrictions
+    description: |
+      Granular per-action moderation sanctions: mute, ban, template
+      publish block, invite block, report block, modmail block.
+  - name: Notifications
+    description: |
+      User-facing notification delivery, acknowledgement, bulk
+      dismiss, and notification preferences.
+  - name: Moderation
+    description: |
+      Report handling, mod queue, template approval, and
+      moderation audit log. The process of reviewing reports.
+  - name: Telemetry
+    description: |
+      Client telemetry ingestion, server health check, and
+      Prometheus-compatible metrics.
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # ════════════════════════════════════════════════════════════════════
+  # AUTH
+  # ════════════════════════════════════════════════════════════════════
+
+  /auth/site:
+    $ref: "./paths/auth.yaml#/AuthSite"
+
+  /auth/oauth/telegram:
+    $ref: "./paths/auth.yaml#/OAuthTelegram"
+
+  /auth/oauth/discord:
+    $ref: "./paths/auth.yaml#/OAuthDiscord"
+
+  /auth/oauth/github:
+    $ref: "./paths/auth.yaml#/OAuthGitHub"
+
+  /auth/refresh:
+    $ref: "./paths/auth.yaml#/AuthRefresh"
+
+  /auth/session:
+    $ref: "./paths/auth.yaml#/AuthSession"
+
+  /auth/logout:
+    $ref: "./paths/auth.yaml#/AuthLogout"
+
+  /auth/session/{sessionId}/logout:
+    $ref: "./paths/auth.yaml#/AuthLogoutSession"
+
+  /auth/session/all/logout:
+    $ref: "./paths/auth.yaml#/AuthLogoutAll"
+
+  /auth/merge/initiate:
+    $ref: "./paths/auth.yaml#/AuthMergeInitiate"
+
+  /auth/recover:
+    $ref: "./paths/auth.yaml#/AuthRecover"
+
+  # ════════════════════════════════════════════════════════════════════
+  # ADMINS — System Operations
+  # ════════════════════════════════════════════════════════════════════
+
+  /admin/config:
+    $ref: "./paths/admins-system.yaml#/AdminConfig"
+
+  /admin/maintenance:
+    $ref: "./paths/admins-system.yaml#/AdminMaintenance"
+
+  /admin/audit:
+    $ref: "./paths/admins-system.yaml#/AdminAuditLog"
+
+  /admin/shutdown:
+    $ref: "./paths/admins-system.yaml#/AdminShutdown"
+
+  /admin/restart:
+    $ref: "./paths/admins-system.yaml#/AdminRestart"
+
+  /admin/metrics:
+    $ref: "./paths/admins-system.yaml#/AdminMetrics"
+
+  /admin/broadcast:
+    $ref: "./paths/admins-system.yaml#/AdminBroadcast"
+
+  # ════════════════════════════════════════════════════════════════════
+  # ADMINS — User Management
+  # ════════════════════════════════════════════════════════════════════
+
+  /admin/users/{userRef}:
+    $ref: "./paths/admins-users.yaml#/AdminUserById"
+
+  /admin/users/{userRef}/ban:
+    $ref: "./paths/admins-users.yaml#/AdminUserBan"
+
+  /admin/users/{userRef}/mute:
+    $ref: "./paths/admins-users.yaml#/AdminUserMute"
+
+  /admin/users/{userRef}/promote:
+    $ref: "./paths/admins-users.yaml#/AdminUserPromote"
+
+  /admin/users/{userRef}/wipeout:
+    $ref: "./paths/admins-users.yaml#/AdminUserWipeout"
+
+  /admin/users/{userRef}/remove-from-clan:
+    $ref: "./paths/admins-users.yaml#/AdminUserRemoveFromClan"
+
+  /admin/users/{userRef}/impersonate:
+    $ref: "./paths/admins-users.yaml#/AdminUserImpersonate"
+
+  /admin/users/{userRef}/reset-avatar:
+    $ref: "./paths/admins-users.yaml#/AdminUserResetAvatar"
+
+  /admin/users/{userRef}/reset-username:
+    $ref: "./paths/admins-users.yaml#/AdminUserResetUsername"
+
+  /admin/users/{userRef}/sessions:
+    $ref: "./paths/admins-users.yaml#/AdminUserSessions"
+
+  /admin/users/{userRef}/notes:
+    $ref: "./paths/admins-users.yaml#/AdminUserNotes"
+
+  # ════════════════════════════════════════════════════════════════════
+  # USERS
+  # ════════════════════════════════════════════════════════════════════
+
+  /users/me:
+    $ref: "./paths/users.yaml#/UsersMe"
+
+  /users/me/avatar:
+    $ref: "./paths/users.yaml#/UsersMeAvatar"
+
+  /users/me/socials:
+    $ref: "./paths/users.yaml#/UsersMeSocials"
+
+  /users/me/socials/{connectionId}:
+    $ref: "./paths/users.yaml#/UsersMeSocialById"
+
+  /users/me/keys:
+    $ref: "./paths/users.yaml#/UsersMeKeys"
+
+  /users/me/keys/{keyId}:
+    $ref: "./paths/users.yaml#/UsersMeKeysById"
+
+  /users/me/keys/{keyId}/request-higher-limits:
+    $ref: "./paths/users.yaml#/UsersMeKeysRequestLimits"
+
+  /users/me/block-list:
+    $ref: "./paths/users.yaml#/UsersMeBlockList"
+
+  /users/me/site-identities:
+    $ref: "./paths/users.yaml#/UsersMeSiteIdentities"
+
+  /users/me/site-identities/{site}:
+    $ref: "./paths/users.yaml#/UsersMeSiteIdentityBySite"
+
+  /users/me/merge:
+    $ref: "./paths/users.yaml#/UsersMeMerge"
+
+  /users/me/recovery/phrase:
+    $ref: "./paths/users.yaml#/UsersMeRecoveryPhrase"
+
+  /users/{userRef}:
+    $ref: "./paths/users.yaml#/UserByRef"
+
+  /users/{userRef}/avatar:
+    $ref: "./paths/users.yaml#/UserAvatarByRef"
+
+  /users/{userRef}/socials:
+    $ref: "./paths/users.yaml#/UserSocialsByRef"
+
+  /users/{userRef}/block:
+    $ref: "./paths/users.yaml#/UserBlock"
+
+  /users/{userRef}/unblock:
+    $ref: "./paths/users.yaml#/UserUnblock"
+
+  /users/{userRef}/templates:
+    $ref: "./paths/users.yaml#/UserTemplatesByRef"
+
+  # ════════════════════════════════════════════════════════════════════
+  # CLANS
+  # ════════════════════════════════════════════════════════════════════
+
+  /clans:
+    $ref: "./paths/clans.yaml#/Clans"
+
+  /clans/new:
+    $ref: "./paths/clans.yaml#/ClansNew"
+
+  /clans/{clanId}:
+    $ref: "./paths/clans.yaml#/ClanById"
+
+  /clans/{clanId}/members:
+    $ref: "./paths/clans.yaml#/ClanMembers"
+
+  /clans/{clanId}/members/{userId}:
+    $ref: "./paths/clans.yaml#/ClanMemberById"
+
+  /clans/{clanId}/invites:
+    $ref: "./paths/clans.yaml#/ClanInvites"
+
+  /clans/{clanId}/invites/{inviteId}:
+    $ref: "./paths/clans.yaml#/ClanInviteById"
+
+  /clans/{clanId}/join:
+    $ref: "./paths/clans.yaml#/ClanJoin"
+
+  /clans/{clanId}/leave:
+    $ref: "./paths/clans.yaml#/ClanLeave"
+
+  /clans/{clanId}/disband:
+    $ref: "./paths/clans.yaml#/ClanDisband"
+
+  /clans/{clanId}/settings:
+    $ref: "./paths/clans.yaml#/ClanSettings"
+
+  /clans/{clanId}/apply/{role}:
+    $ref: "./paths/clans.yaml#/ClanApplyRole"
+
+  /clans/{clanId}/report:
+    $ref: "./paths/clans.yaml#/ClanReport"
+
+  /clans/{clanId}/templates:
+    $ref: "./paths/clans.yaml#/ClanTemplates"
+
+  /clans/{clanId}/restrictions:
+    $ref: "./paths/clans.yaml#/ClanRestrictions"
+
+  # ════════════════════════════════════════════════════════════════════
+  # CHATS
+  # ════════════════════════════════════════════════════════════════════
+
+  /chats:
+    $ref: "./paths/chats.yaml#/Chats"
+
+  /chats/global:
+    $ref: "./paths/chats.yaml#/GlobalChat"
+
+  /chats/global/modmail:
+    $ref: "./paths/chats.yaml#/GlobalModmail"
+
+  /chats/{chatId}:
+    $ref: "./paths/chats.yaml#/ChatById"
+
+  /chats/{chatId}/messages:
+    $ref: "./paths/chats.yaml#/ChatMessages"
+
+  /chats/{chatId}/messages/{messageId}:
+    $ref: "./paths/chats.yaml#/ChatMessageById"
+
+  /chats/{chatId}/messages/{messageId}/report:
+    $ref: "./paths/chats.yaml#/ChatMessageReport"
+
+  /chats/{chatId}/read:
+    $ref: "./paths/chats.yaml#/ChatRead"
+
+  /dm/{userRef}:
+    $ref: "./paths/chats.yaml#/DmThread"
+
+  # ════════════════════════════════════════════════════════════════════
+  # TEMPLATES
+  # ════════════════════════════════════════════════════════════════════
+
+  /templates:
+    $ref: "./paths/templates.yaml#/Templates"
+
+  /templates/new:
+    $ref: "./paths/templates.yaml#/TemplatesNew"
+
+  /templates/{templateId}:
+    $ref: "./paths/templates.yaml#/TemplateById"
+
+  /templates/{templateId}/preview:
+    $ref: "./paths/templates.yaml#/TemplatePreview"
+
+  /templates/{templateId}/image:
+    $ref: "./paths/templates.yaml#/TemplateImage"
+
+  /templates/{templateId}/charity:
+    $ref: "./paths/templates.yaml#/TemplateCharity"
+
+  /templates/{templateId}/wall-dev:
+    $ref: "./paths/templates.yaml#/TemplateWallDev"
+
+  /templates/{templateId}/report:
+    $ref: "./paths/templates.yaml#/TemplateReport"
+
+  /templates/{templateId}/pin:
+    $ref: "./paths/templates.yaml#/TemplatePin"
+
+  /templates/pinned:
+    $ref: "./paths/templates.yaml#/TemplatesPinned"
+
+  # ════════════════════════════════════════════════════════════════════
+  # RESTRICTIONS
+  # ════════════════════════════════════════════════════════════════════
+
+  /restrictions:
+    $ref: "./paths/restrictions.yaml#/Restrictions"
+
+  /restrictions/{restrictionId}:
+    $ref: "./paths/restrictions.yaml#/RestrictionById"
+
+  /users/{userRef}/restrictions:
+    $ref: "./paths/restrictions.yaml#/UserRestrictions"
+
+  # ════════════════════════════════════════════════════════════════════
+  # NOTIFICATIONS
+  # ════════════════════════════════════════════════════════════════════
+
+  /notifications:
+    $ref: "./paths/notifications.yaml#/Notifications"
+
+  /notifications/ack:
+    $ref: "./paths/notifications.yaml#/NotificationsAck"
+
+  /notifications/ack/all:
+    $ref: "./paths/notifications.yaml#/NotificationsAckAll"
+
+  /notifications/settings:
+    $ref: "./paths/notifications.yaml#/NotificationsSettings"
+
+  /notifications/{notificationId}:
+    $ref: "./paths/notifications.yaml#/NotificationById"
+
+  # ════════════════════════════════════════════════════════════════════
+  # MODERATION
+  # ════════════════════════════════════════════════════════════════════
+
+  /moderation/reports:
+    $ref: "./paths/moderation.yaml#/ModerationReports"
+
+  /moderation/reports/{reportId}:
+    $ref: "./paths/moderation.yaml#/ModerationReportById"
+
+  /moderation/reports/{reportId}/resolve:
+    $ref: "./paths/moderation.yaml#/ModerationReportResolve"
+
+  /moderation/reports/{reportId}/dismiss:
+    $ref: "./paths/moderation.yaml#/ModerationReportDismiss"
+
+  /moderation/queue:
+    $ref: "./paths/moderation.yaml#/ModerationQueue"
+
+  /moderation/queue/{templateId}/approve:
+    $ref: "./paths/moderation.yaml#/ModerationQueueApprove"
+
+  /moderation/queue/{templateId}/reject:
+    $ref: "./paths/moderation.yaml#/ModerationQueueReject"
+
+  /moderation/audit-log:
+    $ref: "./paths/moderation.yaml#/ModerationAuditLog"
+
+  # ════════════════════════════════════════════════════════════════════
+  # TELEMETRY
+  # ════════════════════════════════════════════════════════════════════
+
+  /telemetry/events:
+    $ref: "./paths/telemetry.yaml#/TelemetryEvents"
+
+  /telemetry/health:
+    $ref: "./paths/telemetry.yaml#/TelemetryHealth"
+
+  /telemetry/metrics:
+    $ref: "./paths/telemetry.yaml#/TelemetryMetrics"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Short-lived session token obtained via `POST /auth/site` or
+        `POST /auth/refresh`. Include in every request:
+        ```
+        Authorization: Bearer <token>
+        ```
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: |
+        Long-lived personal access token for integrations and bots.
+        ```
+        Authorization: ApiKey <key>
+        ```
+        Inherits full permissions of the owning user account.
+        **Never share with untrusted parties.**

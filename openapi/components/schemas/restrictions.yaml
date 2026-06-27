@@ -1,0 +1,192 @@
+RestrictionSet:
+  type: object
+  required:
+    - id
+    - userId
+    - scope
+    - appliedBy
+    - appliedAt
+    - sanctions
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique restriction identifier.
+    userId:
+      type: string
+      format: uuid
+      description: Target account UUID.
+    scope:
+      type: string
+      enum:
+        - global
+        - clan
+      description: Restriction scope — global applies server-wide, clan applies to a single clan.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: Target clan UUID when scope is "clan".
+    appliedBy:
+      type: string
+      format: uuid
+      description: Account UUID of the moderator who applied the restriction.
+    appliedAt:
+      type: string
+      format: date-time
+      description: Timestamp when the restriction was applied.
+    expiresAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Expiration timestamp. Null means permanent.
+    reason:
+      type: string
+      nullable: true
+      description: Human-readable reason for the restriction.
+    sanctions:
+      type: object
+      description: Individual sanction flags — each controls a specific capability.
+      required:
+        - mute
+        - ban
+        - publishTemplates
+        - inviteToClan
+        - sendReports
+        - sendModmail
+      properties:
+        mute:
+          type: boolean
+          default: false
+          description: Prevents the user from sending chat messages.
+        ban:
+          type: boolean
+          default: false
+          description: Fully prevents the user from accessing the platform.
+        publishTemplates:
+          type: boolean
+          default: false
+          description: Prevents the user from creating or publishing templates.
+        inviteToClan:
+          type: boolean
+          default: false
+          description: Prevents the user from inviting others to clans.
+        sendReports:
+          type: boolean
+          default: false
+          description: Prevents the user from submitting moderation reports.
+        sendModmail:
+          type: boolean
+          default: false
+          description: Prevents the user from sending modmail messages.
+
+RestrictionCreate:
+  type: object
+  required:
+    - userId
+    - scope
+    - sanctions
+  properties:
+    userId:
+      type: string
+      format: uuid
+      description: Target account UUID.
+    scope:
+      type: string
+      enum:
+        - global
+        - clan
+      description: Restriction scope.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: Required when scope is "clan".
+    durationMinutes:
+      type: integer
+      nullable: true
+      description: Duration in minutes. Null means permanent.
+    reason:
+      type: string
+      maxLength: 1000
+      description: Human-readable reason for the restriction.
+    sanctions:
+      type: object
+      description: Individual sanction flags.
+      required:
+        - mute
+        - ban
+        - publishTemplates
+        - inviteToClan
+        - sendReports
+        - sendModmail
+      properties:
+        mute:
+          type: boolean
+          default: false
+          description: Prevents the user from sending chat messages.
+        ban:
+          type: boolean
+          default: false
+          description: Fully prevents the user from accessing the platform.
+        publishTemplates:
+          type: boolean
+          default: false
+          description: Prevents the user from creating or publishing templates.
+        inviteToClan:
+          type: boolean
+          default: false
+          description: Prevents the user from inviting others to clans.
+        sendReports:
+          type: boolean
+          default: false
+          description: Prevents the user from submitting moderation reports.
+        sendModmail:
+          type: boolean
+          default: false
+          description: Prevents the user from sending modmail messages.
+
+RestrictionUpdate:
+  type: object
+  properties:
+    durationMinutes:
+      type: integer
+      nullable: true
+      description: Updated duration in minutes. Null makes it permanent.
+    reason:
+      type: string
+      maxLength: 1000
+      description: Updated reason for the restriction.
+    sanctions:
+      type: object
+      description: Updated individual sanction flags.
+      properties:
+        mute:
+          type: boolean
+          default: false
+          description: Prevents the user from sending chat messages.
+        ban:
+          type: boolean
+          default: false
+          description: Fully prevents the user from accessing the platform.
+        publishTemplates:
+          type: boolean
+          default: false
+          description: Prevents the user from creating or publishing templates.
+        inviteToClan:
+          type: boolean
+          default: false
+          description: Prevents the user from inviting others to clans.
+        sendReports:
+          type: boolean
+          default: false
+          description: Prevents the user from submitting moderation reports.
+        sendModmail:
+          type: boolean
+          default: false
+          description: Prevents the user from sending modmail messages.
+
+RestrictionPage:
+  allOf:
+    - $ref: "./restrictions.yaml#/RestrictionSet"
+    - $ref: "./common.yaml#/Pagination"

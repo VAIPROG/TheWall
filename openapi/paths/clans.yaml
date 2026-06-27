@@ -1,0 +1,603 @@
+# ══════════════════════════════════════════════════════════════════════
+# CLANS — Creation, Membership, Governance
+# ══════════════════════════════════════════════════════════════════════
+
+Clans:
+  get:
+    tags: [Clans]
+    summary: List / search clans
+    operationId: listClans
+    description: |
+      Paginated, filterable list of clans. Supports search by name,
+      sorting by member count, creation date, or activity.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+      - name: search
+        in: query
+        schema:
+          type: string
+        description: Search clans by name.
+      - name: sortBy
+        in: query
+        schema:
+          type: string
+          enum: [name, memberCount, createdAt, activity]
+          default: createdAt
+      - name: order
+        in: query
+        schema:
+          $ref: "../components/schemas/common.yaml#/SortOrder"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Paginated clan list.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/ClanPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+ClansNew:
+  post:
+    tags: [Clans]
+    summary: Create a new clan
+    operationId: createClan
+    description: |
+      Creates a new clan. The authenticated user becomes the clan
+      owner. A user can only own one clan at a time (configurable).
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/clans.yaml#/ClanCreate"
+    responses:
+      "201":
+        description: Clan created.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/Clan"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+
+ClanById:
+  get:
+    tags: [Clans]
+    summary: Get clan details
+    operationId: getClan
+    description: |
+      Returns full clan information including name, description,
+      member count, creation date, settings summary, and clan
+      chat ID.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Clan details.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/Clan"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Clans]
+    summary: Update clan info
+    operationId: updateClan
+    description: |
+      Updates clan name, description, avatar, or other public fields.
+      Requires clan `owner` or `admin` role.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/clans.yaml#/ClanUpdate"
+    responses:
+      "200":
+        description: Clan updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/Clan"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanMembers:
+  get:
+    tags: [Clans]
+    summary: List clan members
+    operationId: listClanMembers
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Clan members.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/ClanMemberPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanMemberById:
+  get:
+    tags: [Clans]
+    summary: Get a specific clan member
+    operationId: getClanMember
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - $ref: "../components/parameters/common.yaml#/UserIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Clan member details.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/ClanMember"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Clans]
+    summary: Update member role
+    operationId: updateClanMember
+    description: |
+      Changes a member's clan role. Requires appropriate hierarchy.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - $ref: "../components/parameters/common.yaml#/UserIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/clans.yaml#/ClanMemberRoleUpdate"
+    responses:
+      "200":
+        description: Member role updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/ClanMember"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Clans]
+    summary: Kick a member from clan
+    operationId: kickClanMember
+    description: |
+      Removes a member. Cannot kick equal or higher role.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - $ref: "../components/parameters/common.yaml#/UserIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Member kicked.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanInvites:
+  get:
+    tags: [Clans]
+    summary: List pending invites
+    operationId: listClanInvites
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Pending invites.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/clans.yaml#/ClanInvite"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  post:
+    tags: [Clans]
+    summary: Create a clan invite
+    operationId: createClanInvite
+    description: |
+      Creates an invitation link or direct user invite.
+      Configurable: expiry, max uses, target user.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/clans.yaml#/ClanInviteCreate"
+    responses:
+      "201":
+        description: Invite created.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/ClanInvite"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+ClanInviteById:
+  delete:
+    tags: [Clans]
+    summary: Revoke a clan invite
+    operationId: revokeClanInvite
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - name: inviteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Invite revoked.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanJoin:
+  post:
+    tags: [Clans]
+    summary: Join a clan
+    operationId: joinClan
+    description: |
+      Join using invite code in body or if clan accepts open
+      membership. May require admin/moderator approval.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/clans.yaml#/ClanJoinRequest"
+    responses:
+      "200":
+        description: Joined clan (or application submitted).
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+
+ClanLeave:
+  post:
+    tags: [Clans]
+    summary: Leave a clan
+    operationId: leaveClan
+    description: |
+      The authenticated user leaves. If owner, must transfer
+      ownership first.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Left clan.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+
+ClanDisband:
+  post:
+    tags: [Clans]
+    summary: Disband (delete) a clan
+    operationId: disbandClan
+    description: |
+      Permanently dissolves the clan. **Clan owner only.**
+      Requires confirmation.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/ConfirmationRequest"
+    responses:
+      "200":
+        description: Clan disbanded.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+ClanSettings:
+  get:
+    tags: [Clans]
+    summary: Get clan settings
+    operationId: getClanSettings
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Clan settings.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/ClanSettings"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Clans]
+    summary: Update clan settings
+    operationId: updateClanSettings
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/clans.yaml#/ClanSettingsUpdate"
+    responses:
+      "200":
+        description: Settings updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/ClanSettings"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+ClanApplyRole:
+  post:
+    tags: [Clans]
+    summary: Apply for a staff role
+    operationId: applyForClanRole
+    description: |
+      Submit application for clan `admin` or `moderator`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - name: role
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [admin, moderator]
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/clans.yaml#/ClanRoleApplication"
+    responses:
+      "200":
+        description: Application submitted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+
+ClanReport:
+  post:
+    tags: [Clans]
+    summary: Report a clan
+    operationId: reportClan
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ReportCreate"
+    responses:
+      "201":
+        description: Report submitted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanTemplates:
+  get:
+    tags: [Clans]
+    summary: List clan templates
+    operationId: listClanTemplates
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Clan templates.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/TemplatePage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanRestrictions:
+  get:
+    tags: [Clans]
+    summary: List clan-scoped restrictions
+    operationId: listClanRestrictions
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Clan restrictions.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/restrictions.yaml#/RestrictionPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"

@@ -1,0 +1,88 @@
+# ══════════════════════════════════════════════════════════════════════
+# TELEMETRY — Client Events, Health, Metrics
+# ══════════════════════════════════════════════════════════════════════
+
+TelemetryEvents:
+  post:
+    tags: [Telemetry]
+    summary: Submit client telemetry events
+    operationId: submitTelemetry
+    description: |
+      Ingests telemetry events. Only accepted from users with
+      `telemetryOptIn: true`. Request body is a batch of events.
+      Data is never sold or shared.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/telemetry.yaml#/TelemetryBatch"
+    responses:
+      "202":
+        description: Events accepted for processing.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+TelemetryHealth:
+  get:
+    tags: [Telemetry]
+    summary: Server health check
+    operationId: healthCheck
+    description: |
+      Publicly accessible. Returns 200 when healthy, 503 when
+      in maintenance or degraded. Includes uptime, DB connectivity,
+      and maintenance status.
+    security: []
+    responses:
+      "200":
+        description: Server is healthy.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/telemetry.yaml#/HealthStatus"
+      "503":
+        description: Server is in maintenance or degraded.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/telemetry.yaml#/HealthStatus"
+
+TelemetryMetrics:
+  get:
+    tags: [Telemetry]
+    summary: Detailed server metrics
+    operationId: getMetrics
+    description: |
+      Admin only. Supports Prometheus (`Accept: text/plain`)
+      or JSON (`Accept: application/json`).
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Server metrics.
+        content:
+          text/plain:
+            schema:
+              type: string
+              description: Prometheus exposition format.
+          application/json:
+            schema:
+              $ref: "../components/schemas/telemetry.yaml#/MetricsSnapshot"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"

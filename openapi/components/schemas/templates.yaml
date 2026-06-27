@@ -1,0 +1,270 @@
+Template:
+  type: object
+  required:
+    - id
+    - name
+    - scope
+    - status
+    - authorId
+    - authorUsername
+    - positionX
+    - positionY
+    - width
+    - height
+    - scale
+    - imageUrl
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique template identifier.
+    name:
+      type: string
+      description: Template name.
+    description:
+      type: string
+      nullable: true
+      description: Template description.
+    scope:
+      type: string
+      enum:
+        - public
+        - clan
+        - private
+      description: Template visibility scope.
+    status:
+      type: string
+      enum:
+        - pending
+        - approved
+        - rejected
+      description: Moderation status.
+    authorId:
+      type: string
+      format: uuid
+      description: Author's account UUID (author.id in the-wall-dev/2 documents).
+    authorUsername:
+      type: string
+      description: Author's username.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: UUID of the clan if scoped to a clan.
+    positionX:
+      type: integer
+      description: X coordinate on the canvas.
+    positionY:
+      type: integer
+      description: Y coordinate on the canvas.
+    width:
+      type: integer
+      description: Width in pixels.
+    height:
+      type: integer
+      description: Height in pixels.
+    scale:
+      type: number
+      format: float
+      default: 1
+      description: Scale factor.
+    imageUrl:
+      type: string
+      format: uri
+      description: URL to the template image.
+    previewUrl:
+      type: string
+      nullable: true
+      format: uri
+      description: URL to a preview image.
+    animationConfig:
+      $ref: "#/AnimationConfig"
+      nullable: true
+      description: Animation configuration (if any).
+    isPinnedByUser:
+      type: boolean
+      nullable: true
+      description: Whether the current user has pinned this template.
+    createdAt:
+      type: string
+      format: date-time
+      description: Creation timestamp.
+    updatedAt:
+      type: string
+      format: date-time
+      description: Last update timestamp.
+
+AnimationConfig:
+  type: object
+  required:
+    - type
+    - loop
+  properties:
+    type:
+      type: string
+      enum:
+        - none
+        - spritesheet
+        - frame_sequence
+      description: Animation type.
+    frameCount:
+      type: integer
+      nullable: true
+      description: Number of frames (for spritesheet).
+    frameWidth:
+      type: integer
+      nullable: true
+      description: Width of each frame (for spritesheet).
+    frameHeight:
+      type: integer
+      nullable: true
+      description: Height of each frame (for spritesheet).
+    frameDurationMs:
+      type: integer
+      nullable: true
+      description: Duration of each frame in milliseconds.
+    loop:
+      type: boolean
+      default: true
+      description: Whether the animation loops.
+
+TemplateCreate:
+  type: object
+  required:
+    - name
+    - positionX
+    - positionY
+    - imageUrl
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 128
+      description: Template name.
+    description:
+      type: string
+      maxLength: 1000
+      description: Optional description.
+    scope:
+      type: string
+      enum:
+        - public
+        - clan
+        - private
+      default: public
+      description: Visibility scope.
+    positionX:
+      type: integer
+      description: X coordinate.
+    positionY:
+      type: integer
+      description: Y coordinate.
+    scale:
+      type: number
+      format: float
+      default: 1
+      description: Scale factor.
+    imageUrl:
+      type: string
+      format: uri
+      description: URL to the template image.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: UUID of the clan if scoped to a clan.
+    animationConfig:
+      $ref: "#/AnimationConfig"
+      description: Optional animation configuration.
+
+TemplateUpdate:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 128
+      description: Template name.
+    description:
+      type: string
+      maxLength: 1000
+      nullable: true
+      description: Template description.
+    scope:
+      type: string
+      enum:
+        - public
+        - clan
+        - private
+      default: public
+      description: Visibility scope.
+    positionX:
+      type: integer
+      description: X coordinate.
+    positionY:
+      type: integer
+      description: Y coordinate.
+    scale:
+      type: number
+      format: float
+      default: 1
+      description: Scale factor.
+    imageUrl:
+      type: string
+      format: uri
+      description: URL to the template image.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: UUID of the clan if scoped to a clan.
+    animationConfig:
+      $ref: "#/AnimationConfig"
+      nullable: true
+      description: Animation configuration.
+
+TemplatePage:
+  allOf:
+    - $ref: "#/Template"
+    - $ref: "./common.yaml#/Pagination"
+
+CharityExport:
+  type: object
+  required:
+    - x
+    - y
+    - w
+    - h
+    - image
+    - hash
+    - name
+  properties:
+    x:
+      type: integer
+      description: X coordinate.
+    y:
+      type: integer
+      description: Y coordinate.
+    w:
+      type: integer
+      description: Width.
+    h:
+      type: integer
+      description: Height.
+    image:
+      type: string
+      description: Image data or URL.
+    hash:
+      type: string
+      description: Content hash.
+    name:
+      type: string
+      description: Item name.
+    defaced:
+      type: boolean
+      description: Whether the item has been defaced.
+    frames:
+      type: array
+      description: Animation frames (if any).

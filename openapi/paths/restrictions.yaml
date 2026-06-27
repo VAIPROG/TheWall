@@ -1,0 +1,187 @@
+# ══════════════════════════════════════════════════════════════════════
+# RESTRICTIONS — Granular Moderation Sanctions
+# ══════════════════════════════════════════════════════════════════════
+
+Restrictions:
+  get:
+    tags: [Restrictions]
+    summary: List restrictions
+    operationId: listRestrictions
+    description: |
+      Paginated list of all restrictions. Filterable by scope,
+      type, user, and active/expired status. Moderator+ only.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+      - name: scope
+        in: query
+        schema:
+          type: string
+          enum: [global, clan]
+      - name: userId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: active
+        in: query
+        schema:
+          type: boolean
+        description: Filter by active (true) or expired (false).
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Restrictions list.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/restrictions.yaml#/RestrictionPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+  post:
+    tags: [Restrictions]
+    summary: Create a restriction
+    operationId: createRestriction
+    description: |
+      Applies a new restriction to a user. Specify type, scope,
+      duration, reason, and target.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/restrictions.yaml#/RestrictionCreate"
+    responses:
+      "201":
+        description: Restriction created.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/restrictions.yaml#/RestrictionSet"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+RestrictionById:
+  get:
+    tags: [Restrictions]
+    summary: Get restriction details
+    operationId: getRestriction
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/RestrictionIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Restriction details.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/restrictions.yaml#/RestrictionSet"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Restrictions]
+    summary: Update a restriction
+    operationId: updateRestriction
+    description: Modify duration, reason, or sanction flags.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/RestrictionIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/restrictions.yaml#/RestrictionUpdate"
+    responses:
+      "200":
+        description: Restriction updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/restrictions.yaml#/RestrictionSet"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Restrictions]
+    summary: Remove a restriction
+    operationId: deleteRestriction
+    description: Removes the restriction. Logged in audit trail.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/RestrictionIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Restriction removed.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UserRestrictions:
+  get:
+    tags: [Restrictions]
+    summary: List restrictions for a user
+    operationId: getUserRestrictions
+    description: |
+      Active and historical restrictions for a user.
+      Moderator+ for others; users can view own active ones.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: User's restrictions.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/restrictions.yaml#/RestrictionPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"

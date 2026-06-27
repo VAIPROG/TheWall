@@ -1,0 +1,119 @@
+ClientVersionHeader:
+  name: X-ClientVersion-TheWallDev-API
+  in: header
+  required: true
+  description: Client application version. Must be 3.
+  schema:
+    type: integer
+    enum:
+      - 3
+
+UserIdPath:
+  name: userId
+  in: path
+  required: true
+  description: Unique identifier of the user (UUID).
+  schema:
+    type: string
+    format: uuid
+
+ClanIdPath:
+  name: clanId
+  in: path
+  required: true
+  description: Unique identifier of the clan (UUID).
+  schema:
+    type: string
+    format: uuid
+
+ChatIdPath:
+  name: chatId
+  in: path
+  required: true
+  description: Unique identifier of the chat.
+  schema:
+    type: string
+    format: uuid
+
+MessageIdPath:
+  name: messageId
+  in: path
+  required: true
+  description: Unique identifier of the message.
+  schema:
+    type: string
+    format: uuid
+
+TemplateIdPath:
+  name: templateId
+  in: path
+  required: true
+  description: Unique identifier of the template.
+  schema:
+    type: string
+    format: uuid
+
+RestrictionIdPath:
+  name: restrictionId
+  in: path
+  required: true
+  description: Unique identifier of the restriction.
+  schema:
+    type: string
+    format: uuid
+
+ReportIdPath:
+  name: reportId
+  in: path
+  required: true
+  description: Unique identifier of the report.
+  schema:
+    type: string
+    format: uuid
+
+ConnectionIdPath:
+  name: connectionId
+  in: path
+  required: true
+  description: Unique identifier of the connection.
+  schema:
+    type: string
+    format: uuid
+
+KeyIdPath:
+  name: keyId
+  in: path
+  required: true
+  description: Unique identifier of the key.
+  schema:
+    type: string
+    format: uuid
+
+PageParam:
+  name: page
+  in: query
+  description: Page number for pagination.
+  schema:
+    type: integer
+    minimum: 1
+    default: 1
+
+PerPageParam:
+  name: perPage
+  in: query
+  description: Number of items per page.
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 20
+
+UserRefPath:
+  name: userRef
+  in: path
+  required: true
+  description: >-
+    User UUID or username (case-insensitive). If the value parses as a UUID it
+    is treated as an id, otherwise as a username (usernames are globally unique).
+  schema:
+    type: string

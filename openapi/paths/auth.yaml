@@ -1,0 +1,369 @@
+# ══════════════════════════════════════════════════════════════════════
+# AUTH — Authentication, OAuth, Session Lifecycle
+# ══════════════════════════════════════════════════════════════════════
+
+AuthSite:
+  post:
+    tags: [Auth]
+    summary: Authenticate via site cookie (attach-or-create)
+    operationId: authSite
+    description: |
+      Primary authentication method. Server verifies the site `token` with
+      the named `site` platform to resolve `(site, siteUserId)`.
+
+      **Attach-or-create semantics:**
+      - If a valid Bearer session is present AND `(site, siteUserId)` is not
+        yet linked to the current account → **attach** a new `SiteIdentity`
+        to the current account and return the existing session.
+      - Otherwise → **find or create** the Wall-Dev account for
+        `(site, siteUserId)` and return a new session.
+
+      `site` is the platform registry id shared with the site-injector adapter
+      (e.g. `filianislost`, `wplace`). Not a closed enum — new platforms are
+      added without an API version bump.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/auth.yaml#/AuthSiteRequest"
+    responses:
+      "200":
+        description: Successfully authenticated (or site identity attached).
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/AuthResponse"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+OAuthTelegram:
+  get:
+    tags: [Auth]
+    summary: Initiate Telegram OAuth flow
+    operationId: authOAuthTelegramInit
+    description: |
+      Redirects the user to Telegram's OAuth authorization page.
+      On success, Telegram redirects back to the callback URL
+      with credentials.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    responses:
+      "302":
+        description: Redirect to Telegram authorization page.
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+  post:
+    tags: [Auth]
+    summary: Complete Telegram OAuth callback
+    operationId: authOAuthTelegramCallback
+    description: |
+      Receives the OAuth callback payload from Telegram. Creates a
+      new user account or links to an existing one. Returns session
+      tokens.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/auth.yaml#/OAuthCallbackRequest"
+    responses:
+      "200":
+        description: Successfully authenticated via Telegram.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/AuthResponse"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+OAuthDiscord:
+  get:
+    tags: [Auth]
+    summary: Initiate Discord OAuth flow
+    operationId: authOAuthDiscordInit
+    description: Redirects to Discord's OAuth2 authorization page.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    responses:
+      "302":
+        description: Redirect to Discord authorization page.
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+  post:
+    tags: [Auth]
+    summary: Complete Discord OAuth callback
+    operationId: authOAuthDiscordCallback
+    description: |
+      Receives the OAuth callback from Discord. Creates or links
+      the account and returns session tokens.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/auth.yaml#/OAuthCallbackRequest"
+    responses:
+      "200":
+        description: Successfully authenticated via Discord.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/AuthResponse"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+OAuthGitHub:
+  get:
+    tags: [Auth]
+    summary: Initiate GitHub OAuth flow
+    operationId: authOAuthGitHubInit
+    description: Redirects to GitHub's OAuth authorization page.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    responses:
+      "302":
+        description: Redirect to GitHub authorization page.
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+  post:
+    tags: [Auth]
+    summary: Complete GitHub OAuth callback
+    operationId: authOAuthGitHubCallback
+    description: |
+      Receives the OAuth callback from GitHub. Creates or links
+      the account and returns session tokens.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/auth.yaml#/OAuthCallbackRequest"
+    responses:
+      "200":
+        description: Successfully authenticated via GitHub.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/AuthResponse"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+AuthRefresh:
+  post:
+    tags: [Auth]
+    summary: Refresh session token
+    operationId: authRefresh
+    description: |
+      Exchanges a valid refresh token for a new access + refresh
+      token pair. The old refresh token is invalidated immediately.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/auth.yaml#/RefreshRequest"
+    responses:
+      "200":
+        description: Tokens refreshed successfully.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/AuthResponse"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+AuthSession:
+  get:
+    tags: [Auth]
+    summary: Introspect current session
+    operationId: authSession
+    description: |
+      Returns information about the current authenticated session
+      including token expiry, user identity, active permissions,
+      and a list of all active sessions for the current user.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Session information.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/SessionInfo"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+AuthLogout:
+  post:
+    tags: [Auth]
+    summary: Logout current session
+    operationId: authLogout
+    description: |
+      Invalidates the current session token and refresh token.
+      The client should discard stored credentials after this call.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Successfully logged out.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+AuthLogoutSession:
+  post:
+    tags: [Auth]
+    summary: Logout a specific session
+    operationId: authLogoutSession
+    description: |
+      Remotely invalidates a specific session by its ID. Useful for
+      revoking access on a lost or compromised device. Users can only
+      target their own sessions unless they have admin privileges.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: ID of the session to invalidate.
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Session invalidated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AuthLogoutAll:
+  post:
+    tags: [Auth]
+    summary: Logout all sessions except current
+    operationId: authLogoutAll
+    description: |
+      Invalidates all active sessions for the current user **except**
+      the session making this request. Equivalent to "log out
+      everywhere else."
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    responses:
+      "200":
+        description: All other sessions invalidated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+AuthMergeInitiate:
+  post:
+    tags: [Auth]
+    summary: Initiate account merge (mint merge token for account B)
+    operationId: authMergeInitiate
+    description: |
+      Called while authenticated as account **B** (the account to be absorbed).
+      Returns a short-lived, single-use merge token (`scope=merge`,
+      `subject=B`) to be submitted by account **A** at
+      `POST /users/me/merge`.
+
+      The token expires in ~10 minutes and can only be used once.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    responses:
+      "200":
+        description: Merge token minted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/MergeInitiateResponse"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+AuthRecover:
+  post:
+    tags: [Auth]
+    summary: Recover account via mnemonic phrase
+    operationId: authRecover
+    description: |
+      Verifies the 8-word BIP-39-style recovery phrase against the stored
+      argon2id hash. On success, mints a **limited-scope recovery session**
+      (AuthResponse) that may be used to re-link a provider or site identity,
+      but cannot perform other account mutations until a full re-auth.
+
+      No authentication required. Rate-limited aggressively.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/auth.yaml#/RecoverRequest"
+    responses:
+      "200":
+        description: Recovery session minted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/AuthResponse"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"

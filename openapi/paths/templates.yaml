@@ -1,0 +1,370 @@
+# ══════════════════════════════════════════════════════════════════════
+# TEMPLATES — Upload, Discovery, Editing, Sharing
+# ══════════════════════════════════════════════════════════════════════
+
+Templates:
+  get:
+    tags: [Templates]
+    summary: List / search templates
+    operationId: listTemplates
+    description: |
+      Paginated, filterable template discovery. Filter by scope,
+      status, author, clan, position range, text search.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+      - name: scope
+        in: query
+        schema:
+          type: string
+          enum: [public, clan, private]
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [pending, approved, rejected]
+      - name: search
+        in: query
+        schema:
+          type: string
+      - name: authorId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: clanId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: sortBy
+        in: query
+        schema:
+          type: string
+          enum: [createdAt, updatedAt, name]
+          default: createdAt
+      - name: order
+        in: query
+        schema:
+          $ref: "../components/schemas/common.yaml#/SortOrder"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Paginated template list.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/TemplatePage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+TemplatesNew:
+  post:
+    tags: [Templates]
+    summary: Upload a new template
+    operationId: createTemplate
+    description: |
+      Creates a new template. Enters moderation queue with status
+      `pending` unless uploader has auto-approve privileges.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/templates.yaml#/TemplateCreate"
+    responses:
+      "201":
+        description: Template created.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/Template"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "422":
+        $ref: "../components/responses/common.yaml#/UnprocessableEntity"
+
+TemplateById:
+  get:
+    tags: [Templates]
+    summary: Get template details
+    operationId: getTemplate
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Template details.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/Template"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Templates]
+    summary: Update a template
+    operationId: updateTemplate
+    description: |
+      Partially updates metadata. Only owner or moderators.
+      Significant changes may re-trigger moderation queue.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/templates.yaml#/TemplateUpdate"
+    responses:
+      "200":
+        description: Template updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/Template"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Templates]
+    summary: Delete a template
+    operationId: deleteTemplate
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Template deleted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+TemplatePreview:
+  get:
+    tags: [Templates]
+    summary: Get template preview image
+    operationId: getTemplatePreview
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - name: width
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: height
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+    responses:
+      "200":
+        description: Preview image.
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+TemplateImage:
+  get:
+    tags: [Templates]
+    summary: Get template source image
+    operationId: getTemplateImage
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    responses:
+      "200":
+        description: Source image (PNG).
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+TemplateCharity:
+  get:
+    tags: [Templates]
+    summary: Export template as Charity format
+    operationId: getTemplateCharity
+    description: |
+      Returns the template in third-party Charity (Bluemarble-style)
+      JSON format for cross-client compatibility.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Charity format export.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/CharityExport"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+TemplateWallDev:
+  get:
+    tags: [Templates]
+    summary: Export template in The Wall Dev Format
+    operationId: getTemplateWallDev
+    description: |
+      Returns the template in The Wall Dev Format v2 with full
+      metadata, animation, and inline image data.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Wall Dev v2 format export.
+        content:
+          application/json: {}
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+TemplateReport:
+  post:
+    tags: [Templates]
+    summary: Report a template
+    operationId: reportTemplate
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ReportCreate"
+    responses:
+      "201":
+        description: Report submitted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+TemplatePin:
+  post:
+    tags: [Templates]
+    summary: Pin template to collection
+    operationId: pinTemplate
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Template pinned.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+  delete:
+    tags: [Templates]
+    summary: Unpin template
+    operationId: unpinTemplate
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Template unpinned.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+TemplatesPinned:
+  get:
+    tags: [Templates]
+    summary: List pinned templates
+    operationId: listPinnedTemplates
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Pinned templates.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/TemplatePage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"

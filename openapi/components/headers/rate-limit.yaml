@@ -1,0 +1,27 @@
+X-RateLimit-Limit:
+  name: X-RateLimit-Limit
+  in: header
+  description: Maximum number of requests allowed in the rate limit window.
+  schema:
+    type: integer
+
+X-RateLimit-Remaining:
+  name: X-RateLimit-Remaining
+  in: header
+  description: Number of requests remaining in the current rate limit window.
+  schema:
+    type: integer
+
+X-RateLimit-Reset:
+  name: X-RateLimit-Reset
+  in: header
+  description: Unix timestamp (seconds) when the rate limit window resets.
+  schema:
+    type: integer
+
+X-RateLimit-AllowedAtPeak:
+  name: X-RateLimit-AllowedAtPeak
+  in: header
+  description: Maximum burst allowance during peak traffic.
+  schema:
+    type: integer

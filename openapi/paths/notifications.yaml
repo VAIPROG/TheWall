@@ -1,0 +1,177 @@
+# ══════════════════════════════════════════════════════════════════════
+# NOTIFICATIONS — Delivery and Lifecycle
+# ══════════════════════════════════════════════════════════════════════
+
+Notifications:
+  get:
+    tags: [Notifications]
+    summary: List notifications
+    operationId: listNotifications
+    description: Paginated. Filter by read/unread status and type.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+      - name: read
+        in: query
+        schema:
+          type: boolean
+        description: Filter by read status.
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Notifications.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/notifications.yaml#/NotificationPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+NotificationsAck:
+  post:
+    tags: [Notifications]
+    summary: Acknowledge notifications
+    operationId: ackNotifications
+    description: Marks one or more notifications as read.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/notifications.yaml#/AckRequest"
+    responses:
+      "200":
+        description: Notifications acknowledged.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+NotificationsAckAll:
+  post:
+    tags: [Notifications]
+    summary: Mark all notifications as read
+    operationId: ackAllNotifications
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: All notifications marked read.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+NotificationsSettings:
+  get:
+    tags: [Notifications]
+    summary: Get notification preferences
+    operationId: getNotificationSettings
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Notification settings.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/notifications.yaml#/NotificationSettings"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+  patch:
+    tags: [Notifications]
+    summary: Update notification preferences
+    operationId: updateNotificationSettings
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/notifications.yaml#/NotificationSettingsUpdate"
+    responses:
+      "200":
+        description: Settings updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/notifications.yaml#/NotificationSettings"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+NotificationById:
+  get:
+    tags: [Notifications]
+    summary: Get a specific notification
+    operationId: getNotification
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: notificationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Notification.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/notifications.yaml#/Notification"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Notifications]
+    summary: Dismiss a notification
+    operationId: deleteNotification
+    description: Permanently removes from user's list.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: notificationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Notification dismissed.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"

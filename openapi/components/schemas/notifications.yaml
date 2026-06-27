@@ -1,0 +1,121 @@
+Notification:
+  type: object
+  required:
+    - id
+    - type
+    - title
+    - body
+    - isRead
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique notification identifier.
+    type:
+      type: string
+      enum:
+        - template_status_change
+        - clan_invite
+        - restriction_update
+        - mod_action
+        - system_announcement
+        - mention
+      description: Notification category.
+    title:
+      type: string
+      description: Short notification headline.
+    body:
+      type: string
+      description: Full notification content.
+    isRead:
+      type: boolean
+      description: Whether the user has acknowledged this notification.
+    actionUrl:
+      type: string
+      nullable: true
+      description: Deep link or relative URL for the notification action.
+    metadata:
+      type: object
+      nullable: true
+      description: Additional context data depending on notification type.
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp when the notification was created.
+
+NotificationPage:
+  allOf:
+    - $ref: "./notifications.yaml#/Notification"
+    - $ref: "./common.yaml#/Pagination"
+
+AckRequest:
+  type: object
+  required:
+    - ids
+  properties:
+    ids:
+      type: array
+      minItems: 1
+      items:
+        type: string
+        format: uuid
+      description: Notification IDs to mark as read.
+
+NotificationSettings:
+  type: object
+  required:
+    - pushEnabled
+    - templateStatusChanges
+    - clanInvites
+    - restrictionUpdates
+    - modActions
+    - systemAnnouncements
+    - mentions
+  properties:
+    pushEnabled:
+      type: boolean
+      description: Whether push notifications are enabled.
+    templateStatusChanges:
+      type: boolean
+      description: Notify when template status changes (approved, rejected, etc.).
+    clanInvites:
+      type: boolean
+      description: Notify on clan invitations.
+    restrictionUpdates:
+      type: boolean
+      description: Notify when restrictions are applied, updated, or removed.
+    modActions:
+      type: boolean
+      description: Notify on moderation actions affecting the user.
+    systemAnnouncements:
+      type: boolean
+      description: Notify on system-wide announcements.
+    mentions:
+      type: boolean
+      description: Notify when mentioned in chat or templates.
+
+NotificationSettingsUpdate:
+  type: object
+  properties:
+    pushEnabled:
+      type: boolean
+      description: Whether push notifications are enabled.
+    templateStatusChanges:
+      type: boolean
+      description: Notify when template status changes (approved, rejected, etc.).
+    clanInvites:
+      type: boolean
+      description: Notify on clan invitations.
+    restrictionUpdates:
+      type: boolean
+      description: Notify when restrictions are applied, updated, or removed.
+    modActions:
+      type: boolean
+      description: Notify on moderation actions affecting the user.
+    systemAnnouncements:
+      type: boolean
+      description: Notify on system-wide announcements.
+    mentions:
+      type: boolean
+      description: Notify when mentioned in chat or templates.

@@ -1,0 +1,324 @@
+User:
+  type: object
+  required:
+    - id
+    - username
+    - displayName
+    - role
+    - lang
+    - telemetryOptIn
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique account identifier (UUID).
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    username:
+      type: string
+      description: Unique username.
+      example: "jane_doe"
+    displayName:
+      type: string
+      description: User-visible display name.
+      example: "Jane Doe"
+    bio:
+      type: string
+      nullable: true
+      description: User biography.
+      example: "Pixel artist and game developer."
+    avatarUrl:
+      type: string
+      nullable: true
+      format: uri
+      description: URL to the user's avatar image.
+      example: "https://example.com/avatars/jane.png"
+    role:
+      type: string
+      enum:
+        - owner
+        - admin
+        - moderator
+        - member
+      description: User role in the system.
+      example: "member"
+    lang:
+      type: string
+      description: Preferred language code.
+      example: "en"
+    telemetryOptIn:
+      type: boolean
+      description: Whether the user has opted into telemetry.
+      example: true
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: UUID of the user's primary clan, if any.
+      example: "661e8400-e29b-41d4-a716-446655440000"
+    createdAt:
+      type: string
+      format: date-time
+      description: Account creation timestamp.
+      example: "2025-01-15T10:30:00Z"
+    updatedAt:
+      type: string
+      format: date-time
+      description: Last update timestamp.
+      example: "2025-06-20T14:22:00Z"
+
+UserSelf:
+  allOf:
+    - $ref: "#/User"
+    - type: object
+      properties:
+        siteIdentities:
+          type: array
+          items:
+            $ref: "./auth.yaml#/SiteIdentity"
+          description: >-
+            Platform site identities linked to this account (one per pixel
+            platform connected, e.g. filianislost, wplace).
+        linkedAccounts:
+          type: array
+          items:
+            $ref: "#/SocialAccount"
+          description: Linked OAuth social accounts (telegram, discord, github).
+        apiKeyCount:
+          type: integer
+          description: Number of API keys the user has.
+          example: 3
+        blockListCount:
+          type: integer
+          description: Number of blocked users.
+          example: 2
+
+UserPublic:
+  type: object
+  required:
+    - id
+    - username
+    - displayName
+    - role
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique account identifier (UUID).
+    username:
+      type: string
+      description: Unique username.
+    displayName:
+      type: string
+      description: User-visible display name.
+    bio:
+      type: string
+      nullable: true
+      description: User biography.
+    avatarUrl:
+      type: string
+      nullable: true
+      format: uri
+      description: URL to the user's avatar image.
+    role:
+      type: string
+      description: User role.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: UUID of the user's primary clan, if any.
+    createdAt:
+      type: string
+      format: date-time
+      description: Account creation timestamp.
+
+UserUpdate:
+  type: object
+  properties:
+    displayName:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: New display name.
+    username:
+      type: string
+      minLength: 3
+      maxLength: 32
+      pattern: "^[a-zA-Z0-9_]+$"
+      description: New username (letters, digits, underscores only).
+    bio:
+      type: string
+      nullable: true
+      maxLength: 500
+      description: New biography.
+    lang:
+      type: string
+      description: New preferred language code.
+    telemetryOptIn:
+      type: boolean
+      description: New telemetry preference.
+
+SocialAccount:
+  type: object
+  required:
+    - id
+    - provider
+    - providerUid
+    - username
+    - isVerified
+    - isPublic
+    - linkedAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique identifier for the linked account.
+    provider:
+      type: string
+      enum:
+        - telegram
+        - discord
+        - github
+      description: OAuth provider name.
+    providerUid:
+      type: string
+      description: Provider-specific user ID.
+    username:
+      type: string
+      description: Username on the provider.
+    isVerified:
+      type: boolean
+      description: Whether the account ownership is verified.
+    isPublic:
+      type: boolean
+      description: Whether this link is visible on the public profile.
+    linkedAt:
+      type: string
+      format: date-time
+      description: When the account was linked.
+
+SocialAccountPublic:
+  type: object
+  required:
+    - provider
+    - username
+    - isVerified
+    - linkedAt
+  properties:
+    provider:
+      type: string
+      description: OAuth provider name.
+    username:
+      type: string
+      description: Username on the provider.
+    isVerified:
+      type: boolean
+      description: Whether the account ownership is verified.
+    linkedAt:
+      type: string
+      format: date-time
+      description: When the account was linked.
+
+SocialAccountLink:
+  type: object
+  required:
+    - provider
+  properties:
+    provider:
+      type: string
+      enum:
+        - telegram
+        - discord
+        - github
+      description: OAuth provider to link.
+    code:
+      type: string
+      description: Authorization code from the OAuth flow (optional for some providers).
+
+SocialAccountUpdate:
+  type: object
+  properties:
+    isPublic:
+      type: boolean
+      description: Update the public visibility of the linked account.
+
+ApiKeyMeta:
+  type: object
+  required:
+    - id
+    - name
+    - prefix
+    - createdAt
+    - lastUsedAt
+    - permissions
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique API key identifier.
+    name:
+      type: string
+      description: Human-readable key name.
+    prefix:
+      type: string
+      description: First few characters of the key for identification.
+    createdAt:
+      type: string
+      format: date-time
+      description: When the key was created.
+    lastUsedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the key was last used.
+    permissions:
+      type: array
+      items:
+        type: string
+      description: List of permissions granted to this key.
+
+ApiKeyCreate:
+  type: object
+  required:
+    - name
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Name for the new API key.
+
+ApiKeyCreated:
+  allOf:
+    - $ref: "#/ApiKeyMeta"
+    - type: object
+      properties:
+        key:
+          type: string
+          description: The full API key string (shown only once).
+
+ApiKeyUpdate:
+  type: object
+  properties:
+    name:
+      type: string
+      description: New name for the API key.
+    permissions:
+      type: array
+      items:
+        type: string
+      description: New list of permissions.
+
+HigherLimitsRequest:
+  type: object
+  required:
+    - justification
+  properties:
+    justification:
+      type: string
+      minLength: 10
+      maxLength: 500
+      description: Reason for requesting higher rate limits.

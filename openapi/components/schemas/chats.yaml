@@ -1,0 +1,155 @@
+ChatSummary:
+  type: object
+  required:
+    - id
+    - type
+    - participantCount
+    - unreadCount
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique chat identifier.
+    type:
+      type: string
+      enum:
+        - global
+        - clan
+        - dm
+        - modmail
+      description: Chat type.
+    name:
+      type: string
+      nullable: true
+      description: Chat name (if applicable).
+    participantCount:
+      type: integer
+      description: Number of participants.
+    unreadCount:
+      type: integer
+      description: Number of unread messages for the current user.
+    lastMessageAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp of the last message.
+
+ChatDetail:
+  allOf:
+    - $ref: "#/ChatSummary"
+    - type: object
+      properties:
+        participants:
+          type: array
+          items:
+            $ref: "#/Participant"
+          description: List of chat participants.
+        recentMessages:
+          type: array
+          items:
+            $ref: "#/Message"
+          description: Recent messages in the chat.
+
+Participant:
+  type: object
+  required:
+    - userId
+    - username
+    - displayName
+  properties:
+    userId:
+      type: string
+      format: uuid
+      description: Account UUID.
+    username:
+      type: string
+      description: Username.
+    displayName:
+      type: string
+      description: Display name.
+    avatarUrl:
+      type: string
+      nullable: true
+      format: uri
+      description: Avatar URL.
+    role:
+      type: string
+      nullable: true
+      description: User's role in the chat (if any).
+
+Message:
+  type: object
+  required:
+    - id
+    - chatId
+    - authorId
+    - authorUsername
+    - authorDisplayName
+    - content
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique message identifier.
+    chatId:
+      type: string
+      format: uuid
+      description: Chat this message belongs to.
+    authorId:
+      type: string
+      format: uuid
+      description: Author's account UUID.
+    authorUsername:
+      type: string
+      description: Author's username.
+    authorDisplayName:
+      type: string
+      description: Author's display name.
+    authorAvatarUrl:
+      type: string
+      nullable: true
+      format: uri
+      description: Author's avatar URL.
+    content:
+      type: string
+      description: Message content.
+    editedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the message was last edited.
+    createdAt:
+      type: string
+      format: date-time
+      description: When the message was sent.
+
+MessageCreate:
+  type: object
+  required:
+    - content
+  properties:
+    content:
+      type: string
+      minLength: 1
+      maxLength: 4000
+      description: Message content to send.
+
+MessageEdit:
+  type: object
+  required:
+    - content
+  properties:
+    content:
+      type: string
+      minLength: 1
+      maxLength: 4000
+      description: New message content.
+
+ChatReadRequest:
+  type: object
+  properties:
+    messageId:
+      type: string
+      format: uuid
+      description: Mark messages up to this ID as read.

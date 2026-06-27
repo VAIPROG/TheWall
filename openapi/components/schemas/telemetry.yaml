@@ -1,0 +1,125 @@
+TelemetryBatch:
+  type: object
+  required:
+    - events
+  properties:
+    events:
+      type: array
+      minItems: 1
+      maxItems: 100
+      items:
+        $ref: "./telemetry.yaml#/TelemetryEvent"
+      description: Batch of telemetry events.
+
+TelemetryEvent:
+  type: object
+  required:
+    - type
+    - timestamp
+  properties:
+    type:
+      type: string
+      enum:
+        - error
+        - performance
+        - interaction
+        - page_view
+        - custom
+      description: Event category.
+    timestamp:
+      type: string
+      format: date-time
+      description: When the event occurred on the client.
+    data:
+      type: object
+      description: Event-specific payload data.
+    sessionId:
+      type: string
+      format: uuid
+      description: Client session identifier for correlating events.
+    pageUrl:
+      type: string
+      description: URL of the page where the event occurred.
+
+HealthStatus:
+  type: object
+  required:
+    - status
+    - uptime
+    - database
+    - maintenanceMode
+    - version
+  properties:
+    status:
+      type: string
+      enum:
+        - healthy
+        - degraded
+        - maintenance
+      description: Overall server health status.
+    uptime:
+      type: integer
+      description: Server uptime in seconds.
+    database:
+      type: string
+      enum:
+        - connected
+        - disconnected
+      description: Database connectivity status.
+    maintenanceMode:
+      type: boolean
+      description: Whether the server is in maintenance mode.
+    maintenanceReason:
+      type: string
+      nullable: true
+      description: Reason for maintenance mode, if active.
+    version:
+      type: string
+      description: Server version string.
+
+MetricsSnapshot:
+  type: object
+  required:
+    - requestRate
+    - averageLatencyMs
+    - activeConnections
+    - databasePool
+    - memoryUsageMb
+    - cpuUsagePercent
+  properties:
+    requestRate:
+      type: number
+      format: float
+      description: Requests per second.
+    averageLatencyMs:
+      type: number
+      format: float
+      description: Average response latency in milliseconds.
+    activeConnections:
+      type: integer
+      description: Number of active client connections.
+    databasePool:
+      type: object
+      required:
+        - active
+        - idle
+        - waiting
+      properties:
+        active:
+          type: integer
+          description: Active database connections in the pool.
+        idle:
+          type: integer
+          description: Idle database connections in the pool.
+        waiting:
+          type: integer
+          description: Requests waiting for a database connection.
+      description: Database connection pool statistics.
+    memoryUsageMb:
+      type: number
+      format: float
+      description: Memory usage in megabytes.
+    cpuUsagePercent:
+      type: number
+      format: float
+      description: CPU usage as a percentage (0-100).

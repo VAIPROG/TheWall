@@ -1,0 +1,245 @@
+AuthSiteRequest:
+  type: object
+  required:
+    - site
+    - token
+  properties:
+    site:
+      type: string
+      description: |
+        Platform registry id — the same identifier used by the site-injector
+        adapter. Extensible; do not enumerate closed.
+      examples:
+        - filianislost
+        - wplace
+    token:
+      type: string
+      description: Authentication token/cookie from the target site.
+
+OAuthCallbackRequest:
+  type: object
+  required:
+    - code
+  properties:
+    code:
+      type: string
+      description: Authorization code received from OAuth provider.
+    state:
+      type: string
+      description: CSRF state parameter.
+
+RefreshRequest:
+  type: object
+  required:
+    - refreshToken
+  properties:
+    refreshToken:
+      type: string
+      description: Refresh token to exchange for a new access token.
+
+AuthResponse:
+  type: object
+  properties:
+    accessToken:
+      type: string
+      description: JWT access token.
+    refreshToken:
+      type: string
+      description: Refresh token for obtaining new access tokens.
+    expiresIn:
+      type: integer
+      description: Access token lifetime in seconds.
+    tokenType:
+      type: string
+      default: "Bearer"
+      description: Token type prefix.
+    user:
+      type: object
+      required:
+        - id
+        - username
+        - displayName
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique account identifier (UUID).
+        username:
+          type: string
+          description: Unique username.
+        displayName:
+          type: string
+          description: User-visible display name.
+        role:
+          type: string
+          description: User role.
+
+SessionInfo:
+  type: object
+  properties:
+    sessionId:
+      type: string
+      format: uuid
+      description: Unique session identifier.
+    userId:
+      type: string
+      format: uuid
+      description: Owner account identifier (UUID).
+    tokenExpiry:
+      type: string
+      format: date-time
+      description: When the session token expires.
+    permissions:
+      type: array
+      items:
+        type: string
+      description: List of permission strings granted.
+    activeSessions:
+      type: array
+      items:
+        $ref: "#/SessionSummary"
+      description: All active sessions for this user.
+
+SessionSummary:
+  type: object
+  properties:
+    sessionId:
+      type: string
+      format: uuid
+      description: Unique session identifier.
+    ip:
+      type: string
+      description: Client IP address.
+    userAgent:
+      type: string
+      description: Client user-agent string.
+    createdAt:
+      type: string
+      format: date-time
+      description: Session creation timestamp.
+    lastActivityAt:
+      type: string
+      format: date-time
+      description: Last activity timestamp.
+
+SiteIdentity:
+  type: object
+  required:
+    - id
+    - site
+    - siteUserId
+    - linkedAt
+    - lastSeenAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique SiteIdentity record identifier.
+    site:
+      type: string
+      description: Platform registry id (e.g. filianislost, wplace).
+    siteUserId:
+      type: string
+      description: Provider-assigned user id on that platform.
+    siteUsername:
+      type: string
+      nullable: true
+      description: Per-site display username, kept for display purposes.
+    linkedAt:
+      type: string
+      format: date-time
+      description: When this site identity was linked to the account.
+    lastSeenAt:
+      type: string
+      format: date-time
+      description: Last time the account authenticated via this identity.
+
+MergeInitiateResponse:
+  type: object
+  required:
+    - mergeToken
+    - expiresIn
+  properties:
+    mergeToken:
+      type: string
+      description: >-
+        Signed, single-use token (scope=merge, subject=this account) to be
+        submitted by account A when initiating the merge.
+    expiresIn:
+      type: integer
+      description: Seconds until the merge token expires (typically ~600).
+
+MergeRequest:
+  type: object
+  required:
+    - mergeToken
+  properties:
+    mergeToken:
+      type: string
+      description: Merge token minted by account B via POST /auth/merge/initiate.
+
+MergeResult:
+  type: object
+  required:
+    - mergedAccountId
+    - movedSiteIdentities
+    - movedTemplates
+    - unionedSocials
+    - revokedApiKeys
+  properties:
+    mergedAccountId:
+      type: string
+      format: uuid
+      description: UUID of the surviving account (A) that absorbed account B.
+    movedSiteIdentities:
+      type: integer
+      description: Number of SiteIdentities re-parented from B to A.
+    movedTemplates:
+      type: integer
+      description: Number of templates whose author.id was rewritten B→A.
+    unionedSocials:
+      type: integer
+      description: Number of SocialLinks moved from B to A (deduped by provider/uid).
+    revokedApiKeys:
+      type: integer
+      description: Number of B's API keys revoked as part of the merge.
+    conflicts:
+      type: array
+      items:
+        type: string
+      nullable: true
+      description: Human-readable descriptions of any non-fatal merge decisions made.
+
+RecoveryPhraseResponse:
+  type: object
+  required:
+    - phrase
+    - wordCount
+    - createdAt
+  properties:
+    phrase:
+      type: string
+      description: >-
+        The 8-word BIP-39-style mnemonic recovery phrase, shown exactly ONCE.
+        The server stores only a salted argon2id hash — this value cannot be
+        retrieved again. Write it down and store it securely.
+    wordCount:
+      type: integer
+      description: Number of words in the phrase (always 8, ~88 bits of entropy).
+      example: 8
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp when the phrase was generated (or last rotated).
+
+RecoverRequest:
+  type: object
+  required:
+    - phrase
+  properties:
+    phrase:
+      type: string
+      description: >-
+        The 8-word recovery phrase, space-separated. Case-insensitive;
+        normalised server-side before verification.

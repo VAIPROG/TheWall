@@ -1,0 +1,274 @@
+Clan:
+  type: object
+  required:
+    - id
+    - name
+    - description
+    - ownerId
+    - memberCount
+    - joinPolicy
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique clan identifier (UUID).
+      example: "661e8400-e29b-41d4-a716-446655440000"
+    name:
+      type: string
+      description: Clan name.
+      example: "Pixel Warriors"
+    description:
+      type: string
+      description: Clan description.
+      example: "A group for pixel art enthusiasts."
+    avatarUrl:
+      type: string
+      nullable: true
+      format: uri
+      description: URL to the clan's avatar image.
+      example: "https://example.com/clans/pixel-warriors.png"
+    ownerId:
+      type: string
+      format: uuid
+      description: Account UUID of the clan owner.
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    memberCount:
+      type: integer
+      description: Number of members in the clan.
+      example: 15
+    chatId:
+      type: string
+      format: uuid
+      nullable: true
+      description: ID of the clan's chat channel.
+    joinPolicy:
+      type: string
+      enum:
+        - open
+        - invite_only
+        - approval_required
+      description: How users can join the clan.
+      example: "invite_only"
+    createdAt:
+      type: string
+      format: date-time
+      description: Clan creation timestamp.
+    updatedAt:
+      type: string
+      format: date-time
+      description: Last update timestamp.
+
+ClanCreate:
+  type: object
+  required:
+    - name
+  properties:
+    name:
+      type: string
+      minLength: 2
+      maxLength: 32
+      description: Name for the new clan.
+    description:
+      type: string
+      maxLength: 500
+      description: Optional description for the clan.
+
+ClanUpdate:
+  type: object
+  properties:
+    name:
+      type: string
+      description: New clan name.
+    description:
+      type: string
+      nullable: true
+      description: New clan description.
+
+ClanMember:
+  type: object
+  required:
+    - userId
+    - username
+    - displayName
+    - role
+    - joinedAt
+  properties:
+    userId:
+      type: string
+      format: uuid
+      description: Account UUID.
+    username:
+      type: string
+      description: Username.
+    displayName:
+      type: string
+      description: Display name.
+    avatarUrl:
+      type: string
+      nullable: true
+      format: uri
+      description: Avatar URL.
+    role:
+      type: string
+      enum:
+        - owner
+        - admin
+        - moderator
+        - member
+      description: Member's role in the clan.
+    joinedAt:
+      type: string
+      format: date-time
+      description: When the user joined the clan.
+
+ClanMemberPage:
+  allOf:
+    - $ref: "#/ClanMember"
+    - $ref: "./common.yaml#/Pagination"
+
+ClanMemberRoleUpdate:
+  type: object
+  required:
+    - role
+  properties:
+    role:
+      type: string
+      enum:
+        - admin
+        - moderator
+        - member
+      description: New role for the member.
+
+ClanInvite:
+  type: object
+  required:
+    - id
+    - code
+    - createdBy
+    - useCount
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique invite identifier.
+    code:
+      type: string
+      description: Invite code.
+    createdBy:
+      type: string
+      format: uuid
+      description: Account UUID of the inviter.
+    targetUserId:
+      type: string
+      format: uuid
+      nullable: true
+      description: Specific account this invite is targeted at (if any).
+    maxUses:
+      type: integer
+      nullable: true
+      description: Maximum number of uses allowed.
+    useCount:
+      type: integer
+      description: Number of times the invite has been used.
+    expiresAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Expiration timestamp.
+    createdAt:
+      type: string
+      format: date-time
+      description: When the invite was created.
+
+ClanInviteCreate:
+  type: object
+  properties:
+    targetUserId:
+      type: string
+      format: uuid
+      description: Specific account UUID to invite (optional).
+    maxUses:
+      type: integer
+      minimum: 1
+      description: Maximum number of uses (optional).
+    expiresInHours:
+      type: integer
+      minimum: 1
+      maximum: 720
+      description: Hours until expiration (1-720, optional).
+
+ClanJoinRequest:
+  type: object
+  properties:
+    inviteCode:
+      type: string
+      description: Optional invite code to use when joining.
+
+ClanSettings:
+  type: object
+  required:
+    - joinPolicy
+    - templateScopeDefault
+    - moderationPreferences
+    - chatPermissions
+  properties:
+    joinPolicy:
+      type: string
+      enum:
+        - open
+        - invite_only
+        - approval_required
+      description: How users can join the clan.
+    templateScopeDefault:
+      type: string
+      enum:
+        - public
+        - clan
+        - private
+      description: Default template visibility for clan members.
+    moderationPreferences:
+      type: object
+      description: Clan moderation settings.
+    chatPermissions:
+      type: object
+      description: Clan chat permission settings.
+
+ClanSettingsUpdate:
+  type: object
+  properties:
+    joinPolicy:
+      type: string
+      enum:
+        - open
+        - invite_only
+        - approval_required
+      description: New join policy.
+    templateScopeDefault:
+      type: string
+      enum:
+        - public
+        - clan
+        - private
+      description: New default template scope.
+    moderationPreferences:
+      type: object
+      description: Updated moderation settings.
+    chatPermissions:
+      type: object
+      description: Updated chat permission settings.
+
+ClanRoleApplication:
+  type: object
+  properties:
+    message:
+      type: string
+      maxLength: 1000
+      description: Optional message explaining why you want the role.
+
+ClanPage:
+  allOf:
+    - $ref: "#/Clan"
+    - $ref: "./common.yaml#/Pagination"

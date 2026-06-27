@@ -1,0 +1,199 @@
+Report:
+  type: object
+  required:
+    - id
+    - type
+    - targetId
+    - targetType
+    - reporterId
+    - reporterUsername
+    - reason
+    - status
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique report identifier.
+    type:
+      type: string
+      enum:
+        - template
+        - message
+        - user
+        - clan
+      description: Type of reported content.
+    targetId:
+      type: string
+      description: Identifier of the reported entity.
+    targetType:
+      type: string
+      description: Entity type of the target (e.g. "template", "message").
+    reporterId:
+      type: string
+      format: uuid
+      description: Account UUID of the reporter.
+    reporterUsername:
+      type: string
+      description: Username of the reporter.
+    reason:
+      type: string
+      description: Reporter-provided reason.
+    evidence:
+      type: string
+      nullable: true
+      description: Optional evidence provided by the reporter (URL, text, etc.).
+    status:
+      type: string
+      enum:
+        - open
+        - reviewing
+        - resolved
+        - dismissed
+      description: Current report status.
+    assignedModId:
+      type: string
+      format: uuid
+      nullable: true
+      description: Account UUID of the moderator assigned to review this report.
+    resolution:
+      type: string
+      nullable: true
+      description: Final resolution summary when resolved.
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp when the report was created.
+    updatedAt:
+      type: string
+      format: date-time
+      description: Timestamp of the last update.
+
+ReportPage:
+  allOf:
+    - $ref: "./moderation.yaml#/Report"
+    - $ref: "./common.yaml#/Pagination"
+
+ReportCreate:
+  type: object
+  required:
+    - reason
+  properties:
+    reason:
+      type: string
+      minLength: 10
+      maxLength: 2000
+      description: Reporter-provided reason for the report.
+    evidence:
+      type: string
+      maxLength: 5000
+      description: Optional evidence (URL, description of issue, etc.).
+
+ReportUpdate:
+  type: object
+  properties:
+    status:
+      type: string
+      enum:
+        - open
+        - reviewing
+        - resolved
+        - dismissed
+      description: Updated report status.
+    assignedModId:
+      type: string
+      format: uuid
+      description: Account UUID of the moderator to assign this report to.
+    notes:
+      type: string
+      maxLength: 1000
+      description: Internal moderator notes.
+
+ReportResolve:
+  type: object
+  required:
+    - resolution
+  properties:
+    resolution:
+      type: string
+      enum:
+        - content_removed
+        - no_action_needed
+        - user_warned
+        - user_restricted
+        - other
+      description: Resolution action taken.
+    notes:
+      type: string
+      maxLength: 1000
+      description: Additional notes about the resolution.
+    createRestriction:
+      type: boolean
+      default: false
+      description: Whether to automatically create a restriction as part of resolution.
+
+ReportDismiss:
+  type: object
+  properties:
+    reason:
+      type: string
+      enum:
+        - duplicate
+        - false_report
+        - not_actionable
+        - other
+      description: Reason for dismissing the report.
+
+ModAction:
+  type: object
+  properties:
+    notes:
+      type: string
+      maxLength: 1000
+      description: Notes about the moderation action.
+
+AuditLogEntry:
+  type: object
+  required:
+    - id
+    - moderatorId
+    - moderatorUsername
+    - action
+    - targetType
+    - targetId
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique audit log entry identifier.
+    moderatorId:
+      type: string
+      format: uuid
+      description: Account UUID of the moderator who performed the action.
+    moderatorUsername:
+      type: string
+      description: Username of the moderator.
+    action:
+      type: string
+      description: Action performed (e.g. "ban", "mute", "template_approved").
+    targetType:
+      type: string
+      description: Type of entity acted upon.
+    targetId:
+      type: string
+      description: Identifier of the entity acted upon.
+    details:
+      type: object
+      nullable: true
+      description: Additional action-specific details.
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp of the action.
+
+AuditLogPage:
+  allOf:
+    - $ref: "./moderation.yaml#/AuditLogEntry"
+    - $ref: "./common.yaml#/Pagination"

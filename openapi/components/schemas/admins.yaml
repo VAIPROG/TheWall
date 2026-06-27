@@ -1,0 +1,313 @@
+ServerConfig:
+  type: object
+  required:
+    - maxUsersPerClan
+    - maxTemplatesPerUser
+    - maxApiKeysPerUser
+    - maxFileSizeMb
+    - rateLimitPerMinute
+    - maintenanceMode
+    - featureFlags
+  properties:
+    maxUsersPerClan:
+      type: integer
+      description: Maximum members allowed per clan.
+    maxTemplatesPerUser:
+      type: integer
+      description: Maximum templates a single user can create.
+    maxApiKeysPerUser:
+      type: integer
+      description: Maximum API keys per user.
+    maxFileSizeMb:
+      type: integer
+      description: Maximum upload file size in megabytes.
+    rateLimitPerMinute:
+      type: integer
+      description: Rate limit per user per minute.
+    maintenanceMode:
+      type: boolean
+      description: Whether maintenance mode is enabled.
+    featureFlags:
+      type: object
+      additionalProperties:
+        type: boolean
+      description: Dynamic feature flags — keys are feature names, values are enabled/disabled.
+
+ServerConfigUpdate:
+  type: object
+  properties:
+    maxUsersPerClan:
+      type: integer
+      description: Maximum members allowed per clan.
+    maxTemplatesPerUser:
+      type: integer
+      description: Maximum templates a single user can create.
+    maxApiKeysPerUser:
+      type: integer
+      description: Maximum API keys per user.
+    maxFileSizeMb:
+      type: integer
+      description: Maximum upload file size in megabytes.
+    rateLimitPerMinute:
+      type: integer
+      description: Rate limit per user per minute.
+    maintenanceMode:
+      type: boolean
+      description: Whether maintenance mode is enabled.
+    featureFlags:
+      type: object
+      additionalProperties:
+        type: boolean
+      description: Dynamic feature flags — keys are feature names, values are enabled/disabled.
+
+AdminNote:
+  type: object
+  required:
+    - id
+    - authorId
+    - authorUsername
+    - content
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique note identifier.
+    authorId:
+      type: string
+      format: uuid
+      description: Account UUID of the admin/mod who wrote the note.
+    authorUsername:
+      type: string
+      description: Username of the note author.
+    content:
+      type: string
+      description: Note content.
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp when the note was created.
+
+AdminNoteCreate:
+  type: object
+  required:
+    - content
+  properties:
+    content:
+      type: string
+      minLength: 1
+      maxLength: 2000
+      description: Note content.
+
+AdminUserUpdate:
+  type: object
+  properties:
+    username:
+      type: string
+      description: Updated username.
+    displayName:
+      type: string
+      description: Updated display name.
+    bio:
+      type: string
+      nullable: true
+      description: Updated bio.
+    role:
+      type: string
+      enum:
+        - owner
+        - admin
+        - moderator
+        - member
+      description: Updated global role.
+    lang:
+      type: string
+      description: Updated language preference.
+    telemetryOptIn:
+      type: boolean
+      description: Updated telemetry opt-in preference.
+
+BanRequest:
+  type: object
+  properties:
+    durationMinutes:
+      type: integer
+      nullable: true
+      description: Ban duration in minutes. Null means permanent.
+    reason:
+      type: string
+      maxLength: 1000
+      description: Reason for the ban.
+    wipeContent:
+      type: boolean
+      default: false
+      description: Whether to also wipe the user's content (templates, messages, etc.).
+
+MuteRequest:
+  type: object
+  properties:
+    durationMinutes:
+      type: integer
+      nullable: true
+      description: Mute duration in minutes. Null means permanent.
+    reason:
+      type: string
+      maxLength: 1000
+      description: Reason for the mute.
+
+PromoteRequest:
+  type: object
+  required:
+    - role
+  properties:
+    role:
+      type: string
+      enum:
+        - owner
+        - admin
+        - moderator
+        - member
+      description: Target global role.
+
+ConfirmationRequest:
+  type: object
+  required:
+    - confirm
+  properties:
+    confirm:
+      type: boolean
+      description: Must be true to confirm destructive actions.
+
+ImpersonateRequest:
+  type: object
+  properties:
+    durationMinutes:
+      type: integer
+      default: 60
+      maximum: 240
+      description: Impersonation session duration in minutes (max 4 hours).
+
+MaintenanceStatus:
+  type: object
+  required:
+    - enabled
+  properties:
+    enabled:
+      type: boolean
+      description: Whether maintenance mode is active.
+    reason:
+      type: string
+      nullable: true
+      description: Reason for maintenance.
+    estimatedEndTime:
+      type: string
+      format: date-time
+      nullable: true
+      description: Estimated end time of maintenance.
+
+MaintenanceRequest:
+  type: object
+  required:
+    - enabled
+  properties:
+    enabled:
+      type: boolean
+      description: Enable or disable maintenance mode.
+    reason:
+      type: string
+      nullable: true
+      description: Reason for maintenance.
+    estimatedDurationMinutes:
+      type: integer
+      nullable: true
+      description: Estimated duration in minutes.
+
+BroadcastRequest:
+  type: object
+  required:
+    - message
+  properties:
+    message:
+      type: string
+      minLength: 1
+      maxLength: 2000
+      description: Broadcast message content.
+    targetRole:
+      type: string
+      enum:
+        - all
+        - member
+        - moderator
+        - admin
+      description: Target audience by role. Defaults to "all" if omitted.
+    targetUserIds:
+      type: array
+      items:
+        type: string
+        format: uuid
+      description: Specific account UUIDs to target. Overrides targetRole if provided.
+
+AdminUserView:
+  type: object
+  required:
+    - id
+    - username
+    - displayName
+    - role
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique account identifier (UUID).
+    username:
+      type: string
+      description: Unique username.
+    displayName:
+      type: string
+      description: User-visible display name.
+    bio:
+      type: string
+      nullable: true
+      description: User bio.
+    avatarUrl:
+      type: string
+      nullable: true
+      description: URL to the user's avatar image.
+    role:
+      type: string
+      enum:
+        - owner
+        - admin
+        - moderator
+        - member
+      description: Global server role.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: Primary clan UUID, if any.
+    sessions:
+      type: array
+      items:
+        $ref: "./auth.yaml#/SessionSummary"
+      description: All active sessions for this user.
+    restrictions:
+      type: array
+      items:
+        $ref: "./restrictions.yaml#/RestrictionSet"
+      description: All active restrictions applied to this user.
+    adminNotes:
+      type: array
+      items:
+        $ref: "./admins.yaml#/AdminNote"
+      description: Internal admin/mod notes about this user.
+    createdAt:
+      type: string
+      format: date-time
+      description: Account creation timestamp.
+    updatedAt:
+      type: string
+      format: date-time
+      description: Last profile update timestamp.

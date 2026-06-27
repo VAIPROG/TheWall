@@ -1,0 +1,396 @@
+# ══════════════════════════════════════════════════════════════════════
+# CHATS — Messaging, DM, Modmail
+# ══════════════════════════════════════════════════════════════════════
+
+Chats:
+  get:
+    tags: [Chats]
+    summary: List available chats
+    operationId: listChats
+    description: |
+      Returns all chat rooms/channels accessible to the current
+      user: global chat, clan chats, DM threads.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Available chats.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/chats.yaml#/ChatSummary"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+GlobalChat:
+  get:
+    tags: [Chats]
+    summary: Get global chat info and recent messages
+    operationId: getGlobalChat
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Global chat info.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/ChatDetail"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+GlobalModmail:
+  get:
+    tags: [Chats]
+    summary: Get modmail chat
+    operationId: getModmail
+    description: |
+      Private channel between user and moderation team.
+      Moderators see all threads.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Modmail thread.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/ChatDetail"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+  post:
+    tags: [Chats]
+    summary: Send a modmail message
+    operationId: sendModmail
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/chats.yaml#/MessageCreate"
+    responses:
+      "201":
+        description: Modmail message sent.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/Message"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+ChatById:
+  get:
+    tags: [Chats]
+    summary: Get chat details
+    operationId: getChatById
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Chat details.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/ChatDetail"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ChatMessages:
+  get:
+    tags: [Chats]
+    summary: Get message history
+    operationId: getChatMessages
+    description: |
+      Paginated message history. Supports cursor-based pagination
+      (before/after message ID) and date range filtering.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - name: before
+        in: query
+        schema:
+          type: string
+          format: uuid
+        description: Return messages before this message ID.
+      - name: after
+        in: query
+        schema:
+          type: string
+          format: uuid
+        description: Return messages after this message ID.
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Messages.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/chats.yaml#/Message"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  post:
+    tags: [Chats]
+    summary: Send a message
+    operationId: sendChatMessage
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/chats.yaml#/MessageCreate"
+    responses:
+      "201":
+        description: Message sent.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/Message"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+ChatMessageById:
+  get:
+    tags: [Chats]
+    summary: Get a specific message
+    operationId: getChatMessage
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Message.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/Message"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Chats]
+    summary: Edit a message
+    operationId: editChatMessage
+    description: Only the message author can edit.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/chats.yaml#/MessageEdit"
+    responses:
+      "200":
+        description: Message edited.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/Message"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Chats]
+    summary: Delete a message
+    operationId: deleteChatMessage
+    description: Authors delete own. Moderators delete any.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Message deleted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ChatMessageReport:
+  post:
+    tags: [Chats]
+    summary: Report a message
+    operationId: reportChatMessage
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ReportCreate"
+    responses:
+      "201":
+        description: Report submitted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ChatRead:
+  post:
+    tags: [Chats]
+    summary: Mark chat as read
+    operationId: markChatRead
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/chats.yaml#/ChatReadRequest"
+    responses:
+      "200":
+        description: Chat marked as read.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+DmThread:
+  get:
+    tags: [Chats]
+    summary: Get or create a DM thread
+    operationId: getDmThread
+    description: |
+      Returns the DM thread with the specified user.
+      Creates it if it doesn't exist yet.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: DM thread.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/ChatDetail"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  post:
+    tags: [Chats]
+    summary: Send a direct message
+    operationId: sendDm
+    description: |
+      Sends a message in the DM thread. Creates the thread if it
+      doesn't exist. Target must not have sender blocked.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/chats.yaml#/MessageCreate"
+    responses:
+      "201":
+        description: DM sent.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/Message"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"

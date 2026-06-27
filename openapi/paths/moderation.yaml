@@ -1,0 +1,271 @@
+# ══════════════════════════════════════════════════════════════════════
+# MODERATION — Reports, Queue, Audit
+# ══════════════════════════════════════════════════════════════════════
+
+ModerationReports:
+  get:
+    tags: [Moderation]
+    summary: List reports
+    operationId: listReports
+    description: |
+      Paginated list of reports. Filterable by status, type,
+      and date range. Moderator+ only.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [open, reviewing, resolved, dismissed]
+      - name: type
+        in: query
+        schema:
+          type: string
+          enum: [template, message, user, clan]
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Reports.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/moderation.yaml#/ReportPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+ModerationReportById:
+  get:
+    tags: [Moderation]
+    summary: Get report details
+    operationId: getReport
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ReportIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Report details.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/moderation.yaml#/Report"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Moderation]
+    summary: Update report status
+    operationId: updateReport
+    description: Assign moderator, change status, or add notes.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ReportIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ReportUpdate"
+    responses:
+      "200":
+        description: Report updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/moderation.yaml#/Report"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ModerationReportResolve:
+  post:
+    tags: [Moderation]
+    summary: Resolve a report
+    operationId: resolveReport
+    description: |
+      Marks as resolved with a resolution action.
+      Optionally creates a restriction as part of resolution.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ReportIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ReportResolve"
+    responses:
+      "200":
+        description: Report resolved.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/moderation.yaml#/Report"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ModerationReportDismiss:
+  post:
+    tags: [Moderation]
+    summary: Dismiss a report
+    operationId: dismissReport
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ReportIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ReportDismiss"
+    responses:
+      "200":
+        description: Report dismissed.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/moderation.yaml#/Report"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ModerationQueue:
+  get:
+    tags: [Moderation]
+    summary: Template approval queue
+    operationId: getModQueue
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Pending templates.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/TemplatePage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+ModerationQueueApprove:
+  post:
+    tags: [Moderation]
+    summary: Approve a template
+    operationId: approveTemplate
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ModAction"
+    responses:
+      "200":
+        description: Template approved.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/Template"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ModerationQueueReject:
+  post:
+    tags: [Moderation]
+    summary: Reject a template
+    operationId: rejectTemplate
+    description: Rejects with reason. Author is notified.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ModAction"
+    responses:
+      "200":
+        description: Template rejected.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/Template"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ModerationAuditLog:
+  get:
+    tags: [Moderation]
+    summary: Moderation audit log
+    operationId: getModAuditLog
+    description: |
+      Log of all moderation actions. Distinct from admin audit log.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Moderation audit log.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/moderation.yaml#/AuditLogPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"

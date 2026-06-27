@@ -1,0 +1,252 @@
+# ══════════════════════════════════════════════════════════════════════
+# ADMINS — System Operations (config, maintenance, audit, shutdown)
+# ══════════════════════════════════════════════════════════════════════
+
+AdminConfig:
+  get:
+    tags: [Admins]
+    summary: Get server configuration
+    operationId: adminGetConfig
+    description: |
+      Returns the current server configuration including limits,
+      feature flags, and runtime settings.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Server configuration.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/admins.yaml#/ServerConfig"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+  patch:
+    tags: [Admins]
+    summary: Update server configuration
+    operationId: adminUpdateConfig
+    description: |
+      Partially updates server configuration. Changes take effect
+      immediately or after the next request cycle. All changes are
+      logged in the audit trail.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/ServerConfigUpdate"
+    responses:
+      "200":
+        description: Configuration updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/admins.yaml#/ServerConfig"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminMaintenance:
+  get:
+    tags: [Admins]
+    summary: Get maintenance status
+    operationId: adminGetMaintenance
+    description: |
+      Returns whether the server is in maintenance mode,
+      the reason, and estimated end time.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Maintenance status.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/admins.yaml#/MaintenanceStatus"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+  post:
+    tags: [Admins]
+    summary: Enable or disable maintenance mode
+    operationId: adminSetMaintenance
+    description: |
+      When enabled, all non-admin requests receive
+      `503 Service Unavailable`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/MaintenanceRequest"
+    responses:
+      "200":
+        description: Maintenance mode updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/admins.yaml#/MaintenanceStatus"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminAuditLog:
+  get:
+    tags: [Admins]
+    summary: Query the admin audit log
+    operationId: adminGetAuditLog
+    description: |
+      Paginated, filterable log of all administrative actions.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Audit log entries.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/moderation.yaml#/AuditLogPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminShutdown:
+  post:
+    tags: [Admins]
+    summary: Graceful server shutdown
+    operationId: adminShutdown
+    description: |
+      Initiates a graceful shutdown. **Owner only.**
+      Requires confirmation in the request body.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/ConfirmationRequest"
+    responses:
+      "200":
+        description: Shutdown initiated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminRestart:
+  post:
+    tags: [Admins]
+    summary: Graceful server restart
+    operationId: adminRestart
+    description: |
+      Initiates a graceful restart cycle. **Owner only.**
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/ConfirmationRequest"
+    responses:
+      "200":
+        description: Restart initiated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminMetrics:
+  get:
+    tags: [Admins]
+    summary: Server metrics (Prometheus-compatible)
+    operationId: adminGetMetrics
+    description: |
+      Returns server performance metrics. Supports Prometheus
+      exposition format or JSON depending on `Accept` header.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Server metrics.
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminBroadcast:
+  post:
+    tags: [Admins]
+    summary: Send a broadcast notification
+    operationId: adminBroadcast
+    description: |
+      Sends a notification to all users or a filtered subset.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/BroadcastRequest"
+    responses:
+      "200":
+        description: Broadcast sent.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"

@@ -1,0 +1,774 @@
+# ══════════════════════════════════════════════════════════════════════
+# USERS — Profiles, Settings, Identity
+# ══════════════════════════════════════════════════════════════════════
+
+UsersMe:
+  get:
+    tags: [Users]
+    summary: Get current user profile
+    operationId: getMe
+    description: |
+      Returns the full profile of the authenticated user including
+      private fields.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Current user profile.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/UserSelf"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+  patch:
+    tags: [Users]
+    summary: Update current user profile
+    operationId: updateMe
+    description: |
+      Partially updates profile. Updatable: `displayName`, `username`,
+      `bio`, `lang`, `telemetryOptIn`. Username changes may be
+      rate-limited.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/users.yaml#/UserUpdate"
+    responses:
+      "200":
+        description: Profile updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/UserSelf"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+      "422":
+        $ref: "../components/responses/common.yaml#/UnprocessableEntity"
+  delete:
+    tags: [Users]
+    summary: Delete own account
+    operationId: deleteMe
+    description: |
+      Permanently deletes the account and all associated data.
+      Requires confirmation in the request body. Cannot be undone.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/ConfirmationRequest"
+    responses:
+      "200":
+        description: Account deleted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+UsersMeAvatar:
+  get:
+    tags: [Users]
+    summary: Get own avatar image
+    operationId: getMyAvatar
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Avatar image.
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  put:
+    tags: [Users]
+    summary: Upload or replace avatar
+    operationId: uploadMyAvatar
+    description: |
+      Accepts PNG, JPEG, WebP, or GIF. Server may resize and optimize.
+      Maximum file size is configurable (default 2 MB).
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [file]
+            properties:
+              file:
+                type: string
+                format: binary
+    responses:
+      "200":
+        description: Avatar uploaded.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "413":
+        description: File too large.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/ErrorResponse"
+  delete:
+    tags: [Users]
+    summary: Remove custom avatar
+    operationId: deleteMyAvatar
+    description: Reverts to default generated avatar.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Avatar removed.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+UsersMeSocials:
+  get:
+    tags: [Users]
+    summary: List all linked social accounts
+    operationId: getMySocials
+    description: |
+      Returns all social connections including private ones.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Social accounts list.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/users.yaml#/SocialAccount"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+  post:
+    tags: [Users]
+    summary: Link a new social account
+    operationId: addMySocial
+    description: |
+      Initiates linking a new social provider. May redirect to
+      an OAuth flow or accept direct verification data.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/users.yaml#/SocialAccountLink"
+    responses:
+      "201":
+        description: Social account linked.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/SocialAccount"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+
+UsersMeSocialById:
+  get:
+    tags: [Users]
+    summary: Get a specific social connection
+    operationId: getMySocialById
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ConnectionIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Social connection details.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/SocialAccount"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Users]
+    summary: Update social connection settings
+    operationId: updateMySocial
+    description: Update visibility (`isPublic`) or other settings.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ConnectionIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/users.yaml#/SocialAccountUpdate"
+    responses:
+      "200":
+        description: Social connection updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/SocialAccount"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Users]
+    summary: Unlink a social account
+    operationId: deleteMySocial
+    description: |
+      Removes the connection. If this is the only login method,
+      the server MAY reject to prevent account lockout.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ConnectionIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Social account unlinked.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+
+UsersMeKeys:
+  get:
+    tags: [Users]
+    summary: List API keys
+    operationId: getMyApiKeys
+    description: |
+      Returns metadata for all API keys. Actual key value is only
+      shown at creation time.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: API keys list.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/users.yaml#/ApiKeyMeta"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+  post:
+    tags: [Users]
+    summary: Create a new API key
+    operationId: createMyApiKey
+    description: |
+      Generates a new API key. The full key is returned **only in
+      this response**.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/users.yaml#/ApiKeyCreate"
+    responses:
+      "201":
+        description: API key created.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/ApiKeyCreated"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+UsersMeKeysById:
+  get:
+    tags: [Users]
+    summary: Get API key metadata
+    operationId: getMyApiKeyById
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/KeyIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: API key metadata.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/ApiKeyMeta"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  patch:
+    tags: [Users]
+    summary: Update API key metadata
+    operationId: updateMyApiKey
+    description: Update the key's display name or permissions scope.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/KeyIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/users.yaml#/ApiKeyUpdate"
+    responses:
+      "200":
+        description: API key updated.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/ApiKeyMeta"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Users]
+    summary: Revoke an API key
+    operationId: deleteMyApiKey
+    description: Permanently invalidates the API key.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/KeyIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: API key revoked.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UsersMeKeysRequestLimits:
+  post:
+    tags: [Users]
+    summary: Request higher rate limits for an API key
+    operationId: requestHigherKeyLimits
+    description: |
+      Submits a request to increase rate limits for a specific key.
+      Goes to admins for review. Include justification in body.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/KeyIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/users.yaml#/HigherLimitsRequest"
+    responses:
+      "200":
+        description: Request submitted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UsersMeBlockList:
+  get:
+    tags: [Users]
+    summary: Get personal block list
+    operationId: getMyBlockList
+    description: |
+      Returns users blocked by the current user.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Block list.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/users.yaml#/UserPublic"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+UserByRef:
+  get:
+    tags: [Users]
+    summary: Get a user's public profile
+    operationId: getUserByRef
+    description: |
+      Returns the public profile. Accepts numeric user ID or
+      username string. Private fields are omitted.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: User public profile.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/UserPublic"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UserAvatarByRef:
+  get:
+    tags: [Users]
+    summary: Get a user's avatar
+    operationId: getUserAvatar
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    responses:
+      "200":
+        description: Avatar image.
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UserSocialsByRef:
+  get:
+    tags: [Users]
+    summary: Get a user's public social accounts
+    operationId: getUserSocials
+    description: "Returns only connections marked `isPublic: true`."
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Public social accounts.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/users.yaml#/SocialAccountPublic"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UserBlock:
+  post:
+    tags: [Users]
+    summary: Block a user
+    operationId: blockUser
+    description: |
+      Adds target to your block list. Their messages and templates
+      will no longer appear. They are NOT notified.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: User blocked.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UserUnblock:
+  post:
+    tags: [Users]
+    summary: Unblock a user
+    operationId: unblockUser
+    description: Removes user from your block list.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: User unblocked.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UserTemplatesByRef:
+  get:
+    tags: [Users]
+    summary: Get a user's public templates
+    operationId: getUserTemplates
+    description: Paginated list of public templates by the user.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+      - $ref: "../components/parameters/common.yaml#/PageParam"
+      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: User's public templates.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/TemplatePage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+UsersMeSiteIdentities:
+  get:
+    tags: [Users]
+    summary: List linked site identities
+    operationId: getMySiteIdentities
+    description: |
+      Returns all pixel-platform site identities linked to the current account.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Site identities list.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/auth.yaml#/SiteIdentity"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+UsersMeSiteIdentityBySite:
+  delete:
+    tags: [Users]
+    summary: Unlink a site identity
+    operationId: unlinkMySiteIdentity
+    description: |
+      Removes the SiteIdentity for the given `site` from the current account.
+
+      **Guard:** if this is the last remaining login factor across all
+      SiteIdentities AND SocialLinks, the server returns `409 Conflict`
+      (`LAST_LOGIN_FACTOR`) to prevent account lockout. Link another provider
+      before unlinking.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: site
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Platform registry id of the site identity to remove.
+    security:
+      - BearerAuth: []
+    responses:
+      "200":
+        description: Site identity unlinked.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+
+UsersMeMerge:
+  post:
+    tags: [Users]
+    summary: Merge account B into the current account (A)
+    operationId: mergeIntoMe
+    description: |
+      Folds account **B** into the authenticated account **A**.
+      Requires a `mergeToken` minted by `POST /auth/merge/initiate`
+      while authenticated as B.
+
+      **Effects:**
+      - B's SiteIdentities are re-parented onto A. If A and B both hold an
+        identity on the **same** site → `409 MERGE_SITE_CONFLICT`.
+      - B's SocialLinks are unioned (deduplicated by provider/uid).
+      - B's templates have `author.id` rewritten to A.
+      - B's API keys are **revoked** (not transferred).
+      - B is tombstoned; a UUID alias row (B→A) is kept for 90 days.
+
+      **Irreversible** after the tombstone grace window. Explicit confirmation
+      is built into the merge token (callers must have minted it knowingly).
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/auth.yaml#/MergeRequest"
+    responses:
+      "200":
+        description: Merge completed successfully.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/MergeResult"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+UsersMeRecoveryPhrase:
+  post:
+    tags: [Users]
+    summary: Generate or rotate mnemonic recovery phrase
+    operationId: generateMyRecoveryPhrase
+    description: |
+      Generates (or rotates) an 8-word BIP-39-style mnemonic recovery phrase
+      for the current account. The phrase is returned **once** in this
+      response — it cannot be retrieved again.
+
+      The server stores only a salted argon2id hash of the normalised phrase.
+      The phrase can be used at `POST /auth/recover` to obtain a recovery
+      session when all other login factors are unavailable.
+
+      Calling this endpoint rotates the phrase, invalidating any previous one.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    responses:
+      "200":
+        description: Recovery phrase generated (shown once).
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/RecoveryPhraseResponse"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
