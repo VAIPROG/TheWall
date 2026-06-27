@@ -277,7 +277,7 @@ export function getOverlayAnimRuntime(): AnimRuntime | null {
  *  loaded overlay source. Accepts either format; repositioning to the
  *  template's x/y is the caller's job — this only drives frame selection and
  *  rebuild cadence. */
-export function setOverlayAnimation(src: AnimSource | null): void {
+export function setOverlayAnimation(src: AnimSource | null, render = true): void {
   _animSrc = src;
   _animRt =
     src === null
@@ -302,7 +302,7 @@ export function setOverlayAnimation(src: AnimSource | null): void {
     _animRt = null;
     log.info("OVERLAY_ANIM", "animation off");
   }
-  if (overlayData.srcOrig) renderOverlay(true);
+  if (render && overlayData.srcOrig) renderOverlay(true);
   emitOverlayChanged();
 }
 
@@ -715,7 +715,7 @@ function readLiveRegion(
   }
 }
 
-export function setOverlayImage(src: string, w: number, h: number): void {
+export function setOverlayImage(src: string, w: number, h: number, render = true): void {
   overlayData.srcOrig = src;
   overlayData.origW = w;
   overlayData.origH = h;
@@ -726,13 +726,15 @@ export function setOverlayImage(src: string, w: number, h: number): void {
   _cachedTemplateW = 0;
   _cachedTemplateH = 0;
   // A fresh upload is static until the caller explicitly re-enables animation
-  // (setOverlayAnimation) — otherwise a stale sheet config would slice it.
-  if (_animRt) setOverlayAnimation(null);
-  if (overlayImg) {
-    overlayImg.src = src;
-    overlayImg.style.display = "block";
-  }
-  renderOverlay(true);
+  // (setOverlayAnimation) — otherwise a stale sheet config would slice it. Never
+  // render from this internal clear; the render below (or the caller) covers it.
+  if (_animRt) setOverlayAnimation(null, false);
+  // NB: do NOT point overlayImg at the raw `src` here — that decodes/paints the
+  // full un-quantised image (the WHOLE sprite sheet for animations) just to be
+  // replaced milliseconds later by the quantised render. renderDiffOnly sets
+  // overlayImg.src to the finished result.
+  if (overlayImg) overlayImg.style.display = "block";
+  if (render) renderOverlay(true);
   emitOverlayChanged();
 }
 

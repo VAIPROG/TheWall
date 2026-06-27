@@ -20,6 +20,7 @@ import {
   setOverlayImage,
   setOverlayPos,
   setOverlayAnimation,
+  renderOverlay,
   type AnimSource,
 } from "./overlay";
 import { quantizeImageData } from "./palette";
@@ -81,9 +82,16 @@ export async function insertTemplate(spec: TemplateInsert): Promise<{ w: number;
     cfg.overlayScale = Math.max(0.05, Math.min(10, spec.scale));
     saveCfg();
   }
-  setOverlayImage(src, w, h); // clears any prior animation; triggers a render
+  // Set image + position + animation state WITHOUT rendering each step, then
+  // render exactly ONCE. Previously each setter ran its own full
+  // rasterise→quantise→PNG-encode (2–3 per insert), and for animated sheets the
+  // first render fired before the frame runtime existed — rasterising the ENTIRE
+  // sprite sheet only to discard it. That redundant, area-scaled main-thread work
+  // was the load-time freeze on large/animated (esp. Charity) templates.
+  setOverlayImage(src, w, h, false);
   setOverlayPos(spec.x, spec.y);
-  setOverlayAnimation(spec.animation ?? null);
+  setOverlayAnimation(spec.animation ?? null, false);
+  renderOverlay(true);
 
   log.ok(
     "INSERT",
