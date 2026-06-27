@@ -1,3 +1,37 @@
+ClanLockableField:
+  type: string
+  description: A presentation field on a clan that a global moderator can lock, preventing clan-level roles from modifying it.
+  enum:
+    - avatar
+    - banner
+    - description
+    - tag
+    - discoverable
+
+ClanModerationState:
+  type: object
+  description: Global-moderation lock state applied to this clan. Present when the clan has been actioned by a global moderator.
+  properties:
+    lockedFields:
+      type: array
+      description: Fields currently locked by global moderation. Clan-level roles cannot modify these fields until a global moderator unlocks them.
+      items:
+        $ref: "#/ClanLockableField"
+    lockedBy:
+      type: string
+      format: uuid
+      nullable: true
+      description: Account UUID of the global moderator who applied the lock, or null if no lock is active.
+    lockedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the lock was applied, or null if no lock is active.
+    reason:
+      type: string
+      nullable: true
+      description: Moderator-supplied reason for the lock, surfaced to clan leadership.
+
 Clan:
   type: object
   required:
@@ -108,6 +142,15 @@ Clan:
       $ref: "#/ClanViewerContext"
       nullable: true
       description: Caller's relationship to this clan. Null when unauthenticated or not a member.
+    moderation:
+      $ref: "#/ClanModerationState"
+      nullable: true
+      readOnly: true
+      description: |
+        Global-moderation state for this clan. Null when no moderation action has been applied.
+        Clients must check `moderation.lockedFields` and disable editing of those fields for
+        clan-level roles; only a global moderator+ can unlock them via
+        `POST /moderation/clans/{clanId}/unlock`.
 
 ClanCreate:
   type: object

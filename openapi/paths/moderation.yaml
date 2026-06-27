@@ -269,3 +269,91 @@ ModerationAuditLog:
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "403":
         $ref: "../components/responses/common.yaml#/Forbidden"
+
+ClanTakedown:
+  post:
+    tags: [Moderation]
+    summary: Takedown clan presentation fields
+    operationId: clanTakedown
+    description: |
+      Strips (and optionally locks) one or more presentation fields on the
+      specified clan. Requires global `moderator` role or higher.
+
+      The action never deletes the clan — it only clears and/or locks the
+      specified `ClanLockableField` values so that clan-level roles cannot
+      restore them. When `action` is `strip_and_lock` (default), the fields
+      are recorded in `Clan.moderation.lockedFields` and the `423 Locked`
+      response is returned to clan-level update attempts until unlocked via
+      `POST /moderation/clans/{clanId}/unlock`.
+
+      The action and reason are recorded in the moderation audit log.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ClanTakedownRequest"
+    responses:
+      "200":
+        description: Takedown applied. Returns the updated clan.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/Clan"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+ClanUnlock:
+  post:
+    tags: [Moderation]
+    summary: Unlock clan presentation fields
+    operationId: clanUnlock
+    description: |
+      Removes a global-moderation field lock from the specified clan, allowing
+      clan-level roles to modify those fields again. Requires global `moderator`
+      role or higher.
+
+      Only fields currently listed in `Clan.moderation.lockedFields` are affected;
+      unlisting a field that is not locked is a no-op. The action and reason are
+      recorded in the moderation audit log.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/moderation.yaml#/ClanUnlockRequest"
+    responses:
+      "200":
+        description: Lock released. Returns the updated clan.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/Clan"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"

@@ -491,6 +491,12 @@ paths:
   /moderation/audit-log:
     $ref: "./paths/moderation.yaml#/ModerationAuditLog"
 
+  /moderation/clans/{clanId}/takedown:
+    $ref: "./paths/moderation.yaml#/ClanTakedown"
+
+  /moderation/clans/{clanId}/unlock:
+    $ref: "./paths/moderation.yaml#/ClanUnlock"
+
   # ════════════════════════════════════════════════════════════════════
   # TELEMETRY
   # ════════════════════════════════════════════════════════════════════

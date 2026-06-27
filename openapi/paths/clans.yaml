@@ -108,6 +108,10 @@ ClanById:
     description: |
       Updates clan name, description, avatar, or other public fields.
       Requires clan `owner` or `admin` role.
+
+      Fields listed in `Clan.moderation.lockedFields` cannot be changed by
+      clan-level roles — attempts return `423 Locked`. Only a global moderator
+      or higher can release locks via `POST /moderation/clans/{clanId}/unlock`.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/ClanIdPath"
@@ -135,6 +139,8 @@ ClanById:
         $ref: "../components/responses/common.yaml#/Forbidden"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
+      "423":
+        $ref: "../components/responses/common.yaml#/Locked"
 
 ClanMembers:
   get:
@@ -457,6 +463,13 @@ ClanSettings:
     tags: [Clans]
     summary: Update clan settings
     operationId: updateClanSettings
+    description: |
+      Updates clan configuration settings. Requires clan `owner` or `admin` role.
+
+      Settings that correspond to fields listed in `Clan.moderation.lockedFields`
+      (e.g. `discoverable`) cannot be changed by clan-level roles — attempts
+      return `423 Locked`. Only a global moderator or higher can release locks via
+      `POST /moderation/clans/{clanId}/unlock`.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/ClanIdPath"
@@ -482,6 +495,8 @@ ClanSettings:
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "403":
         $ref: "../components/responses/common.yaml#/Forbidden"
+      "423":
+        $ref: "../components/responses/common.yaml#/Locked"
 
 ClanApplyRole:
   post:

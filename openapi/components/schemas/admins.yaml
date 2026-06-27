@@ -1,3 +1,44 @@
+GlobalPermission:
+  type: string
+  description: |
+    A single global capability that can be held by an account.
+
+    Role → permission mapping (each role is a strict superset of all roles below it):
+
+    - **member** — no elevated permissions; baseline authenticated access only.
+    - **moderator** — `review_reports`, `manage_mod_queue`, `apply_restrictions`,
+      `view_audit_log`, `moderate_clans`.
+    - **admin** — all moderator permissions, plus: `manage_users`, `ban_users`,
+      `mute_users`, `broadcast`, `impersonate`, `read_server_config`,
+      `view_metrics`, `disband_clan`.
+    - **owner** — all admin permissions, plus: `write_server_config`, `maintenance`,
+      `shutdown`, `restart`, `promote_to_admin_or_owner`, `wipeout`,
+      `transfer_ownership`.
+
+    Hierarchy rule: a role may only act on strictly-lower roles.
+    Only `owner` may assign or demote `admin` or `owner` roles.
+  enum:
+    - review_reports
+    - manage_mod_queue
+    - apply_restrictions
+    - view_audit_log
+    - moderate_clans
+    - manage_users
+    - ban_users
+    - mute_users
+    - broadcast
+    - impersonate
+    - read_server_config
+    - view_metrics
+    - disband_clan
+    - write_server_config
+    - maintenance
+    - shutdown
+    - restart
+    - promote_to_admin_or_owner
+    - wipeout
+    - transfer_ownership
+
 ServerConfig:
   type: object
   required:
@@ -303,6 +344,15 @@ AdminUserView:
       items:
         $ref: "./admins.yaml#/AdminNote"
       description: Internal admin/mod notes about this user.
+    effectivePermissions:
+      type: array
+      readOnly: true
+      description: |
+        The full set of global capabilities currently granted to this account
+        by its role. Derived server-side; clients should use this list to gate
+        admin UI affordances rather than inferring from `role` alone.
+      items:
+        $ref: "./admins.yaml#/GlobalPermission"
     createdAt:
       type: string
       format: date-time
