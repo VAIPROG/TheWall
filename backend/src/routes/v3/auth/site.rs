@@ -2,17 +2,13 @@ use axum::{
     extract::{Json, State},
     http::{HeaderMap, StatusCode},
 };
-use chrono::Utc;
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
     AppState,
-    auth::{AuthUser, hash_token, issue_session_pair, verify_token},
-    models::{
-        AccountPublic, ProviderLink, Session, SiteIdentity, User, V3AuthResponse, V3AuthSiteRequest,
-        V3RefreshRequest,
-    },
+    auth::{issue_session_pair, verify_token},
+    models::{User, V3AuthResponse, V3AuthSiteRequest},
 };
 
 // ---------------------------------------------------------------------------
@@ -23,29 +19,6 @@ use crate::{
 struct SiteUser {
     id: i64,
     username: String,
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-fn account_public(user: &User) -> AccountPublic {
-    AccountPublic {
-        id: user.id,
-        username: user.username.clone(),
-        display_name: None,
-        role: user.global_role.clone(),
-    }
-}
-
-fn v3_response(access_token: String, refresh_token: String, user: &User) -> V3AuthResponse {
-    V3AuthResponse {
-        access_token,
-        refresh_token,
-        expires_in: 86400,
-        token_type: "Bearer".into(),
-        user: account_public(user),
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -205,116 +178,5 @@ pub async fn site(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // 8. Return V3AuthResponse.
-    Ok(Json(v3_response(access, refresh, &user)))
-}
-
-// ---------------------------------------------------------------------------
-// GET /api/v3/auth/session — current account + identities + providers
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SessionInfo {
-    pub user: AccountPublic,
-    pub site_identities: Vec<SiteIdentity>,
-    pub providers: Vec<ProviderLink>,
-}
-
-pub async fn session(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> Result<Json<SessionInfo>, StatusCode> {
-    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
-        .bind(auth.user_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    let site_identities = sqlx::query_as::<_, SiteIdentity>(
-        "SELECT * FROM site_identities WHERE account_id = $1 ORDER BY linked_at",
-    )
-    .bind(auth.user_id)
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let providers = sqlx::query_as::<_, ProviderLink>(
-        "SELECT * FROM provider_links WHERE account_id = $1 ORDER BY linked_at",
-    )
-    .bind(auth.user_id)
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(Json(SessionInfo {
-        user: account_public(&user),
-        site_identities,
-        providers,
-    }))
-}
-
-// ---------------------------------------------------------------------------
-// POST /api/v3/auth/refresh
-// ---------------------------------------------------------------------------
-
-pub async fn refresh(
-    State(state): State<AppState>,
-    Json(body): Json<V3RefreshRequest>,
-) -> Result<Json<V3AuthResponse>, StatusCode> {
-    let refresh_hash = hash_token(&body.refresh_token);
-    let now = Utc::now();
-
-    let session = sqlx::query_as::<_, Session>(
-        "SELECT * FROM sessions WHERE refresh_hash = $1 AND expires_at > $2 LIMIT 1",
-    )
-    .bind(&refresh_hash)
-    .bind(now)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
-        .bind(session.user_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    // Delete old session.
-    sqlx::query("DELETE FROM sessions WHERE id = $1")
-        .bind(session.id)
-        .execute(&state.pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    // Issue new session pair.
-    let (access, new_refresh) = issue_session_pair(&state.pool, &state.jwt_secret, user.id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(Json(v3_response(access, new_refresh, &user)))
-}
-
-// ---------------------------------------------------------------------------
-// POST /api/v3/auth/logout
-// ---------------------------------------------------------------------------
-//
-// NOTE (slice 1 simplification): deletes ALL sessions for the user — i.e.,
-// logs out everywhere. A future slice can narrow this to delete only the
-// session matching the Bearer token's hash.
-
-pub async fn logout(
-    State(state): State<AppState>,
-    auth: AuthUser,
-    _headers: HeaderMap,
-) -> Result<StatusCode, StatusCode> {
-    sqlx::query("DELETE FROM sessions WHERE user_id = $1")
-        .bind(auth.user_id)
-        .execute(&state.pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(super::v3_response(access, refresh, &user)))
 }
