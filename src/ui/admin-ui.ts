@@ -1,10 +1,10 @@
-import { Backend, getMe } from "./backend";
-import { $, esc, errMsg } from "./helpers";
-import { ic } from "./icons";
-import { log } from "./log";
-import { toast } from "./notify";
-import { confirmDlg, errorDlg, openDialog, promptDlg } from "./dialog";
-import { isWalldevDark } from "./theme";
+import { Backend, getMe } from "../backend";
+import { $, esc, errMsg } from "../helpers";
+import { ic } from "../icons";
+import { log } from "../log";
+import { toast } from "../notify";
+import { confirmDlg, errorDlg, openDialog, promptDlg } from "../dialog";
+import { isWalldevDark } from "../theme";
 
 /** Global roles in V2: user / admin / owner. */
 const GLOBAL_ROLES = ["user", "admin", "owner"] as const;

@@ -16,7 +16,7 @@ import { getCached, setCached } from "./cache";
 import { ANNOUNCEMENT_POLL_MS, CACHE_TTL_TEMPLATES_MS } from "./constants";
 import { applyCursorMode } from "./cursors";
 import { importShare } from "./share";
-import { updateAdminVisibility } from "./admin-ui";
+import { updateAdminVisibility } from "./ui/admin-ui";
 
 function roleBadge(role: string | undefined): string {
   const r = String(role || "member").toLowerCase();

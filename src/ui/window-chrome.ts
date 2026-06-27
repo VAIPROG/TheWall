@@ -22,7 +22,7 @@ import {
   loadModApps,
   loadAdminTemplates,
   loadAdminNotifs,
-} from "../admin-ui";
+} from "./admin-ui";
 import { loadAchievementList } from "./achievements-tab";
 
 export function wireWindowChrome(win: HTMLElement): void {

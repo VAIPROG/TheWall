@@ -11,7 +11,7 @@ import {
   loadAdminTemplates,
   loadAdminNotifs,
   broadcastNotification,
-} from "../admin-ui";
+} from "./admin-ui";
 import {
   listCatalogue,
   adminGrant,
