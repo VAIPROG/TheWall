@@ -804,6 +804,14 @@ async fn main() {
             "/api/v2/admin/config/{key}",
             put(routes::v2::admin_config::update_config),
         )
+        /* ════════════════════════════ V3 API ══════════════════════════════
+         * Split identity model: users = Account, site_identities + provider_links
+         * hold per-platform connections. */
+        // --- auth: site attach-or-create, session info, refresh, logout ----
+        .route("/api/v3/auth/site", post(routes::v3::auth::site))
+        .route("/api/v3/auth/session", get(routes::v3::auth::session))
+        .route("/api/v3/auth/refresh", post(routes::v3::auth::refresh))
+        .route("/api/v3/auth/logout", post(routes::v3::auth::logout))
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(TraceLayer::new_for_http())
         .with_state(state);

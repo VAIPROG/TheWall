@@ -144,3 +144,73 @@ pub struct ModApplyRequest {
 pub struct ChatRelayRequest {
     pub markdown: String,
 }
+
+// ---------------------------------------------------------------------------
+// V3 identity models
+// ---------------------------------------------------------------------------
+
+/// One row from `site_identities` — a per-site connection for an account.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct SiteIdentity {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub source: String,
+    pub external_id: String,
+    pub site_username: Option<String>,
+    pub linked_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+}
+
+/// One row from `provider_links` — an OAuth provider connection.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderLink {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub provider: String,
+    pub provider_uid: String,
+    pub username: Option<String>,
+    pub is_verified: bool,
+    pub is_public: bool,
+    pub linked_at: DateTime<Utc>,
+}
+
+// ---------------------------------------------------------------------------
+// V3 API request / response types
+// ---------------------------------------------------------------------------
+
+/// POST /api/v3/auth/site — attach-or-create via filianislost site token.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V3AuthSiteRequest {
+    pub site: String,
+    pub token: String,
+}
+
+/// Public account projection returned in V3 responses.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountPublic {
+    pub id: Uuid,
+    pub username: String,
+    pub display_name: Option<String>,
+    pub role: String,
+}
+
+/// V3 auth response (JWT pair + account info).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V3AuthResponse {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: i64,
+    pub token_type: String,
+    pub user: AccountPublic,
+}
+
+/// POST /api/v3/auth/refresh
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V3RefreshRequest {
+    pub refresh_token: String,
+}
