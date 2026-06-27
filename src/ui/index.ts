@@ -6,3 +6,69 @@ export { wireSettings } from "./settings-tab";
 export { wireShare } from "./share-tab";
 export { wireTemplates } from "./templates-tab";
 export * from "./paint";
+export { wireWindowChrome } from "./window-chrome";
+export { loadAchievementList } from "./achievements-tab";
+
+import { wireAnimAndProtect } from "../anim-protect-wire";
+import { wireLinks } from "../links-wire";
+import { wireWindowChrome } from "./window-chrome";
+import { wireOverlay } from "./overlay-tab";
+import { wireShare } from "./share-tab";
+import { wireTemplates } from "./templates-tab";
+import { wireProfile } from "./profile-tab";
+import { wireChats } from "./chats";
+import { wireSettings } from "./settings-tab";
+import { wireAdmin } from "./admin";
+import { wireMailUI } from "../mail";
+import { setActiveColor } from "../palette";
+import { downloadWallSnapshot } from "../snapshot";
+import { $ } from "../helpers";
+
+export function wireExtensionUI(win: HTMLElement): void {
+  // Animation + region-protection groups live in their own wiring module.
+  wireAnimAndProtect();
+  wireLinks();
+
+  // Window chrome: tab switching, drag, resize grip, min/close, mail-tab listener
+  wireWindowChrome(win);
+
+  // overlay tab
+  wireOverlay(win);
+  // share tab (import / export wiring)
+  wireShare(win);
+
+  // draw tab
+  win.querySelectorAll(".wp-sw button").forEach((b) =>
+    b.addEventListener("click", () => {
+      setActiveColor((b as HTMLElement).dataset.hex || "");
+      win
+        .querySelectorAll(".wp-sw button")
+        .forEach((x) => x.classList.remove("sel"));
+      b.classList.add("sel");
+    }),
+  );
+
+  // templates tab
+  wireTemplates(win);
+
+  // social tab
+  // Wall snapshot — fetch every tile from ws.filianislost.com/tiles, stitch
+  // onto a brick-background canvas, downscale to chosen quality, download PNG.
+  $("btn-snapshot")!.addEventListener("click", () => {
+    const sel = $("snapshot-quality") as HTMLSelectElement | null;
+    const q = (sel?.value || "high") as "low" | "medium" | "high";
+    downloadWallSnapshot(q);
+  });
+
+  // profile tab
+  wireProfile(win);
+
+  // mail tab
+  wireMailUI();
+  wireChats(win);
+
+  // settings tab
+  wireSettings(win);
+
+  wireAdmin(win);
+}
