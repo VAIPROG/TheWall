@@ -118,11 +118,14 @@ TemplateById:
         $ref: "../components/responses/common.yaml#/NotFound"
   patch:
     tags: [Templates]
-    summary: Update a template
-    operationId: updateTemplate
+    summary: Patch a template
+    operationId: patchTemplate
     description: |
-      Partially updates metadata. Only owner or moderators.
-      Significant changes may re-trigger moderation queue.
+      Flexible partial edit of a stored template. Supports changing scope/clan,
+      patching document-level metadata (notes, contacts, access control,
+      author visibility), and applying layer operations (add, remove, move,
+      update) to document.templates[]. Only owner or moderators. Significant
+      changes may re-trigger the moderation queue.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -134,7 +137,7 @@ TemplateById:
       content:
         application/json:
           schema:
-            $ref: "../components/schemas/templates.yaml#/TemplateUpdate"
+            $ref: "../components/schemas/templates.yaml#/TemplatePatch"
     responses:
       "200":
         description: Template updated.
@@ -228,8 +231,13 @@ TemplateCharity:
     summary: Export template as Charity format
     operationId: getTemplateCharity
     description: |
-      Returns the template in third-party Charity (Bluemarble-style)
-      JSON format for cross-client compatibility.
+      Returns the template derived into the third-party Charity
+      (Bluemarble-style) JSON format for cross-client compatibility.
+      The stored canonical form is always the-wall-dev/2; this response
+      is assembled on demand. Conversion is lossy — some v2 features
+      (per-frame image overrides, access control, contacts) are not
+      expressible in the Charity format. Charity compatibility is
+      permanent and supported indefinitely.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -238,11 +246,11 @@ TemplateCharity:
       - ApiKeyAuth: []
     responses:
       "200":
-        description: Charity format export.
+        description: Charity format derived from the stored v2 document.
         content:
           application/json:
             schema:
-              $ref: "../components/schemas/templates.yaml#/CharityExport"
+              $ref: "../components/schemas/templates.yaml#/CharityConfig"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
@@ -251,11 +259,13 @@ TemplateCharity:
 TemplateWallDev:
   get:
     tags: [Templates]
-    summary: Export template in The Wall Dev Format
+    summary: Get template as native the-wall-dev/2 document
     operationId: getTemplateWallDev
     description: |
-      Returns the template in The Wall Dev Format v2 with full
-      metadata, animation, and inline image data.
+      Returns the stored the-wall-dev/2 document directly. This is the
+      canonical stored form — no conversion is applied. Includes full
+      metadata, animation, access control, contacts, and multi-source
+      image fallback lists.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -264,9 +274,11 @@ TemplateWallDev:
       - ApiKeyAuth: []
     responses:
       "200":
-        description: Wall Dev v2 format export.
+        description: Native the-wall-dev/2 document.
         content:
-          application/json: {}
+          application/json:
+            schema:
+              $ref: "../components/schemas/templates.yaml#/WallDevDocument"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":

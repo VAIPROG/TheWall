@@ -1,32 +1,383 @@
-Template:
+# Mirrors schema/theWallDev/2.json — FROZEN; keep byte-compatible.
+WallDevDocument:
   type: object
   required:
-    - id
+    - format
+    - createdAt
+    - editedAt
+    - templates
+  properties:
+    format:
+      type: string
+      const: "the-wall-dev/2"
+      description: "Format identifier. Must be 'the-wall-dev/2'."
+    createdAt:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp of original creation.
+    editedAt:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp of last modification.
+    author:
+      description: |
+        Author identification. Three modes:
+        1. Full object — structured info with UUID.
+        2. String 'anon' — explicitly anonymous.
+        3. Null — silent anonymous.
+        Clients MUST handle all three.
+      oneOf:
+        - $ref: "#/WallDevAuthor"
+        - type: string
+          const: "anon"
+          description: Explicitly anonymous author.
+        - type: "null"
+          description: No author information.
+    notes:
+      type: array
+      items:
+        type: string
+      description: "Free-form notes. Changelogs, instructions, warnings."
+    contacts:
+      $ref: "#/WallDevContacts"
+    domainsWhitelist:
+      type: array
+      items:
+        type: string
+        format: hostname
+      description: Allowed domains. CLIENT-SIDE enforcement only.
+    usersWhitelist:
+      type: array
+      items:
+        type: string
+        format: uuid
+      description: User IDs ALLOWED to view. BACKEND MUST ENFORCE.
+    usersBlocklist:
+      type: array
+      items:
+        type: string
+        format: uuid
+      description: User IDs BLOCKED from viewing. BACKEND MUST ENFORCE.
+    allowedToEdit:
+      $ref: "#/WallDevAccessControl"
+    templates:
+      type: array
+      minItems: 1
+      description: Template layers. At least one required.
+      items:
+        $ref: "#/WallDevLayer"
+
+WallDevAuthor:
+  type: object
+  description: Structured author information.
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Author's unique identifier.
+    name:
+      type: string
+      description: Human-readable display name.
+    backendUrl:
+      type: string
+      format: uri
+      description: API backend URL. Omit for offline/self-contained files.
+    clanId:
+      type: string
+      format: uuid
+      description: Author's clan UUID.
+    clanName:
+      type: string
+      description: Human-readable clan name.
+
+WallDevContacts:
+  type: object
+  description: Contact information. All fields are arrays — multiple entries per platform.
+  properties:
+    discord:
+      type: array
+      items:
+        type: object
+        required: [type, link]
+        properties:
+          type:
+            type: string
+            enum: [user, guild]
+            description: "'user' = profile/DM. 'guild' = server invite."
+          link:
+            type: string
+            format: uri
+          notes:
+            type: array
+            items:
+              type: string
+    telegram:
+      type: array
+      items:
+        type: object
+        required: [type, link]
+        properties:
+          type:
+            type: string
+            enum: [user, group, channel, bot]
+          link:
+            type: string
+            format: uri
+            description: "Full Telegram URL (e.g. https://t.me/...)."
+          startParam:
+            type: string
+            description: "Deep-link ?start= parameter for bots."
+          notes:
+            type: array
+            items:
+              type: string
+    x:
+      type: array
+      items:
+        type: object
+        required: [link]
+        properties:
+          link:
+            type: string
+            format: uri
+          notes:
+            type: array
+            items:
+              type: string
+    matrix:
+      type: array
+      items:
+        type: object
+        required: [type, link]
+        properties:
+          type:
+            type: string
+            enum: [user, group, bot]
+            description: "'bot' = protocol-level user treated as bot by clients for UI purposes."
+          link:
+            type: string
+            description: Matrix ID or matrix.to URL.
+          notes:
+            type: array
+            items:
+              type: string
+    sites:
+      type: array
+      items:
+        type: object
+        required: [url]
+        properties:
+          url:
+            type: string
+            format: uri
+          notes:
+            type: array
+            items:
+              type: string
+    other:
+      type: array
+      items:
+        type: object
+        required: [label, url]
+        properties:
+          label:
+            type: string
+            description: "Human-readable platform name (e.g. 'Bluesky', 'YouTube')."
+          type:
+            type: string
+            description: Optional machine-readable type hint. Free-form.
+          url:
+            type: string
+            format: uri
+          notes:
+            type: array
+            items:
+              type: string
+
+WallDevAccessControl:
+  type: object
+  description: Edit permissions ACL. BACKEND MUST ENFORCE.
+  properties:
+    userIds:
+      type: array
+      items:
+        type: string
+        format: uuid
+    clanIds:
+      type: array
+      items:
+        type: string
+        format: uuid
+
+WallDevLayer:
+  type: object
+  description: A single template layer (TemplateEntry in the frozen schema).
+  required:
     - name
-    - scope
-    - status
-    - authorId
-    - authorUsername
-    - positionX
-    - positionY
+    - imageSources
+    - x
+    - y
+    - scale
     - width
     - height
-    - scale
-    - imageUrl
+  properties:
+    name:
+      type: string
+      description: Display name of this template layer.
+    description:
+      type: string
+      description: Optional description or instructions.
+    imageSources:
+      type: array
+      minItems: 1
+      items:
+        type: string
+        description: URL or inline data URI pointing to an image.
+      description: "Ordered fallback list. Client tries each in order. Last entry SHOULD be a base64 data URI as offline fallback."
+    x:
+      type: integer
+      description: Horizontal position (px) of top-left corner on canvas.
+    y:
+      type: integer
+      description: Vertical position (px) of top-left corner on canvas.
+    z:
+      type: integer
+      description: Depth position. Reserved for future 3D support.
+    scale:
+      type: number
+      exclusiveMinimum: 0
+      description: Scale multiplier. 1.0 = native.
+    width:
+      type: integer
+      minimum: 1
+      description: Frame width in pixels (before scaling).
+    height:
+      type: integer
+      minimum: 1
+      description: Frame height in pixels (before scaling).
+    animation:
+      $ref: "#/WallDevAnimation"
+
+WallDevAnimation:
+  type: object
+  description: "Sprite-sheet animation descriptor. Absent for static templates. Supports per-frame image replacement via WallDevFrameOverride.imageSources."
+  required:
+    - sheet
+    - timing
+  properties:
+    sheet:
+      type: object
+      description: Physical layout of frames within the sprite-sheet image.
+      required:
+        - frameWidth
+        - frameHeight
+        - frameCount
+        - layout
+        - order
+      properties:
+        frameWidth:
+          type: integer
+          minimum: 1
+          description: Width of each frame (pixels).
+        frameHeight:
+          type: integer
+          minimum: 1
+          description: Height of each frame (pixels).
+        frameCount:
+          type: integer
+          minimum: 1
+          description: Total number of frames in the sheet.
+        layout:
+          type: string
+          enum: [line, grid]
+          description: "'line' = all frames in a single row or column. 'grid' = frames arranged in a 2D grid."
+        order:
+          type: string
+          enum: [row, column, serpentine]
+          description: "'row' = left-to-right, top-to-bottom. 'column' = top-to-bottom, left-to-right. 'serpentine' = alternating direction per row (boustrophedon scan)."
+    timing:
+      type: object
+      description: "Playback timing, sync anchor, and looping."
+      required:
+        - startTime
+        - defaultFrameMs
+        - looping
+      properties:
+        startTime:
+          type: number
+          description: Epoch ms when timeline begins. All clients sync to this absolute time.
+        defaultFrameMs:
+          type: number
+          minimum: 1
+          description: Default per-frame duration (ms).
+        looping:
+          type: boolean
+          description: Restart from frame 0 after last frame.
+        frames:
+          type: array
+          description: "Per-frame overrides. Unlisted frames use defaults and are rendered from the sprite sheet normally."
+          items:
+            $ref: "#/WallDevFrameOverride"
+    scaleMode:
+      type: string
+      enum: [native, scaled]
+      default: native
+      description: "'native' = render at original pixel size (crispy pixel art). 'scaled' = apply template scale to animation frames."
+
+WallDevFrameOverride:
+  type: object
+  description: "Per-frame override. Controls timing, visibility, and optionally replaces the frame image entirely. When imageSources is provided, the client renders that image instead of slicing the sprite sheet at this index."
+  required:
+    - index
+  properties:
+    index:
+      type: integer
+      minimum: 0
+      description: Zero-based frame index in traversal order (as defined by sheet.order).
+    durationMs:
+      type: number
+      minimum: 1
+      description: "Custom display duration (ms). Overrides timing.defaultFrameMs."
+    skip:
+      type: boolean
+      default: false
+      description: "Exclude this frame from playback entirely. When true, imageSources and scale are ignored."
+    imageSources:
+      type: array
+      minItems: 1
+      items:
+        type: string
+        description: URL or inline data URI pointing to an image.
+      description: "Replacement image for this frame. Ordered fallback list — client tries each in order. Last entry SHOULD be a base64 data URI as offline fallback."
+    width:
+      type: integer
+      minimum: 1
+      description: Width of the replacement image in pixels.
+    height:
+      type: integer
+      minimum: 1
+      description: Height of the replacement image in pixels.
+    scale:
+      type: number
+      exclusiveMinimum: 0
+      description: "Scale multiplier for the replacement image relative to the frame slot. 1.0 = render at frameWidth × frameHeight."
+
+Template:
+  type: object
+  description: Server metadata record wrapping an embedded the-wall-dev/2 document.
+  required:
+    - id
+    - scope
+    - status
+    - author
     - createdAt
     - updatedAt
+    - document
   properties:
     id:
       type: string
       format: uuid
       description: Unique template identifier.
-    name:
-      type: string
-      description: Template name.
-    description:
-      type: string
-      nullable: true
-      description: Template description.
     scope:
       type: string
       enum:
@@ -41,48 +392,29 @@ Template:
         - approved
         - rejected
       description: Moderation status.
-    authorId:
-      type: string
-      format: uuid
-      description: Author's account UUID (author.id in the-wall-dev/2 documents).
-    authorUsername:
-      type: string
-      description: Author's username.
+    author:
+      type: object
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Author's account UUID.
+        username:
+          type: string
+          description: Author's username.
     clanId:
       type: string
       format: uuid
       nullable: true
       description: UUID of the clan if scoped to a clan.
-    positionX:
-      type: integer
-      description: X coordinate on the canvas.
-    positionY:
-      type: integer
-      description: Y coordinate on the canvas.
-    width:
-      type: integer
-      description: Width in pixels.
-    height:
-      type: integer
-      description: Height in pixels.
-    scale:
-      type: number
-      format: float
-      default: 1
-      description: Scale factor.
-    imageUrl:
-      type: string
-      format: uri
-      description: URL to the template image.
     previewUrl:
       type: string
-      nullable: true
       format: uri
-      description: URL to a preview image.
-    animationConfig:
-      $ref: "#/AnimationConfig"
       nullable: true
-      description: Animation configuration (if any).
+      description: URL to a rendered preview image.
     isPinnedByUser:
       type: boolean
       nullable: true
@@ -95,58 +427,35 @@ Template:
       type: string
       format: date-time
       description: Last update timestamp.
-
-AnimationConfig:
-  type: object
-  required:
-    - type
-    - loop
-  properties:
-    type:
-      type: string
-      enum:
-        - none
-        - spritesheet
-        - frame_sequence
-      description: Animation type.
-    frameCount:
-      type: integer
-      nullable: true
-      description: Number of frames (for spritesheet).
-    frameWidth:
-      type: integer
-      nullable: true
-      description: Width of each frame (for spritesheet).
-    frameHeight:
-      type: integer
-      nullable: true
-      description: Height of each frame (for spritesheet).
-    frameDurationMs:
-      type: integer
-      nullable: true
-      description: Duration of each frame in milliseconds.
-    loop:
-      type: boolean
-      default: true
-      description: Whether the animation loops.
+    document:
+      $ref: "#/WallDevDocument"
+    bounds:
+      type: object
+      readOnly: true
+      description: "Read-only convenience bounds computed from all layers in document.templates."
+      properties:
+        x:
+          type: integer
+          description: Leftmost x across all layers.
+        y:
+          type: integer
+          description: Topmost y across all layers.
+        w:
+          type: integer
+          description: Total width spanning all layers.
+        h:
+          type: integer
+          description: Total height spanning all layers.
 
 TemplateCreate:
   type: object
+  description: |
+    Submit a new template. The server accepts the-wall-dev/2 (native),
+    the-wall-dev/1 (migrated to v2 on ingest), or charity (assembled into
+    v2 on ingest). The stored canonical form is always the-wall-dev/2.
   required:
-    - name
-    - positionX
-    - positionY
-    - imageUrl
+    - source
   properties:
-    name:
-      type: string
-      minLength: 1
-      maxLength: 128
-      description: Template name.
-    description:
-      type: string
-      maxLength: 1000
-      description: Optional description.
     scope:
       type: string
       enum:
@@ -155,116 +464,204 @@ TemplateCreate:
         - private
       default: public
       description: Visibility scope.
-    positionX:
-      type: integer
-      description: X coordinate.
-    positionY:
-      type: integer
-      description: Y coordinate.
-    scale:
-      type: number
-      format: float
-      default: 1
-      description: Scale factor.
-    imageUrl:
-      type: string
-      format: uri
-      description: URL to the template image.
     clanId:
       type: string
       format: uuid
       nullable: true
       description: UUID of the clan if scoped to a clan.
-    animationConfig:
-      $ref: "#/AnimationConfig"
-      description: Optional animation configuration.
+    source:
+      type: object
+      required:
+        - format
+        - document
+      properties:
+        format:
+          type: string
+          enum:
+            - "the-wall-dev/2"
+            - "the-wall-dev/1"
+            - "charity"
+          description: |
+            Input format. The server normalises any accepted format into a
+            stored the-wall-dev/2 document:
+            - `the-wall-dev/2`: stored as-is.
+            - `the-wall-dev/1`: migrated to v2 on ingest.
+            - `charity`: assembled into v2 on ingest (lossy conversion).
+        document:
+          type: object
+          description: Raw document payload matching the declared format. Validated server-side against the corresponding schema.
 
-TemplateUpdate:
+TemplatePatch:
   type: object
+  description: |
+    Flexible partial edit of a stored template. All fields optional.
+    `doc` patches document-level fields (metadata, access control).
+    `layerOps` applies ordered operations to document.templates[].
+    Significant changes (e.g. new layers, access changes) may re-trigger
+    the moderation queue.
   properties:
-    name:
-      type: string
-      minLength: 1
-      maxLength: 128
-      description: Template name.
-    description:
-      type: string
-      maxLength: 1000
-      nullable: true
-      description: Template description.
     scope:
       type: string
       enum:
         - public
         - clan
         - private
-      default: public
-      description: Visibility scope.
-    positionX:
-      type: integer
-      description: X coordinate.
-    positionY:
-      type: integer
-      description: Y coordinate.
-    scale:
-      type: number
-      format: float
-      default: 1
-      description: Scale factor.
-    imageUrl:
-      type: string
-      format: uri
-      description: URL to the template image.
+      description: Change visibility scope.
     clanId:
       type: string
       format: uuid
       nullable: true
-      description: UUID of the clan if scoped to a clan.
-    animationConfig:
-      $ref: "#/AnimationConfig"
-      nullable: true
-      description: Animation configuration.
+      description: Change the owning clan.
+    doc:
+      type: object
+      description: Partial edit of document-level fields.
+      properties:
+        name:
+          type: string
+          description: Name of the first (or primary) template layer.
+        notes:
+          type: array
+          items:
+            type: string
+          description: Replace document notes array.
+        contacts:
+          $ref: "#/WallDevContacts"
+        access:
+          $ref: "#/WallDevAccessControl"
+        authorVisibility:
+          type: string
+          enum: [full, anon, hidden]
+          description: |
+            Controls how the stored author field is exposed in exports:
+            - `full`: expose complete WallDevAuthor object.
+            - `anon`: store as the string 'anon'.
+            - `hidden`: store as null.
+    layerOps:
+      type: array
+      description: Ordered list of layer operations applied sequentially to document.templates[].
+      items:
+        oneOf:
+          - type: object
+            description: Add a new layer.
+            required: [op, layer]
+            properties:
+              op:
+                type: string
+                const: add
+              layer:
+                $ref: "#/WallDevLayer"
+              atIndex:
+                type: integer
+                minimum: 0
+                description: "Insert position. Omit to append."
+          - type: object
+            description: Remove a layer by index.
+            required: [op, index]
+            properties:
+              op:
+                type: string
+                const: remove
+              index:
+                type: integer
+                minimum: 0
+          - type: object
+            description: Move a layer from one index to another.
+            required: [op, from, to]
+            properties:
+              op:
+                type: string
+                const: move
+              from:
+                type: integer
+                minimum: 0
+              to:
+                type: integer
+                minimum: 0
+          - type: object
+            description: Apply a partial update to a layer at the given index.
+            required: [op, index, patch]
+            properties:
+              op:
+                type: string
+                const: update
+              index:
+                type: integer
+                minimum: 0
+              patch:
+                type: object
+                description: Partial WallDevLayer — only provided fields are updated.
 
 TemplatePage:
   allOf:
     - $ref: "#/Template"
     - $ref: "./common.yaml#/Pagination"
 
-CharityExport:
+CharityEntry:
   type: object
+  description: A single template entry in the Charity (Bluemarble-style) format.
   required:
     - x
     - y
-    - w
-    - h
-    - image
-    - hash
-    - name
   properties:
-    x:
-      type: integer
-      description: X coordinate.
-    y:
-      type: integer
-      description: Y coordinate.
-    w:
-      type: integer
-      description: Width.
-    h:
-      type: integer
-      description: Height.
-    image:
-      type: string
-      description: Image data or URL.
-    hash:
-      type: string
-      description: Content hash.
     name:
       type: string
-      description: Item name.
-    defaced:
-      type: boolean
-      description: Whether the item has been defaced.
-    frames:
+      description: Template name.
+    sources:
       type: array
-      description: Animation frames (if any).
+      items:
+        type: string
+      description: Ordered fallback image URLs.
+    x:
+      type: number
+      description: X coordinate on canvas.
+    y:
+      type: number
+      description: Y coordinate on canvas.
+    frameWidth:
+      type: number
+      nullable: true
+      description: Width of each animation frame (pixels).
+    frameHeight:
+      type: number
+      nullable: true
+      description: Height of each animation frame (pixels).
+    frameCount:
+      type: integer
+      description: Total number of animation frames.
+    secondsPerFrame:
+      type: number
+      description: Duration of each frame in seconds.
+    startTimestamp:
+      type: number
+      description: Epoch timestamp (ms) for animation sync.
+    looping:
+      type: boolean
+      description: Whether the animation loops.
+
+CharityConfig:
+  type: object
+  description: |
+    Charity (Bluemarble-style) template config. Derived on demand from the
+    stored the-wall-dev/2 document. Conversion is lossy — some v2 features
+    (per-frame image overrides, access control, contacts) are not expressible
+    in the Charity format. Charity compatibility is permanent and supported
+    indefinitely.
+  required:
+    - templates
+  properties:
+    faction:
+      type: string
+      description: Faction or group identifier.
+    contact:
+      type: string
+      description: Contact string (URL or handle).
+    templates:
+      type: array
+      items:
+        $ref: "#/CharityEntry"
+      description: Template entries derived from document layers.
+    whitelist:
+      type: array
+      items:
+        type: string
+      description: Optional domain or user whitelist entries.
