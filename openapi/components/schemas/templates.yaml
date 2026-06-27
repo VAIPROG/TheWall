@@ -429,6 +429,9 @@ Template:
       description: Last update timestamp.
     document:
       $ref: "#/WallDevDocument"
+    version:
+      type: integer
+      description: Optimistic concurrency token. Incremented on each update. Pass as `expectedVersion` in TemplatePatch to guard against lost updates.
     bounds:
       type: object
       readOnly: true
@@ -500,6 +503,9 @@ TemplatePatch:
     Significant changes (e.g. new layers, access changes) may re-trigger
     the moderation queue.
   properties:
+    expectedVersion:
+      type: integer
+      description: Optimistic concurrency guard. If provided, the server rejects the patch with 409 Conflict when the stored template version does not match.
     scope:
       type: string
       enum:

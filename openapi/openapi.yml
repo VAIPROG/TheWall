@@ -354,6 +354,12 @@ paths:
   /clans/{clanId}/restrictions:
     $ref: "./paths/clans.yaml#/ClanRestrictions"
 
+  /clans/{clanId}/applications:
+    $ref: "./paths/clans.yaml#/ClanApplications"
+
+  /clans/{clanId}/applications/{applicationId}/review:
+    $ref: "./paths/clans.yaml#/ClanApplicationReview"
+
   # ════════════════════════════════════════════════════════════════════
   # CHATS
   # ════════════════════════════════════════════════════════════════════
@@ -378,6 +384,12 @@ paths:
 
   /chats/{chatId}/messages/{messageId}/report:
     $ref: "./paths/chats.yaml#/ChatMessageReport"
+
+  /chats/{chatId}/messages/{messageId}/reactions/{emoji}:
+    $ref: "./paths/chats.yaml#/MessageReaction"
+
+  /chats/{chatId}/messages/{messageId}/pin:
+    $ref: "./paths/chats.yaml#/MessagePin"
 
   /chats/{chatId}/read:
     $ref: "./paths/chats.yaml#/ChatRead"
