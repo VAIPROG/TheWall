@@ -68,7 +68,14 @@ TemplatesNew:
     operationId: createTemplate
     description: |
       Creates a new template. The resulting `status` depends on scope, caller
-      role, and server configuration:
+      role, and server configuration.
+
+      **Server-side format conversion**
+      The server accepts `the-wall-dev/2` (stored as-is), `the-wall-dev/1`
+      (converted to v2 on ingest), and `charity` (assembled into v2 on ingest).
+      The stored canonical form is always `the-wall-dev/2`. Non-fatal messages
+      produced during conversion are returned in `warnings`; `warnings` is
+      always present and empty for native v2 inputs.
 
       **Publish gating by scope**
       - `private` — any authenticated user; always auto-approved.
@@ -104,17 +111,69 @@ TemplatesNew:
             $ref: "../components/schemas/templates.yaml#/TemplateCreate"
     responses:
       "201":
-        description: Template created.
+        description: |
+          Template created. `warnings` is always present; non-empty only when
+          the input was converted from `the-wall-dev/1` or `charity`.
         content:
           application/json:
             schema:
-              $ref: "../components/schemas/templates.yaml#/Template"
+              $ref: "../components/schemas/templates.yaml#/TemplateCreated"
       "400":
         $ref: "../components/responses/common.yaml#/BadRequest"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "422":
         $ref: "../components/responses/common.yaml#/UnprocessableEntity"
+
+AdminTemplatesBackfillDocuments:
+  post:
+    tags: [Templates]
+    summary: Backfill share→document for legacy template rows (admin)
+    operationId: adminBackfillTemplateDocuments
+    description: |
+      Admin-only one-shot migration job. Selects up to 1 000 template rows
+      whose `document` column is NULL (legacy share-based rows created before
+      the v3 `document` column existed), decodes each row's `share` field via
+      the server-side format converter, and writes the resulting
+      `the-wall-dev/2` document back into `document`.
+
+      Returns a summary of how many rows were scanned, migrated, failed to
+      decode/write, and how many still remain after the batch. Call repeatedly
+      until `remaining` reaches 0.
+
+      Rows that cannot be decoded are left untouched (document stays NULL) and
+      counted in `failed` — they will appear again in subsequent calls.
+    security:
+      - BearerAuth: []
+    responses:
+      "200":
+        description: Batch complete. Returns migration counts.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - scanned
+                - migrated
+                - failed
+                - remaining
+              properties:
+                scanned:
+                  type: integer
+                  description: Number of NULL-document rows selected in this batch (capped at 1 000).
+                migrated:
+                  type: integer
+                  description: Number of rows successfully decoded and updated in this batch.
+                failed:
+                  type: integer
+                  description: Number of rows that could not be decoded or written. Left unchanged.
+                remaining:
+                  type: integer
+                  description: Total count of NULL-document rows remaining after this batch.
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
 
 TemplateById:
   get:

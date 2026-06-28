@@ -76,6 +76,15 @@ pub struct TemplateCreateV3 {
     pub source: TemplateSource,
 }
 
+/// Response body for POST /api/v3/templates/new — wraps the created row
+/// with any non-fatal conversion warnings emitted during ingest.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateCreated {
+    pub template: TemplateV3,
+    pub warnings: Vec<String>,
+}
+
 /// Query parameters for GET /api/v3/templates.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]

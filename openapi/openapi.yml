@@ -434,6 +434,9 @@ paths:
   /templates/pinned:
     $ref: "./paths/templates.yaml#/TemplatesPinned"
 
+  /admin/templates/backfill-documents:
+    $ref: "./paths/templates.yaml#/AdminTemplatesBackfillDocuments"
+
   # ════════════════════════════════════════════════════════════════════
   # RESTRICTIONS
   # ════════════════════════════════════════════════════════════════════

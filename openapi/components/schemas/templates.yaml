@@ -482,6 +482,31 @@ Template:
           type: integer
           description: Total height spanning all layers.
 
+TemplateCreated:
+  type: object
+  description: |
+    Response envelope returned by `POST /templates/new`. Wraps the created
+    template record with any non-fatal conversion warnings produced during
+    ingest. Warnings are emitted when the submitted `source.format` is not
+    `the-wall-dev/2` and the server converts it server-side before storage.
+    Empty array for native v2 submissions.
+  required:
+    - template
+    - warnings
+  properties:
+    template:
+      $ref: "#/Template"
+    warnings:
+      type: array
+      items:
+        type: string
+      description: |
+        Non-fatal messages from the server-side format conversion. Present
+        (possibly empty) on every response. Non-empty only when the input
+        format was `the-wall-dev/1` or `charity` and was converted to
+        `the-wall-dev/2` on ingest.
+      example: ["converted from the-wall-dev/1 to the-wall-dev/2"]
+
 TemplateCreate:
   type: object
   description: |

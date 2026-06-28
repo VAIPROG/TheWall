@@ -832,6 +832,10 @@ async fn main() {
             "/api/v3/templates/{id}/charity",
             get(routes::v3::templates::charity),
         )
+        .route(
+            "/api/v3/admin/templates/backfill-documents",
+            post(routes::v3::templates::backfill),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(TraceLayer::new_for_http())
         .with_state(state);

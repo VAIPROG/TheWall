@@ -1,6 +1,10 @@
 //! POST /api/v3/templates/new
 //!
-//! Creates a new V3 template from a the-wall-dev/2 canonical document.
+//! Creates a new V3 template. Accepts the-wall-dev/2 (native), the-wall-dev/1,
+//! and charity payloads. Non-native formats are converted server-side to
+//! the-wall-dev/2 before storage; conversion warnings are returned in the
+//! response alongside the created template.
+//!
 //! Mirrors v2 create logic: scope validation, clan_id resolution, membership
 //! check, auto-approval via permissions::publish_auto_approved, scale
 //! validation, and the allow_public_template_publishing server_config gate.
@@ -15,7 +19,7 @@ use uuid::Uuid;
 use crate::{
     AppState,
     auth::AuthUser,
-    models::{TemplateCreateV3, TemplateV3},
+    models::{TemplateCreateV3, TemplateCreated, TemplateV3},
     routes::v2::permissions,
     routes::templates::validate_template_scale,
 };
@@ -24,7 +28,7 @@ pub async fn create(
     auth: AuthUser,
     State(state): State<AppState>,
     Json(body): Json<TemplateCreateV3>,
-) -> Result<Json<TemplateV3>, (StatusCode, String)> {
+) -> Result<Json<TemplateCreated>, (StatusCode, String)> {
     // ── 1. Validate scope ────────────────────────────────────────────────────
     if !matches!(body.scope.as_str(), "private" | "clan" | "public") {
         return Err((
@@ -33,17 +37,17 @@ pub async fn create(
         ));
     }
 
-    // ── 2. Format gate: only the-wall-dev/2 accepted in this slice ──────────
-    if body.source.format != "the-wall-dev/2" {
-        return Err((
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "convert to the-wall-dev/2 first (client-side or via the migration endpoint)"
-                .to_string(),
-        ));
-    }
+    // ── 2. Convert input to the-wall-dev/2 (passthrough for native v2) ───────
+    let crate::formats::Converted { document: doc, warnings } =
+        crate::formats::to_v2(
+            &body.source.format,
+            &body.source.document,
+            auth.user_id,
+            chrono::Utc::now(),
+        )
+        .map_err(|msg| (StatusCode::BAD_REQUEST, msg))?;
 
     // ── 3. Extract primary layer from document.templates[0] ─────────────────
-    let doc = &body.source.document;
     let layer = doc
         .get("templates")
         .and_then(|t| t.as_array())
@@ -192,10 +196,10 @@ pub async fn create(
     .bind(status)
     .bind(&username)
     .bind(clan_id)
-    .bind(&body.source.document)
+    .bind(doc)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(row))
+    Ok(Json(TemplateCreated { template: row, warnings }))
 }
