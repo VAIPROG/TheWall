@@ -830,6 +830,12 @@ async fn main() {
         .route("/api/v3/users/me/merge", post(routes::v3::auth::merge))
         .route("/api/v3/auth/oauth/{provider}/start", get(routes::v3::auth::oauth::start))
         .route("/api/v3/auth/oauth/{provider}/callback", post(routes::v3::auth::oauth::callback))
+        // --- mnemonic recovery: generate phrase (auth), recover account (public) ---
+        .route("/api/v3/users/me/recovery/phrase", post(routes::v3::auth::generate_phrase))
+        .route("/api/v3/auth/recover", post(routes::v3::auth::recover))
+        // --- site-identity management: list + unlink ---
+        .route("/api/v3/users/me/site-identities", get(routes::v3::users::list_site_identities))
+        .route("/api/v3/users/me/site-identities/{source}", delete(routes::v3::users::unlink_site_identity))
         // --- templates: V3 CRUD with the-wall-dev/2 canonical document ------
         .route("/api/v3/templates", get(routes::v3::templates::list))
         .route("/api/v3/templates/new", post(routes::v3::templates::create))

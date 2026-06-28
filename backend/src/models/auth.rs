@@ -116,3 +116,22 @@ pub struct MergeResult {
     #[serde(flatten)]
     pub auth: V3AuthResponse,
 }
+
+// ---------------------------------------------------------------------------
+// V3 mnemonic recovery DTOs
+// ---------------------------------------------------------------------------
+
+/// Response from POST /api/v3/users/me/recovery/phrase — phrase shown ONCE.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryPhraseResponse {
+    pub phrase: String,
+    pub word_count: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Request body for POST /api/v3/auth/recover.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RecoverRequest {
+    pub phrase: String,
+}

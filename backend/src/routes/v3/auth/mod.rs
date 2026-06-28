@@ -1,10 +1,12 @@
 mod merge;
+mod recovery;
 mod session;
 mod site;
 mod tokens;
 pub mod oauth;
 
 pub use merge::{merge, merge_initiate};
+pub use recovery::{generate_phrase, recover};
 pub use session::session;
 pub use site::site;
 pub use tokens::{logout, refresh};
