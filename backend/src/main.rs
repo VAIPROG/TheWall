@@ -819,6 +819,18 @@ async fn main() {
             "/api/v3/templates/{id}",
             get(routes::v3::templates::get).delete(routes::v3::templates::delete),
         )
+        .route(
+            "/api/v3/templates/{id}/verify",
+            post(routes::v3::templates::verify),
+        )
+        .route(
+            "/api/v3/templates/{id}/wall-dev",
+            get(routes::v3::templates::wall_dev),
+        )
+        .route(
+            "/api/v3/templates/{id}/charity",
+            get(routes::v3::templates::charity),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(TraceLayer::new_for_http())
         .with_state(state);

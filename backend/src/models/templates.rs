@@ -86,3 +86,12 @@ pub struct TemplateListQueryV3 {
     pub limit: Option<i64>,
     pub cursor: Option<DateTime<Utc>>,
 }
+
+/// Request body for POST /api/v3/templates/{id}/verify.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateVerifyRequest {
+    /// "approve" or "reject"
+    pub decision: String,
+    pub reason: Option<String>,
+}

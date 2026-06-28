@@ -2,8 +2,12 @@
 
 mod create;
 mod delete;
+mod export;
 mod read;
+mod verify;
 
 pub use create::create;
 pub use delete::delete;
+pub use export::{charity, wall_dev};
 pub use read::{get, list};
+pub use verify::verify;
