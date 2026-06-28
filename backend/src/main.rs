@@ -3,6 +3,7 @@ mod bot_commands;
 mod bot_core;
 mod discord_commands;
 mod discord_gateway;
+mod formats;
 mod models;
 mod region_guard;
 mod reminder_worker;
