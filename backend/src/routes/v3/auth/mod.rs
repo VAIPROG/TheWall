@@ -1,11 +1,13 @@
-mod site;
+mod merge;
 mod session;
+mod site;
 mod tokens;
 pub mod oauth;
 
-pub use site::site;
+pub use merge::{merge, merge_initiate};
 pub use session::session;
-pub use tokens::{refresh, logout};
+pub use site::site;
+pub use tokens::{logout, refresh};
 
 // ---------------------------------------------------------------------------
 // Shared helpers used by submodules

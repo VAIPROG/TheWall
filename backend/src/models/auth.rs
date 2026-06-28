@@ -86,3 +86,33 @@ pub struct OAuthCallbackBody {
     pub code: String,
     pub state: String,
 }
+
+// ---------------------------------------------------------------------------
+// V3 account merge DTOs
+// ---------------------------------------------------------------------------
+
+/// Response from POST /api/v3/auth/merge/initiate.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeInitiateResponse {
+    pub merge_token: String,
+    pub expires_in: u32,
+}
+
+/// Request body for POST /api/v3/users/me/merge.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeRequest {
+    pub merge_token: String,
+}
+
+/// Response from POST /api/v3/users/me/merge.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeResult {
+    /// The account that now owns all of B's data (= account A).
+    pub merged_account_id: Uuid,
+    /// Fresh auth tokens for account A so the client stays authenticated.
+    #[serde(flatten)]
+    pub auth: V3AuthResponse,
+}

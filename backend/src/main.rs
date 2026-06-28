@@ -826,6 +826,8 @@ async fn main() {
         .route("/api/v3/auth/session", get(routes::v3::auth::session))
         .route("/api/v3/auth/refresh", post(routes::v3::auth::refresh))
         .route("/api/v3/auth/logout", post(routes::v3::auth::logout))
+        .route("/api/v3/auth/merge/initiate", post(routes::v3::auth::merge_initiate))
+        .route("/api/v3/users/me/merge", post(routes::v3::auth::merge))
         .route("/api/v3/auth/oauth/{provider}/start", get(routes::v3::auth::oauth::start))
         .route("/api/v3/auth/oauth/{provider}/callback", post(routes::v3::auth::oauth::callback))
         // --- templates: V3 CRUD with the-wall-dev/2 canonical document ------
