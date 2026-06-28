@@ -127,3 +127,54 @@ pub struct TemplateVerifyRequest {
     pub decision: String,
     pub reason: Option<String>,
 }
+
+// ---------------------------------------------------------------------------
+// V3 PATCH DTOs
+// ---------------------------------------------------------------------------
+
+/// Document-level fields that can be patched.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocPatch {
+    pub name: Option<String>,
+    pub notes: Option<Vec<String>>,
+    pub contacts: Option<serde_json::Value>,
+    /// Keys merged into the access fields (usersWhitelist/usersBlocklist/
+    /// allowedToEdit/domainsWhitelist).
+    pub access: Option<serde_json::Value>,
+    /// "full" | "anon" | "hidden"
+    pub author_visibility: Option<String>,
+}
+
+/// A single layer operation applied to document.templates[].
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "op", rename_all = "lowercase")]
+pub enum LayerOp {
+    Add {
+        layer: serde_json::Value,
+        #[serde(rename = "atIndex")]
+        at_index: Option<usize>,
+    },
+    Remove {
+        index: usize,
+    },
+    Move {
+        from: usize,
+        to: usize,
+    },
+    Update {
+        index: usize,
+        patch: serde_json::Value,
+    },
+}
+
+/// Request body for PATCH /api/v3/templates/{id}.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplatePatchV3 {
+    pub scope: Option<String>,
+    pub clan_id: Option<uuid::Uuid>,
+    pub doc: Option<DocPatch>,
+    pub layer_ops: Option<Vec<LayerOp>>,
+    pub expected_version: Option<i32>,
+}

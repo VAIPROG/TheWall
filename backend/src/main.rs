@@ -833,7 +833,9 @@ async fn main() {
         .route("/api/v3/templates/new", post(routes::v3::templates::create))
         .route(
             "/api/v3/templates/{id}",
-            get(routes::v3::templates::get).delete(routes::v3::templates::delete),
+            get(routes::v3::templates::get)
+                .patch(routes::v3::templates::update)
+                .delete(routes::v3::templates::delete),
         )
         .route(
             "/api/v3/templates/{id}/verify",

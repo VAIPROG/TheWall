@@ -4,7 +4,9 @@ mod backfill;
 mod create;
 mod delete;
 mod export;
+pub mod patch_apply;
 mod read;
+mod update;
 mod verify;
 
 pub use backfill::backfill;
@@ -12,4 +14,5 @@ pub use create::create;
 pub use delete::delete;
 pub use export::{charity, wall_dev};
 pub use read::{get, list};
+pub use update::update;
 pub use verify::verify;
