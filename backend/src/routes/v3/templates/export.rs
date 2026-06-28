@@ -9,7 +9,8 @@
 use axum::{
     Json,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -24,15 +25,16 @@ use crate::{
 // ---------------------------------------------------------------------------
 
 /// Load a template row restricted to the caller's visibility, returning
-/// `(owner_id, scope, clan_id, author, document)` or a 404 error.
+/// `(owner_id, scope, clan_id, author, document, version)` or a 404 error.
 async fn load_visible(
     state: &AppState,
     user_id: Uuid,
     template_id: Uuid,
-) -> Result<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>), (StatusCode, String)> {
-    let row: Option<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>)> =
+) -> Result<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>, i32), (StatusCode, String)>
+{
+    let row: Option<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>, i32)> =
         sqlx::query_as(
-            r#"SELECT user_id, scope, clan_id, author, document
+            r#"SELECT user_id, scope, clan_id, author, document, version
                  FROM templates
                 WHERE id = $2
                   AND (
@@ -63,8 +65,9 @@ pub async fn wall_dev(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let (_owner_id, _scope, _clan_id, _author, document) =
+    headers: HeaderMap,
+) -> Result<Response, (StatusCode, String)> {
+    let (_owner_id, _scope, _clan_id, _author, document, version) =
         load_visible(&state, auth.user_id, id).await?;
 
     let doc = document.ok_or_else(|| {
@@ -74,7 +77,32 @@ pub async fn wall_dev(
         )
     })?;
 
-    Ok(Json(doc))
+    // ETag: "<id>-v<version>"
+    let etag_value = format!("\"{}-v{}\"", id, version);
+
+    // Conditional GET — return 304 if client already has this version.
+    if let Some(inm) = headers.get("if-none-match") {
+        if inm.as_bytes() == etag_value.as_bytes() {
+            let mut resp_headers = HeaderMap::new();
+            resp_headers.insert(
+                "etag",
+                HeaderValue::from_str(&etag_value)
+                    .unwrap_or_else(|_| HeaderValue::from_static("")),
+            );
+            return Ok((StatusCode::NOT_MODIFIED, resp_headers).into_response());
+        }
+    }
+
+    let mut resp_headers = HeaderMap::new();
+    if let Ok(v) = HeaderValue::from_str(&etag_value) {
+        resp_headers.insert("etag", v);
+    }
+    resp_headers.insert(
+        "cache-control",
+        HeaderValue::from_static("private, must-revalidate"),
+    );
+
+    Ok((StatusCode::OK, resp_headers, Json(doc)).into_response())
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +129,7 @@ pub async fn charity(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let (_owner_id, _scope, _clan_id, author, document) =
+    let (_owner_id, _scope, _clan_id, author, document, _version) =
         load_visible(&state, auth.user_id, id).await?;
 
     let doc = document.ok_or_else(|| {

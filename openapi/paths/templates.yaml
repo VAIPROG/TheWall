@@ -53,11 +53,13 @@ Templates:
       - ApiKeyAuth: []
     responses:
       "200":
-        description: Paginated template list.
+        description: Paginated template list (light projection — no document field).
         content:
           application/json:
             schema:
-              $ref: "../components/schemas/templates.yaml#/TemplatePage"
+              type: array
+              items:
+                $ref: "../components/schemas/templates.yaml#/TemplateSummaryV3"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
 
@@ -183,16 +185,39 @@ TemplateById:
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - name: If-None-Match
+        in: header
+        description: |
+          Conditional GET. Pass the ETag value from a previous response to
+          receive 304 Not Modified when the template has not changed.
+        schema:
+          type: string
     security:
       - BearerAuth: []
       - ApiKeyAuth: []
     responses:
       "200":
         description: Template details.
+        headers:
+          ETag:
+            description: Strong ETag — format `"<id>-v<version>"`. Pass as `If-None-Match` on subsequent requests.
+            schema:
+              type: string
+          Cache-Control:
+            description: Always `private, must-revalidate`.
+            schema:
+              type: string
         content:
           application/json:
             schema:
               $ref: "../components/schemas/templates.yaml#/Template"
+      "304":
+        description: Not Modified. The template has not changed since the supplied ETag.
+        headers:
+          ETag:
+            description: Current ETag (same value that was submitted in If-None-Match).
+            schema:
+              type: string
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
@@ -365,16 +390,39 @@ TemplateWallDev:
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - name: If-None-Match
+        in: header
+        description: |
+          Conditional GET. Pass the ETag value from a previous response to
+          receive 304 Not Modified when the document has not changed.
+        schema:
+          type: string
     security:
       - BearerAuth: []
       - ApiKeyAuth: []
     responses:
       "200":
         description: Native the-wall-dev/2 document.
+        headers:
+          ETag:
+            description: Strong ETag — format `"<id>-v<version>"`. Pass as `If-None-Match` on subsequent requests.
+            schema:
+              type: string
+          Cache-Control:
+            description: Always `private, must-revalidate`.
+            schema:
+              type: string
         content:
           application/json:
             schema:
               $ref: "../components/schemas/templates.yaml#/WallDevDocument"
+      "304":
+        description: Not Modified. The document has not changed since the supplied ETag.
+        headers:
+          ETag:
+            description: Current ETag (same value that was submitted in If-None-Match).
+            schema:
+              type: string
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":

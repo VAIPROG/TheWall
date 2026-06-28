@@ -85,6 +85,29 @@ pub struct TemplateCreated {
     pub warnings: Vec<String>,
 }
 
+/// Light projection returned by GET /api/v3/templates (list).
+/// Omits `document` to keep list payloads small; clients fetch the full
+/// row or the /wall-dev export when they need the document.
+#[derive(Debug, Clone, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateSummary {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub name: String,
+    pub x: i32,
+    pub y: i32,
+    pub scale: f64,
+    pub scope: String,
+    pub status: String,
+    pub version: i32,
+    pub clan_id: Option<Uuid>,
+    pub verified_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    /// True when the `document` column is non-NULL (i.e. the row has been
+    /// backfilled to the v2 format and export endpoints will work).
+    pub has_document: bool,
+}
+
 /// Query parameters for GET /api/v3/templates.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]

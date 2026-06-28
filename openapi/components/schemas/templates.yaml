@@ -362,6 +362,79 @@ WallDevFrameOverride:
       exclusiveMinimum: 0
       description: "Scale multiplier for the replacement image relative to the frame slot. 1.0 = render at frameWidth × frameHeight."
 
+TemplateSummaryV3:
+  type: object
+  description: |
+    Light projection returned by `GET /api/v3/templates` (list). The `document`
+    field is intentionally omitted — v3-native documents embed base64 inline
+    images and returning them in a list would be very large. Use
+    `GET /api/v3/templates/{id}` or `GET /api/v3/templates/{id}/wall-dev` to
+    fetch the full document for a single template.
+  required:
+    - id
+    - userId
+    - name
+    - x
+    - y
+    - scale
+    - scope
+    - status
+    - version
+    - hasDocument
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique template identifier.
+    userId:
+      type: string
+      format: uuid
+      description: Account UUID of the template owner.
+    name:
+      type: string
+      description: Template name (copied from the primary document layer).
+    x:
+      type: integer
+      description: Horizontal canvas position (px) of the primary layer.
+    y:
+      type: integer
+      description: Vertical canvas position (px) of the primary layer.
+    scale:
+      type: number
+      description: Scale multiplier. 1.0 = native.
+    scope:
+      type: string
+      enum: [public, clan, private]
+      description: Visibility scope.
+    status:
+      type: string
+      enum: [pending, approved, rejected]
+      description: Moderation status.
+    version:
+      type: integer
+      description: Optimistic concurrency token. Incremented on each update.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: UUID of the owning clan for clan-scoped templates.
+    verifiedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the moderation decision was recorded.
+    createdAt:
+      type: string
+      format: date-time
+      description: Creation timestamp.
+    hasDocument:
+      type: boolean
+      description: |
+        True when the `document` column is non-NULL (i.e. the row has been
+        backfilled to the the-wall-dev/2 format). When false, the `/wall-dev`
+        and `/charity` export endpoints will return 409 Conflict.
+
 Template:
   type: object
   description: Server metadata record wrapping an embedded the-wall-dev/2 document.

@@ -20,6 +20,7 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::env;
+use tower_http::compression::CompressionLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -837,6 +838,7 @@ async fn main() {
             post(routes::v3::templates::backfill),
         )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
+        .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
