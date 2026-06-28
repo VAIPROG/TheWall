@@ -1,6 +1,7 @@
 mod site;
 mod session;
 mod tokens;
+pub mod oauth;
 
 pub use site::site;
 pub use session::session;
@@ -12,7 +13,7 @@ pub use tokens::{refresh, logout};
 
 use crate::models::{AccountPublic, User, V3AuthResponse};
 
-pub(super) fn account_public(user: &User) -> AccountPublic {
+pub(crate) fn account_public(user: &User) -> AccountPublic {
     AccountPublic {
         id: user.id,
         username: user.username.clone(),
@@ -21,7 +22,7 @@ pub(super) fn account_public(user: &User) -> AccountPublic {
     }
 }
 
-pub(super) fn v3_response(access_token: String, refresh_token: String, user: &User) -> V3AuthResponse {
+pub(crate) fn v3_response(access_token: String, refresh_token: String, user: &User) -> V3AuthResponse {
     V3AuthResponse {
         access_token,
         refresh_token,

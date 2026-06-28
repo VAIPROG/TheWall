@@ -48,6 +48,10 @@ pub struct OAuthConfig {
     pub telegram_client_secret: Option<String>,
     pub discord_client_id: Option<String>,
     pub discord_client_secret: Option<String>,
+    /// GitHub OAuth app Client ID.
+    pub github_client_id: Option<String>,
+    /// GitHub OAuth app Client Secret.
+    pub github_client_secret: Option<String>,
     /// Discord *bot* token (separate from OAuth secret) used for Bot API
     /// calls like opening a DM channel + posting attachments.
     pub discord_bot_token: Option<String>,
@@ -171,6 +175,8 @@ const KNOWN_ENV_KEYS: &[&str] = &[
     "TELEGRAM_ADMIN_IDS",
     "DISCORD_CLIENT_ID",
     "DISCORD_CLIENT_SECRET",
+    "GITHUB_CLIENT_ID",
+    "GITHUB_CLIENT_SECRET",
     "DISCORD_BOT_TOKEN",
     "DISCORD_BOT", // legacy fallback read by routes/avatar.rs
     "DISCORD_REDIRECT_URI",
@@ -249,6 +255,10 @@ fn warn_unset_config(oauth: &OAuthConfig, notify: &NotifyTargets) {
          "Discord OAuth linking/sign-in disabled"),
         ("DISCORD_CLIENT_SECRET", oauth.discord_client_secret.is_some(),
          "Discord OAuth linking/sign-in disabled"),
+        ("GITHUB_CLIENT_ID", oauth.github_client_id.is_some(),
+         "GitHub OAuth linking/sign-in disabled"),
+        ("GITHUB_CLIENT_SECRET", oauth.github_client_secret.is_some(),
+         "GitHub OAuth linking/sign-in disabled"),
         ("DISCORD_BOT_TOKEN", oauth.discord_bot_token.is_some(),
          "Discord bot disabled (gateway presence, DMs, slash registration)"),
         ("DISCORD_APPLICATION_ID", oauth.discord_application_id.is_some(),
@@ -312,6 +322,8 @@ async fn main() {
         telegram_client_secret: opt_env("TELEGRAM_CLIENT_SECRET"),
         discord_client_id: opt_env("DISCORD_CLIENT_ID"),
         discord_client_secret: opt_env("DISCORD_CLIENT_SECRET"),
+        github_client_id: opt_env("GITHUB_CLIENT_ID"),
+        github_client_secret: opt_env("GITHUB_CLIENT_SECRET"),
         discord_bot_token: opt_env("DISCORD_BOT_TOKEN"),
         discord_application_id: opt_env("DISCORD_APPLICATION_ID"),
         discord_public_key: opt_env("DISCORD_PUBLIC_KEY"),
@@ -814,6 +826,8 @@ async fn main() {
         .route("/api/v3/auth/session", get(routes::v3::auth::session))
         .route("/api/v3/auth/refresh", post(routes::v3::auth::refresh))
         .route("/api/v3/auth/logout", post(routes::v3::auth::logout))
+        .route("/api/v3/auth/oauth/{provider}/start", get(routes::v3::auth::oauth::start))
+        .route("/api/v3/auth/oauth/{provider}/callback", post(routes::v3::auth::oauth::callback))
         // --- templates: V3 CRUD with the-wall-dev/2 canonical document ------
         .route("/api/v3/templates", get(routes::v3::templates::list))
         .route("/api/v3/templates/new", post(routes::v3::templates::create))

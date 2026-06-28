@@ -108,61 +108,58 @@ OAuthStart:
         $ref: "../components/responses/common.yaml#/TooManyRequests"
 
 OAuthCallback:
-  get:
+  post:
     tags: [Auth]
     summary: Handle OAuth provider callback
     operationId: oauthCallback
     description: |
-      Receives the provider redirect after the user grants consent.
+      Completes the OAuth2 authorization-code + PKCE flow. The static
+      callback page captures `code` and `state` from the provider redirect
+      and POSTs them here as a JSON body — this keeps tokens out of the URL
+      and avoids server-side redirects.
 
       The server:
       1. Validates the `state` (single-use, checks expiry and CSRF).
-      2. Exchanges the `code` for provider tokens entirely server-side
-         (including PKCE code-verifier lookup).
-      3. Resolves the provider user identity.
-      4. Executes the stored intent:
-         - **login**: attach-or-create account → return `AuthResponse`
-           (or redirect to `redirectUri` with a one-time auth code).
-         - **link**: add a `SocialLink` to the authenticated account →
-           return `SuccessMessage` (or redirect).
+      2. Looks up the stored PKCE code-verifier for this state token.
+      3. Exchanges the `code` for provider tokens entirely server-side
+         (PKCE code-verifier is included in the exchange).
+      4. Resolves the provider user identity.
+      5. Executes the stored intent:
+         - **login**: finds the Wall-Dev account linked to this provider
+           identity and returns `AuthResponse` with a fresh session pair.
+           Returns `404` if no account is linked (link it first).
+         - **link**: upserts the provider identity onto the authenticated
+           account and returns `AuthResponse` confirming the link.
 
       Returns `409` when the provider identity is already bound to a
       **different** account.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/OAuthProviderPath"
-      - name: code
-        in: query
-        required: true
-        description: Authorization code issued by the provider.
-        schema:
-          type: string
-      - name: state
-        in: query
-        required: true
-        description: Single-use CSRF/PKCE binding token from `OAuthStart`.
-        schema:
-          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/auth.yaml#/OAuthCallbackBody"
     responses:
       "200":
         description: |
-          OAuth flow completed successfully.
-          - `intent=login`: body is `AuthResponse` containing the session tokens.
-          - `intent=link`: body is `SuccessMessage` confirming the provider was linked.
+          OAuth flow completed successfully. Body is `AuthResponse` for
+          both `login` and `link` intents.
         content:
           application/json:
             schema:
               $ref: "../components/schemas/auth.yaml#/AuthResponse"
-      "302":
-        description: |
-          Redirect to the `redirectUri` supplied in `OAuthStart`. For
-          `intent=login` a short-lived one-time auth code is appended as
-          a query parameter so the receiving page can complete the session
-          exchange without a second round-trip.
       "400":
         $ref: "../components/responses/common.yaml#/BadRequest"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        description: >-
+          `intent=login`: no Wall-Dev account is linked to this provider
+          identity. Link the provider from the extension or overlay first.
+        $ref: "../components/responses/common.yaml#/NotFound"
       "409":
         description: >-
           The resolved provider identity is already linked to a different

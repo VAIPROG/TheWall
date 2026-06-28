@@ -58,3 +58,31 @@ pub struct V3AuthResponse {
 pub struct V3RefreshRequest {
     pub refresh_token: String,
 }
+
+// ---------------------------------------------------------------------------
+// V3 OAuth center DTOs
+// ---------------------------------------------------------------------------
+
+/// GET /api/v3/auth/oauth/{provider}/start — query params.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthStartQuery {
+    pub intent: String,
+    pub redirect_uri: Option<String>,
+}
+
+/// Response for the start endpoint — the client redirects the user to
+/// `authorize_url` and stores `state` to correlate the callback.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthStartResponse {
+    pub authorize_url: String,
+    pub state: String,
+}
+
+/// POST /api/v3/auth/oauth/{provider}/callback — body.
+#[derive(Debug, Clone, Deserialize)]
+pub struct OAuthCallbackBody {
+    pub code: String,
+    pub state: String,
+}
