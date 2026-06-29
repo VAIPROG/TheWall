@@ -24,6 +24,37 @@ pub struct ChatV3 {
     pub created_at: DateTime<Utc>,
 }
 
+/// Wire shape for `GET /api/v3/chats` — extends `ChatV3` with read-state
+/// derived fields (`unreadCount`, `lastMessageAt`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSummaryView {
+    pub id: Uuid,
+    #[serde(rename = "type")]
+    pub chat_type: String,
+    pub clan_id: Option<Uuid>,
+    pub dm_key: Option<String>,
+    pub topic: Option<String>,
+    pub slowmode_seconds: i32,
+    pub created_at: DateTime<Utc>,
+    pub unread_count: i64,
+    pub last_message_at: Option<DateTime<Utc>>,
+}
+
+
+// ---------------------------------------------------------------------------
+// Reaction
+// ---------------------------------------------------------------------------
+
+/// A single emoji reaction bucket on a message.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reaction {
+    pub emoji: String,
+    pub count: i64,
+    pub reacted_by_me: bool,
+}
+
 // ---------------------------------------------------------------------------
 // Message (raw DB row)
 // ---------------------------------------------------------------------------
@@ -69,6 +100,7 @@ pub struct MessageView {
     pub is_deleted: bool,
     pub version: i32,
     pub created_at: DateTime<Utc>,
+    pub reactions: Vec<Reaction>,
 }
 
 impl MessageView {
@@ -96,6 +128,7 @@ impl MessageView {
             is_deleted,
             version: msg.version,
             created_at: msg.created_at,
+            reactions: Vec::new(),
         }
     }
 }
@@ -147,6 +180,7 @@ impl MessageJoinRow {
             is_deleted,
             version: self.version,
             created_at: self.created_at,
+            reactions: Vec::new(),
         }
     }
 }
@@ -177,4 +211,13 @@ pub struct MessageListQuery {
     /// Cursor: return messages created_at > this message's created_at.
     pub after: Option<Uuid>,
     pub limit: Option<i64>,
+}
+
+/// Request body for `POST /api/v3/chats/{cid}/read`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatReadRequest {
+    /// Mark up to this specific message as read.  When omitted, marks the
+    /// latest message in the chat as read.
+    pub message_id: Option<Uuid>,
 }

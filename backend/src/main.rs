@@ -875,6 +875,15 @@ async fn main() {
             "/api/v3/chats/dm/{account_id}",
             post(routes::v3::chats::open_dm),
         )
+        .route(
+            "/api/v3/chats/{cid}/messages/{mid}/reactions/{emoji}",
+            axum::routing::put(routes::v3::chats::add_reaction)
+                .delete(routes::v3::chats::remove_reaction),
+        )
+        .route(
+            "/api/v3/chats/{cid}/read",
+            post(routes::v3::chats::mark_read),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())

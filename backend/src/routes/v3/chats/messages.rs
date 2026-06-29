@@ -18,6 +18,7 @@ use crate::{
     routes::v2::permissions,
 };
 
+use super::reactions::{attach_reactions, attach_reactions_one};
 use super::resolve::{can_access_chat, load_chat};
 
 // ---------------------------------------------------------------------------
@@ -102,7 +103,9 @@ pub async fn list_messages(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     };
 
-    Ok(Json(rows.into_iter().map(|r| r.into_view()).collect()))
+    let mut views: Vec<MessageView> = rows.into_iter().map(|r| r.into_view()).collect();
+    attach_reactions(&state.pool, auth.user_id, &mut views).await?;
+    Ok(Json(views))
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +173,9 @@ pub async fn send_message(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok((StatusCode::CREATED, Json(row.into_view())))
+    let mut view = row.into_view();
+    attach_reactions_one(&state.pool, auth.user_id, &mut view).await?;
+    Ok((StatusCode::CREATED, Json(view)))
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +251,9 @@ pub async fn edit_message(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(updated.into_view()))
+    let mut view = updated.into_view();
+    attach_reactions_one(&state.pool, auth.user_id, &mut view).await?;
+    Ok(Json(view))
 }
 
 // ---------------------------------------------------------------------------
