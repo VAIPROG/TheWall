@@ -863,17 +863,30 @@ async fn main() {
         )
         // --- V3 chats: unified chat model (global, clan, DM) ------------------
         .route("/api/v3/chats", get(routes::v3::chats::list_chats))
+        // Literal-segment routes (/global, /dm) come before param-segment /{id}
+        // in the source; axum 0.8's radix trie gives literals priority anyway,
+        // but explicit ordering avoids any ambiguity.
+        .route(
+            "/api/v3/chats/global",
+            get(routes::v3::chats::get_global_chat),
+        )
+        .route(
+            "/api/v3/chats/dm/{account_id}",
+            post(routes::v3::chats::open_dm),
+        )
+        .route(
+            "/api/v3/chats/{id}",
+            get(routes::v3::chats::get_chat),
+        )
         .route(
             "/api/v3/chats/{id}/messages",
             get(routes::v3::chats::list_messages).post(routes::v3::chats::send_message),
         )
         .route(
             "/api/v3/chats/{cid}/messages/{mid}",
-            patch(routes::v3::chats::edit_message).delete(routes::v3::chats::delete_message),
-        )
-        .route(
-            "/api/v3/chats/dm/{account_id}",
-            post(routes::v3::chats::open_dm),
+            get(routes::v3::chats::get_message)
+                .patch(routes::v3::chats::edit_message)
+                .delete(routes::v3::chats::delete_message),
         )
         .route(
             "/api/v3/chats/{cid}/messages/{mid}/reactions/{emoji}",

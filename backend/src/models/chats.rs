@@ -221,3 +221,64 @@ pub struct ChatReadRequest {
     /// latest message in the chat as read.
     pub message_id: Option<Uuid>,
 }
+
+// ---------------------------------------------------------------------------
+// ChatDetail models
+// ---------------------------------------------------------------------------
+
+/// One participant entry returned inside `ChatDetailView`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParticipantView {
+    pub user_id: Uuid,
+    pub username: String,
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+    pub role: Option<String>,
+    pub role_rank: Option<i32>,
+    pub last_read_message_id: Option<Uuid>,
+    pub joined_at: Option<DateTime<Utc>>,
+    pub is_muted: bool,
+}
+
+/// Caller's access context for a chat.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatViewerContext {
+    pub role: Option<String>,
+    pub can_post: bool,
+    pub is_muted: bool,
+    pub last_read_message_id: Option<Uuid>,
+}
+
+/// Short preview of the latest message — surfaced on ChatDetailView.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LastMessagePreview {
+    pub id: Uuid,
+    pub author_username: Option<String>,
+    pub content_preview: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Full chat detail: summary fields + participants, recent messages, pinned ids.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatDetailView {
+    pub id: Uuid,
+    #[serde(rename = "type")]
+    pub chat_type: String,
+    pub clan_id: Option<Uuid>,
+    pub dm_key: Option<String>,
+    pub topic: Option<String>,
+    pub slowmode_seconds: i32,
+    pub created_at: DateTime<Utc>,
+    pub participant_count: i64,
+    pub unread_count: i64,
+    pub last_message_at: Option<DateTime<Utc>>,
+    pub last_message: Option<LastMessagePreview>,
+    pub viewer: ChatViewerContext,
+    pub participants: Vec<ParticipantView>,
+    pub recent_messages: Vec<MessageView>,
+    pub pinned_message_ids: Vec<Uuid>,
+}
