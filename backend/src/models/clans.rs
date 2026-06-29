@@ -188,3 +188,74 @@ pub struct ClanMemberRoleUpdate {
 pub struct ConfirmRequest {
     pub confirm: bool,
 }
+
+// ---------------------------------------------------------------------------
+// Join-flow wire shapes (slice 3)
+// ---------------------------------------------------------------------------
+
+/// A single clan invite as returned by the API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanInviteView {
+    pub id: Uuid,
+    pub code: String,
+    pub created_by: Option<Uuid>,
+    pub target_user_id: Option<Uuid>,
+    pub max_uses: Option<i32>,
+    pub use_count: i32,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// POST /api/v3/clans/{id}/invites body.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanInviteCreate {
+    pub target_user_id: Option<Uuid>,
+    pub max_uses: Option<i32>,
+    pub expires_in_hours: Option<i64>,
+}
+
+/// POST /api/v3/clans/{id}/join body.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanJoinRequest {
+    pub invite_code: Option<String>,
+}
+
+/// POST /api/v3/clans/{cid}/apply/{role} body.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClanRoleApplicationReq {
+    pub message: Option<String>,
+}
+
+/// Nested applicant info embedded in `ClanJoinApplicationView`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanJoinApplicationApplicant {
+    pub user_id: Uuid,
+    pub username: String,
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+}
+
+/// A join application as returned by the API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanJoinApplicationView {
+    pub id: Uuid,
+    pub clan_id: Uuid,
+    pub applicant: ClanJoinApplicationApplicant,
+    pub message: Option<String>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub reviewed_by: Option<Uuid>,
+    pub reviewed_at: Option<DateTime<Utc>>,
+}
+
+/// POST /api/v3/clans/{cid}/applications/{aid}/review body.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ApplicationReview {
+    pub decision: String, // "approve" | "reject"
+    pub reason: Option<String>,
+}

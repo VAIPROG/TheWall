@@ -939,6 +939,33 @@ async fn main() {
             "/api/v3/clans/{id}/disband",
             post(routes::v3::clans::disband_clan),
         )
+        // --- V3 clans: invites -----------------------------------------------
+        .route(
+            "/api/v3/clans/{id}/invites",
+            get(routes::v3::clans::list_invites).post(routes::v3::clans::create_invite),
+        )
+        .route(
+            "/api/v3/clans/{cid}/invites/{iid}",
+            delete(routes::v3::clans::revoke_invite),
+        )
+        // --- V3 clans: join + staff-role applications ------------------------
+        .route(
+            "/api/v3/clans/{id}/join",
+            post(routes::v3::clans::join_clan),
+        )
+        .route(
+            "/api/v3/clans/{cid}/apply/{role}",
+            post(routes::v3::clans::apply_for_role),
+        )
+        // --- V3 clans: join-application review --------------------------------
+        .route(
+            "/api/v3/clans/{id}/applications",
+            get(routes::v3::clans::list_applications),
+        )
+        .route(
+            "/api/v3/clans/{cid}/applications/{aid}/review",
+            post(routes::v3::clans::review_application),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())

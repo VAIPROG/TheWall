@@ -1,13 +1,19 @@
-//! V3 Clan CRUD — list, create, get, update, members, lifecycle.
+//! V3 Clan CRUD — list, create, get, update, members, lifecycle, join flows.
 
+mod applications;
 mod create;
 mod detail;
+mod invites;
+mod join;
 mod lifecycle;
 mod list;
 mod members;
 
+pub use applications::{list_applications, review_application};
 pub use create::create_clan;
 pub use detail::{get_clan, update_clan};
+pub use invites::{create_invite, list_invites, revoke_invite};
+pub use join::{apply_for_role, join_clan};
 pub use lifecycle::{disband_clan, leave_clan};
 pub use list::list_clans;
 pub use members::{get_member, kick_member, list_members, update_member_role};
@@ -142,10 +148,43 @@ pub(crate) async fn build_clan_view(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
         let is_owner = clan.owner_id == Some(uid);
+
         let membership_status = if is_owner || is_active_member.is_some() {
             "member".to_string()
         } else {
-            "none".to_string()
+            // Check for pending join application
+            let is_pending: Option<bool> = sqlx::query_scalar(
+                "SELECT TRUE FROM clan_join_applications WHERE clan_id = $1 AND applicant_id = $2 AND status = 'pending'",
+            )
+            .bind(clan.id)
+            .bind(uid)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            if is_pending.is_some() {
+                "pending".to_string()
+            } else {
+                // Check for an unexpired direct invite targeting this viewer
+                let is_invited: Option<bool> = sqlx::query_scalar(
+                    r#"SELECT TRUE FROM clan_invites
+                       WHERE clan_id = $1
+                         AND target_user_id = $2
+                         AND (expires_at IS NULL OR expires_at > NOW())
+                         AND (max_uses IS NULL OR use_count < max_uses)"#,
+                )
+                .bind(clan.id)
+                .bind(uid)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+                if is_invited.is_some() {
+                    "invited".to_string()
+                } else {
+                    "none".to_string()
+                }
+            }
         };
 
         let role_str = actual_role.map(|r| r.as_str().to_string());
