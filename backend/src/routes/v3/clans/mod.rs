@@ -8,6 +8,10 @@ mod join;
 mod lifecycle;
 mod list;
 mod members;
+mod report;
+mod restrictions;
+mod settings;
+mod templates;
 
 pub use applications::{list_applications, review_application};
 pub use create::create_clan;
@@ -17,6 +21,10 @@ pub use join::{apply_for_role, join_clan};
 pub use lifecycle::{disband_clan, leave_clan};
 pub use list::list_clans;
 pub use members::{get_member, kick_member, list_members, update_member_role};
+pub use report::report_clan;
+pub use restrictions::list_clan_restrictions;
+pub use settings::{get_settings, update_settings};
+pub use templates::list_clan_templates;
 
 use axum::http::StatusCode;
 use sqlx::PgPool;

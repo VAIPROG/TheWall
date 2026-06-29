@@ -966,6 +966,23 @@ async fn main() {
             "/api/v3/clans/{cid}/applications/{aid}/review",
             post(routes::v3::clans::review_application),
         )
+        // --- V3 clans: settings, report, clan templates, restrictions ---------
+        .route(
+            "/api/v3/clans/{id}/settings",
+            get(routes::v3::clans::get_settings).patch(routes::v3::clans::update_settings),
+        )
+        .route(
+            "/api/v3/clans/{id}/report",
+            post(routes::v3::clans::report_clan),
+        )
+        .route(
+            "/api/v3/clans/{id}/templates",
+            get(routes::v3::clans::list_clan_templates),
+        )
+        .route(
+            "/api/v3/clans/{id}/restrictions",
+            get(routes::v3::clans::list_clan_restrictions),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())

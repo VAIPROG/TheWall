@@ -259,3 +259,84 @@ pub struct ApplicationReview {
     pub decision: String, // "approve" | "reject"
     pub reason: Option<String>,
 }
+
+// ---------------------------------------------------------------------------
+// Settings wire shapes (slice 4)
+// ---------------------------------------------------------------------------
+
+/// Fine-grained moderation configuration stored under settings["moderationPreferences"].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanModerationPreferences {
+    pub auto_approve_joins: bool,
+    pub require_approval_for_templates: bool,
+    pub min_account_age_days: i32,
+    pub block_reported_users: bool,
+    pub members_can_delete_own_templates: bool,
+}
+
+impl Default for ClanModerationPreferences {
+    fn default() -> Self {
+        Self {
+            auto_approve_joins: false,
+            require_approval_for_templates: false,
+            min_account_age_days: 0,
+            block_reported_users: false,
+            members_can_delete_own_templates: true,
+        }
+    }
+}
+
+/// Chat permission rules stored under settings["chatPermissions"].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanChatPermissions {
+    pub who_can_post: String,
+    pub slowmode_seconds: i32,
+    pub who_can_invite: String,
+    pub who_can_post_templates: String,
+}
+
+impl Default for ClanChatPermissions {
+    fn default() -> Self {
+        Self {
+            who_can_post: "members".to_string(),
+            slowmode_seconds: 0,
+            who_can_invite: "moderators".to_string(),
+            who_can_post_templates: "members".to_string(),
+        }
+    }
+}
+
+/// GET /api/v3/clans/{id}/settings response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanSettingsView {
+    pub join_policy: String,
+    pub template_scope_default: String,
+    pub moderation_preferences: ClanModerationPreferences,
+    pub chat_permissions: ClanChatPermissions,
+    pub discoverable: bool,
+    pub default_member_role: String,
+    pub member_cap: i32,
+}
+
+/// PATCH /api/v3/clans/{id}/settings request body. All fields optional.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanSettingsUpdate {
+    pub join_policy: Option<String>,
+    pub template_scope_default: Option<String>,
+    pub moderation_preferences: Option<ClanModerationPreferences>,
+    pub chat_permissions: Option<ClanChatPermissions>,
+    pub discoverable: Option<bool>,
+    pub default_member_role: Option<String>,
+    pub member_cap: Option<i32>,
+}
+
+/// POST /api/v3/clans/{id}/report request body.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClanReportCreate {
+    pub reason: String,
+    pub evidence: Option<String>,
+}
