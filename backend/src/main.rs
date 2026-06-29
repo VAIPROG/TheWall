@@ -836,6 +836,7 @@ async fn main() {
         // --- site-identity management: list + unlink ---
         .route("/api/v3/users/me/site-identities", get(routes::v3::users::list_site_identities))
         .route("/api/v3/users/me/site-identities/{source}", delete(routes::v3::users::unlink_site_identity))
+        .route("/api/v3/users/me/appeal", post(routes::v3::users::submit_appeal))
         // --- templates: V3 CRUD with the-wall-dev/2 canonical document ------
         .route("/api/v3/templates", get(routes::v3::templates::list))
         .route("/api/v3/templates/new", post(routes::v3::templates::create))
@@ -1041,6 +1042,10 @@ async fn main() {
             "/api/v3/users/{user_ref}/restrictions",
             get(routes::v3::moderation::user_restrictions),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            routes::v3::middleware::auth_and_ban_middleware,
+        ))
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())

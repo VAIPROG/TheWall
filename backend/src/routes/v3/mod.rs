@@ -7,6 +7,7 @@
 pub mod auth;
 pub mod chats;
 pub mod clans;
+pub mod middleware;
 pub mod moderation;
 pub mod templates;
 pub mod users;

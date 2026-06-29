@@ -305,6 +305,20 @@ pub struct AuditLogRow {
     pub moderator_username: Option<String>,
 }
 
+/// Row from `clan_bans`.
+#[derive(Debug, Clone, FromRow)]
+pub struct ClanBanRow {
+    pub id: Uuid,
+    pub clan_id: Uuid,
+    pub user_id: Uuid,
+    pub banned_by: Uuid,
+    pub reason: Option<String>,
+    pub banned_at: DateTime<Utc>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub removed_at: Option<DateTime<Utc>>,
+    pub removed_by: Option<Uuid>,
+}
+
 /// Wire shape — `AuditLogEntry` in the OpenAPI spec.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -343,4 +357,39 @@ pub struct AuditLogPage {
     pub per_page: i64,
     pub total: i64,
     pub total_pages: i64,
+}
+
+// ===========================================================================
+// User appeals
+// ===========================================================================
+
+/// Request body for POST /api/v3/users/me/appeal.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserAppealCreate {
+    pub reason: String,
+}
+
+/// Row from `user_appeals`.
+#[derive(Debug, Clone, FromRow)]
+pub struct UserAppealRow {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub reason: String,
+    pub status: String,
+    pub moderator_notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub resolved_at: Option<DateTime<Utc>>,
+    pub resolved_by: Option<Uuid>,
+}
+
+/// Wire shape for a submitted appeal.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserAppeal {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub reason: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
 }

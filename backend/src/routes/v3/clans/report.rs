@@ -17,14 +17,11 @@ pub async fn report_clan(
     Path(clan_id): Path<Uuid>,
     Json(body): Json<ClanReportCreate>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
-    // Enforcement: bans block all writes; SendReports blocks clan reports.
+    // Enforcement: SendReports blocks clan reports.
     sanctions::check_sanctions(
         &state.pool,
         auth.user_id,
-        &[
-            (sanctions::Sanction::Ban, None),
-            (sanctions::Sanction::SendReports, Some(clan_id)),
-        ],
+        &[(sanctions::Sanction::SendReports, Some(clan_id))],
     )
     .await?;
 

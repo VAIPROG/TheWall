@@ -54,16 +54,12 @@ pub async fn send_modmail(
 ) -> Result<(StatusCode, Json<MessageView>), (StatusCode, String)> {
     let chat_id = modmail_chat_id(&state.pool, auth.user_id).await?;
 
-    // Enforcement: bans block all writes; the separate SendModmail sanction
-    // controls modmail specifically. Mute intentionally does NOT block modmail
-    // so a muted user can still appeal via modmail.
+    // Enforcement: the separate SendModmail sanction controls modmail.
+    // Mute intentionally does NOT block modmail so a muted user can still appeal.
     sanctions::check_sanctions(
         &state.pool,
         auth.user_id,
-        &[
-            (sanctions::Sanction::Ban, None),
-            (sanctions::Sanction::SendModmail, None),
-        ],
+        &[(sanctions::Sanction::SendModmail, None)],
     )
     .await?;
 

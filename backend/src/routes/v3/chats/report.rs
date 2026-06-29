@@ -38,15 +38,12 @@ pub async fn report_message(
         return Err((StatusCode::FORBIDDEN, "access denied".to_string()));
     }
 
-    // Enforcement: bans block all writes; SendReports blocks submitting reports
-    // (clan-scoped restriction applies when the chat is tied to a clan).
+    // Enforcement: SendReports blocks submitting reports (clan-scoped when the
+    // chat is tied to a clan).
     sanctions::check_sanctions(
         &state.pool,
         auth.user_id,
-        &[
-            (sanctions::Sanction::Ban, None),
-            (sanctions::Sanction::SendReports, chat.clan_id),
-        ],
+        &[(sanctions::Sanction::SendReports, chat.clan_id)],
     )
     .await?;
 

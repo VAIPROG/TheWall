@@ -287,6 +287,9 @@ paths:
   /users/me/recovery/phrase:
     $ref: "./paths/users.yaml#/UsersMeRecoveryPhrase"
 
+  /users/me/appeal:
+    $ref: "./paths/users.yaml#/UsersMeAppeal"
+
   /users/{userRef}:
     $ref: "./paths/users.yaml#/UserByRef"
 

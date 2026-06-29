@@ -72,14 +72,11 @@ pub async fn send_dm(
 
     let chat_id = dm_chat_id(&state.pool, auth.user_id, peer).await?;
 
-    // Enforcement: bans block all writes; mutes block chat messages.
+    // Enforcement: mutes block chat messages.
     sanctions::check_sanctions(
         &state.pool,
         auth.user_id,
-        &[
-            (sanctions::Sanction::Ban, None),
-            (sanctions::Sanction::Mute, None),
-        ],
+        &[(sanctions::Sanction::Mute, None)],
     )
     .await?;
 

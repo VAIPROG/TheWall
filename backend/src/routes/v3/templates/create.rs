@@ -29,14 +29,11 @@ pub async fn create(
     State(state): State<AppState>,
     Json(body): Json<TemplateCreateV3>,
 ) -> Result<Json<TemplateCreated>, (StatusCode, String)> {
-    // Enforcement: bans block all writes; PublishTemplates blocks template creation.
+    // Enforcement: PublishTemplates blocks template creation.
     sanctions::check_sanctions(
         &state.pool,
         auth.user_id,
-        &[
-            (sanctions::Sanction::Ban, None),
-            (sanctions::Sanction::PublishTemplates, body.clan_id),
-        ],
+        &[(sanctions::Sanction::PublishTemplates, body.clan_id)],
     )
     .await?;
 

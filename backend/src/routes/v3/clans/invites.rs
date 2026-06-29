@@ -119,14 +119,11 @@ pub async fn create_invite(
     Path(clan_id): Path<Uuid>,
     Json(body): Json<ClanInviteCreate>,
 ) -> Result<(StatusCode, Json<ClanInviteView>), (StatusCode, String)> {
-    // Enforcement: bans block all writes; InviteToClan blocks clan invites.
+    // Enforcement: InviteToClan blocks clan invites.
     sanctions::check_sanctions(
         &state.pool,
         auth.user_id,
-        &[
-            (sanctions::Sanction::Ban, None),
-            (sanctions::Sanction::InviteToClan, Some(clan_id)),
-        ],
+        &[(sanctions::Sanction::InviteToClan, Some(clan_id))],
     )
     .await?;
 

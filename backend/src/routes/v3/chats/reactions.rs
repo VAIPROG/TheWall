@@ -14,6 +14,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{MessageJoinRow, MessageView, Reaction},
+    routes::v3::utils::sanctions,
 };
 
 use super::resolve::{can_access_chat, load_chat};
@@ -116,6 +117,14 @@ pub async fn add_reaction(
     if !can_access_chat(&state.pool, auth.user_id, &chat).await? {
         return Err((StatusCode::FORBIDDEN, "access denied".to_string()));
     }
+
+    // Enforcement: mutes block social reactions (add only) in this chat context.
+    sanctions::check_sanctions(
+        &state.pool,
+        auth.user_id,
+        &[(sanctions::Sanction::Mute, chat.clan_id)],
+    )
+    .await?;
 
     // Verify message exists in this chat and is not deleted.
     let msg_exists: Option<(bool,)> = sqlx::query_as(

@@ -322,3 +322,47 @@ HigherLimitsRequest:
       minLength: 10
       maxLength: 500
       description: Reason for requesting higher rate limits.
+
+UserAppealCreate:
+  type: object
+  required:
+    - reason
+  properties:
+    reason:
+      type: string
+      minLength: 1
+      maxLength: 5000
+      description: User's explanation for the appeal.
+
+UserAppeal:
+  type: object
+  required:
+    - id
+    - userId
+    - reason
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique appeal identifier.
+    userId:
+      type: string
+      format: uuid
+      description: Account UUID of the appealing user.
+    reason:
+      type: string
+      description: Appeal text submitted by the user.
+    status:
+      type: string
+      enum:
+        - pending
+        - reviewing
+        - granted
+        - rejected
+      description: Current appeal status.
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp when the appeal was created.

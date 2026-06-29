@@ -27,6 +27,7 @@ use crate::{
     routes::v3::utils::{
         audit,
         permissions::{effective_clan_role, global_role_of},
+        sanctions,
     },
 };
 
@@ -81,6 +82,75 @@ async fn authorize_restriction(
     }
 
     Err((StatusCode::FORBIDDEN, "moderator required".to_string()))
+}
+
+
+// ---------------------------------------------------------------------------
+// Clan-ban sync helper
+// ---------------------------------------------------------------------------
+
+/// When a clan-scoped restriction carries the `ban` flag, the user is removed
+/// from the clan and an explicit `clan_bans` row is kept so that later
+/// join/apply attempts can be rejected with a clear message.
+async fn apply_clan_ban(
+    pool: &sqlx::PgPool,
+    caller_id: Uuid,
+    clan_id: Uuid,
+    user_id: Uuid,
+    reason: Option<&str>,
+    expires_at: Option<chrono::DateTime<chrono::Utc>>,
+) -> Result<(), (StatusCode, String)> {
+    sqlx::query(
+        r#"INSERT INTO clan_bans (clan_id, user_id, banned_by, reason, banned_at, expires_at)
+           VALUES ($1, $2, $3, $4, NOW(), $5)
+           ON CONFLICT (clan_id, user_id) WHERE removed_at IS NULL
+           DO UPDATE SET
+               banned_by = EXCLUDED.banned_by,
+               reason = EXCLUDED.reason,
+               banned_at = NOW(),
+               expires_at = EXCLUDED.expires_at,
+               removed_at = NULL,
+               removed_by = NULL"#,
+    )
+    .bind(clan_id)
+    .bind(user_id)
+    .bind(caller_id)
+    .bind(reason)
+    .bind(expires_at)
+    .execute(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    sqlx::query(
+        "DELETE FROM clan_memberships WHERE clan_id = $1 AND user_id = $2",
+    )
+    .bind(clan_id)
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(())
+}
+
+async fn remove_clan_ban(
+    pool: &sqlx::PgPool,
+    caller_id: Uuid,
+    clan_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), (StatusCode, String)> {
+    sqlx::query(
+        r#"UPDATE clan_bans
+              SET removed_at = NOW(), removed_by = $1
+            WHERE clan_id = $2 AND user_id = $3 AND removed_at IS NULL"#,
+    )
+    .bind(caller_id)
+    .bind(clan_id)
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +300,12 @@ pub async fn create_restriction(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    if body.scope == "clan" && body.sanctions.ban {
+        if let Some(cid) = body.clan_id {
+            apply_clan_ban(&state.pool, auth.user_id, cid, body.user_id, body.reason.as_deref(), expires_at).await?;
+        }
+    }
+
     let _ = audit::log_action(
         &state.pool,
         auth.user_id,
@@ -340,6 +416,22 @@ pub async fn update_restriction(
 
     let updated = load_restriction(&state.pool, id).await?;
 
+    // Sync clan_ban state when the ban flag or scope changes.
+    if updated.scope == "clan" {
+        let had_ban = existing.s_ban;
+        let now_ban = updated.s_ban;
+        if let Some(cid) = updated.clan_id {
+            if !had_ban && now_ban {
+                apply_clan_ban(&state.pool, auth.user_id, cid, updated.user_id, updated.reason.as_deref(), updated.expires_at).await?;
+            } else if had_ban && !now_ban {
+                remove_clan_ban(&state.pool, auth.user_id, cid, updated.user_id).await?;
+            } else if now_ban && body.duration_minutes.is_some() {
+                // Expiry changed while ban remains active — refresh clan_bans.
+                apply_clan_ban(&state.pool, auth.user_id, cid, updated.user_id, updated.reason.as_deref(), updated.expires_at).await?;
+            }
+        }
+    }
+
     let _ = audit::log_action(
         &state.pool,
         auth.user_id,
@@ -373,6 +465,12 @@ pub async fn delete_restriction(
     .execute(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if existing.scope == "clan" && existing.s_ban {
+        if let Some(cid) = existing.clan_id {
+            remove_clan_ban(&state.pool, auth.user_id, cid, existing.user_id).await?;
+        }
+    }
 
     let _ = audit::log_action(
         &state.pool,

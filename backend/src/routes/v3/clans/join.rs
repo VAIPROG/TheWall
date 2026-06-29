@@ -13,7 +13,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{ClanJoinRequest, ClanRoleApplicationReq},
-    routes::v3::utils::permissions::effective_clan_role,
+    routes::v3::utils::{permissions::effective_clan_role, sanctions},
 };
 
 use super::load_clan;
@@ -50,6 +50,8 @@ pub async fn join_clan(
     Path(clan_id): Path<Uuid>,
     Json(body): Json<ClanJoinRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    sanctions::ensure_not_clan_banned(&state.pool, auth.user_id, clan_id).await?;
+
     let clan = load_clan(&state.pool, clan_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "clan not found".to_string()))?;
@@ -212,6 +214,8 @@ pub async fn apply_for_role(
     Path((clan_id, role)): Path<(Uuid, String)>,
     Json(body): Json<ClanRoleApplicationReq>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    sanctions::ensure_not_clan_banned(&state.pool, auth.user_id, clan_id).await?;
+
     let _clan = load_clan(&state.pool, clan_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "clan not found".to_string()))?;

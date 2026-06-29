@@ -184,3 +184,43 @@ pub async fn check_sanctions(
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Clan ban
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if the user is currently banned from the given clan via the
+/// explicit `clan_bans` table. These bans are created when a moderator applies a
+/// clan-scoped restriction with the `ban` sanction flag.
+pub async fn is_clan_banned(
+    pool: &PgPool,
+    user_id: Uuid,
+    clan_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    let exists: bool = sqlx::query_scalar(
+        r#"SELECT EXISTS (
+            SELECT 1 FROM clan_bans
+             WHERE clan_id = $1
+               AND user_id = $2
+               AND removed_at IS NULL
+               AND (expires_at IS NULL OR expires_at > NOW())
+           )"#,
+    )
+    .bind(clan_id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(exists)
+}
+
+/// Ensures the user is not banned from the clan. Returns `Err(403)` if banned.
+pub async fn ensure_not_clan_banned(
+    pool: &PgPool,
+    user_id: Uuid,
+    clan_id: Uuid,
+) -> Result<(), (StatusCode, String)> {
+    if is_clan_banned(pool, user_id, clan_id).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))? {
+        return Err((StatusCode::FORBIDDEN, "you are banned from this clan".to_string()));
+    }
+    Ok(())
+}
