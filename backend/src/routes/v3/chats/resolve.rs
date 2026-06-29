@@ -3,7 +3,7 @@
 use axum::{Json, extract::State, http::StatusCode};
 use uuid::Uuid;
 
-use crate::{AppState, auth::AuthUser, models::ChatV3};
+use crate::{AppState, auth::AuthUser, models::ChatV3, routes::v2::permissions};
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -81,7 +81,7 @@ pub fn dm_key_for(a: Uuid, b: Uuid) -> String {
 /// Load a chat row by id, returning `None` if absent.
 pub async fn load_chat(pool: &sqlx::PgPool, chat_id: Uuid) -> Result<Option<ChatV3>, (StatusCode, String)> {
     sqlx::query_as::<_, ChatV3>(
-        "SELECT id, type, clan_id, dm_key, topic, slowmode_seconds, created_at \
+        "SELECT id, type, clan_id, dm_key, topic, slowmode_seconds, created_at, opener_id \
          FROM chats WHERE id = $1",
     )
     .bind(chat_id)
@@ -128,31 +128,30 @@ pub async fn can_access_chat(
             Ok(key.contains(&user_id.to_string()))
         }
         "modmail" => {
-            let clan_id = match chat.clan_id {
-                Some(c) => c,
-                None => return Ok(false),
-            };
-            let role: Option<String> = sqlx::query_scalar(
-                "SELECT clan_role FROM clan_memberships \
-                 WHERE user_id = $1 AND clan_id = $2 AND active = TRUE",
-            )
-            .bind(user_id)
-            .bind(clan_id)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            // Also accept global admin/owner.
-            if matches!(role.as_deref(), Some("moderator") | Some("admin")) {
+            // Opener sees their own thread.
+            if chat.opener_id == Some(user_id) {
                 return Ok(true);
             }
-            // Check global role.
-            let global_role: Option<String> =
-                sqlx::query_scalar("SELECT global_role FROM users WHERE id = $1")
-                    .bind(user_id)
-                    .fetch_optional(pool)
+            // Global admin/owner sees all modmail threads.
+            if permissions::global_role_of(pool, user_id)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .is_admin()
+            {
+                return Ok(true);
+            }
+            // Clan-scoped modmail: allow that clan's mod+ as well.
+            if let Some(clan_id) = chat.clan_id {
+                if permissions::effective_clan_role(pool, user_id, clan_id)
                     .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            Ok(matches!(global_role.as_deref(), Some("admin") | Some("owner")))
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                    .map(|r| r.is_mod())
+                    .unwrap_or(false)
+                {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
         }
         _ => Ok(false),
     }

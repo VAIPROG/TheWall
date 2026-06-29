@@ -283,29 +283,42 @@ pub async fn delete_message(
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "chat not found".to_string()))?;
 
-    // Authorization: author OR global admin/owner OR clan mod+ in a clan chat.
+    // Gate on chat access first — prevents admins from deleting DM messages
+    // in threads they are not a participant of.
+    if !can_access_chat(&state.pool, auth.user_id, &chat).await? {
+        return Err((StatusCode::FORBIDDEN, "access denied".into()));
+    }
+
     let is_author = msg_row.author_id == Some(auth.user_id);
 
-    let is_global_admin = permissions::global_role_of(&state.pool, auth.user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .is_admin();
+    let allowed = if chat.chat_type == "dm" {
+        // DM: only the message author may delete.
+        is_author
+    } else {
+        // Non-DM: author, global admin/owner, or clan mod+ (clan / modmail).
+        let is_global_admin = permissions::global_role_of(&state.pool, auth.user_id)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .is_admin();
 
-    let is_clan_mod = if chat.chat_type == "clan" {
-        if let Some(clan_id) = chat.clan_id {
-            permissions::effective_clan_role(&state.pool, auth.user_id, clan_id)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-                .map(|r| r.is_mod())
-                .unwrap_or(false)
+        let is_clan_mod = if chat.chat_type == "clan" || chat.chat_type == "modmail" {
+            if let Some(clan_id) = chat.clan_id {
+                permissions::effective_clan_role(&state.pool, auth.user_id, clan_id)
+                    .await
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                    .map(|r| r.is_mod())
+                    .unwrap_or(false)
+            } else {
+                false
+            }
         } else {
             false
-        }
-    } else {
-        false
+        };
+
+        is_author || is_global_admin || is_clan_mod
     };
 
-    if !is_author && !is_global_admin && !is_clan_mod {
+    if !allowed {
         return Err((StatusCode::FORBIDDEN, "not allowed".to_string()));
     }
 

@@ -4,7 +4,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::{AppState, auth::AuthUser, models::{ChatSummaryView, ChatV3}};
+use crate::{AppState, auth::AuthUser, models::{ChatSummaryView, ChatV3}, routes::v2::permissions};
 
 use super::resolve::{clan_chat_id, dm_key_for, global_chat_id};
 
@@ -145,7 +145,7 @@ pub async fn list_chats(
     // 3. DM chats where this user is a participant.
     let uid_str = auth.user_id.to_string();
     let dm_chats: Vec<ChatV3> = sqlx::query_as::<_, ChatV3>(
-        "SELECT id, type, clan_id, dm_key, topic, slowmode_seconds, created_at \
+        "SELECT id, type, clan_id, dm_key, topic, slowmode_seconds, created_at, opener_id \
          FROM chats \
          WHERE type = 'dm' \
            AND (dm_key LIKE $1 OR dm_key LIKE $2)",
@@ -170,7 +170,38 @@ pub async fn list_chats(
     // Suppress unused import warning for dm_key_for.
     let _ = dm_key_for;
 
-    // 4. Enrich all chats in one query.
+    // 4. Modmail chats: admin/owner sees all; caller sees only their own thread.
+    let is_admin = permissions::global_role_of(&state.pool, auth.user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .is_admin();
+
+    let modmail_chats: Vec<ChatV3> = if is_admin {
+        sqlx::query_as::<_, ChatV3>(
+            "SELECT id, type, clan_id, dm_key, topic, slowmode_seconds, created_at, opener_id \
+             FROM chats WHERE type = 'modmail' ORDER BY created_at ASC",
+        )
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    } else {
+        sqlx::query_as::<_, ChatV3>(
+            "SELECT id, type, clan_id, dm_key, topic, slowmode_seconds, created_at, opener_id \
+             FROM chats WHERE type = 'modmail' AND opener_id = $1",
+        )
+        .bind(auth.user_id)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    };
+
+    for mm in &modmail_chats {
+        if !ordered_ids.contains(&mm.id) {
+            ordered_ids.push(mm.id);
+        }
+    }
+
+    // 5. Enrich all chats in one query.
     let enriched = enrich_chats(&state.pool, auth.user_id, &ordered_ids).await?;
 
     // Re-order to match ordered_ids (the enrichment query may return rows in

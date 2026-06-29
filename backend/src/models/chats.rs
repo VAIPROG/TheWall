@@ -22,6 +22,7 @@ pub struct ChatV3 {
     pub topic: Option<String>,
     pub slowmode_seconds: i32,
     pub created_at: DateTime<Utc>,
+    pub opener_id: Option<Uuid>,
 }
 
 /// Wire shape for `GET /api/v3/chats` — extends `ChatV3` with read-state
