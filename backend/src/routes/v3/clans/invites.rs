@@ -16,7 +16,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{ClanInviteCreate, ClanInviteView, ClanV3},
-    routes::v3::utils::permissions::{ClanRole, effective_clan_role},
+    routes::v3::utils::{permissions::{ClanRole, effective_clan_role}, sanctions},
 };
 
 use super::load_clan;
@@ -119,6 +119,17 @@ pub async fn create_invite(
     Path(clan_id): Path<Uuid>,
     Json(body): Json<ClanInviteCreate>,
 ) -> Result<(StatusCode, Json<ClanInviteView>), (StatusCode, String)> {
+    // Enforcement: bans block all writes; InviteToClan blocks clan invites.
+    sanctions::check_sanctions(
+        &state.pool,
+        auth.user_id,
+        &[
+            (sanctions::Sanction::Ban, None),
+            (sanctions::Sanction::InviteToClan, Some(clan_id)),
+        ],
+    )
+    .await?;
+
     let clan = load_clan(&state.pool, clan_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "clan not found".to_string()))?;

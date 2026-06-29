@@ -48,6 +48,18 @@ impl Sanction {
             Sanction::SendModmail => "s_send_modmail",
         }
     }
+
+    /// Returns the boolean column value on a restriction row.
+    fn flag_on(&self, row: &RestrictionRow) -> bool {
+        match self {
+            Sanction::Mute => row.s_mute,
+            Sanction::Ban => row.s_ban,
+            Sanction::PublishTemplates => row.s_publish_templates,
+            Sanction::InviteToClan => row.s_invite_to_clan,
+            Sanction::SendReports => row.s_send_reports,
+            Sanction::SendModmail => row.s_send_modmail,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -117,9 +129,7 @@ pub async fn has_sanction(
 
 /// Returns `Err(403, "you are <label>")` if the user has an active sanction.
 /// Wire call sites into handlers that must respect restrictions (chat send,
-/// template create, invite, report submit, modmail). This function is defined
-/// now; wiring into handlers is slice 4.
-#[allow(dead_code)]
+/// template create, invite, report submit, modmail).
 pub async fn ensure_not_sanctioned(
     pool: &PgPool,
     user_id: Uuid,
@@ -135,6 +145,42 @@ pub async fn ensure_not_sanctioned(
             StatusCode::FORBIDDEN,
             format!("you are {label}"),
         ));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// check_sanctions — multiple sanctions in one query
+// ---------------------------------------------------------------------------
+
+/// Check several sanctions at once, returning the first active violation.
+/// Each tuple is `(sanction, clan_context)` where `None` means global/non-clan
+/// scope. A single DB query fetches all active restrictions; each sanction is
+/// evaluated against the appropriate scope (global always applies, clan only
+/// when the restriction's clan_id matches).
+pub async fn check_sanctions(
+    pool: &PgPool,
+    user_id: Uuid,
+    checks: &[(Sanction, Option<Uuid>)],
+) -> Result<(), (StatusCode, String)> {
+    let rows = active_restrictions(pool, user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    for (sanction, clan_id) in checks {
+        let applies = rows.iter().any(|r| {
+            if !sanction.flag_on(r) {
+                return false;
+            }
+            match r.scope.as_str() {
+                "global" => true,
+                "clan" => clan_id.map(|cid| r.clan_id == Some(cid)).unwrap_or(false),
+                _ => false,
+            }
+        });
+        if applies {
+            return Err((StatusCode::FORBIDDEN, format!("you are {}", sanction.label())));
+        }
     }
     Ok(())
 }

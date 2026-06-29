@@ -12,6 +12,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{ChatDetailView, MessageJoinRow, MessageView, SendMessageReq},
+    routes::v3::utils::sanctions,
 };
 
 use super::detail::build_detail;
@@ -52,6 +53,19 @@ pub async fn send_modmail(
     Json(body): Json<SendMessageReq>,
 ) -> Result<(StatusCode, Json<MessageView>), (StatusCode, String)> {
     let chat_id = modmail_chat_id(&state.pool, auth.user_id).await?;
+
+    // Enforcement: bans block all writes; the separate SendModmail sanction
+    // controls modmail specifically. Mute intentionally does NOT block modmail
+    // so a muted user can still appeal via modmail.
+    sanctions::check_sanctions(
+        &state.pool,
+        auth.user_id,
+        &[
+            (sanctions::Sanction::Ban, None),
+            (sanctions::Sanction::SendModmail, None),
+        ],
+    )
+    .await?;
 
     let content = body.content.trim().to_string();
     if content.is_empty() {

@@ -20,7 +20,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{TemplateCreateV3, TemplateCreated, TemplateV3},
-    routes::v3::utils::permissions,
+    routes::v3::utils::{permissions, sanctions},
     routes::templates::validate_template_scale,
 };
 
@@ -29,6 +29,17 @@ pub async fn create(
     State(state): State<AppState>,
     Json(body): Json<TemplateCreateV3>,
 ) -> Result<Json<TemplateCreated>, (StatusCode, String)> {
+    // Enforcement: bans block all writes; PublishTemplates blocks template creation.
+    sanctions::check_sanctions(
+        &state.pool,
+        auth.user_id,
+        &[
+            (sanctions::Sanction::Ban, None),
+            (sanctions::Sanction::PublishTemplates, body.clan_id),
+        ],
+    )
+    .await?;
+
     // ── 1. Validate scope ────────────────────────────────────────────────────
     if !matches!(body.scope.as_str(), "private" | "clan" | "public") {
         return Err((

@@ -13,6 +13,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::ReportCreate,
+    routes::v3::utils::sanctions,
 };
 
 use super::resolve::{can_access_chat, load_chat};
@@ -36,6 +37,18 @@ pub async fn report_message(
     if !can_access_chat(&state.pool, auth.user_id, &chat).await? {
         return Err((StatusCode::FORBIDDEN, "access denied".to_string()));
     }
+
+    // Enforcement: bans block all writes; SendReports blocks submitting reports
+    // (clan-scoped restriction applies when the chat is tied to a clan).
+    sanctions::check_sanctions(
+        &state.pool,
+        auth.user_id,
+        &[
+            (sanctions::Sanction::Ban, None),
+            (sanctions::Sanction::SendReports, chat.clan_id),
+        ],
+    )
+    .await?;
 
     // Verify the message exists in this chat.
     let msg_exists: Option<bool> = sqlx::query_scalar(

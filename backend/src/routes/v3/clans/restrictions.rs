@@ -1,7 +1,4 @@
-//! GET /api/v3/clans/{id}/restrictions — list clan-scoped restrictions (stub).
-//!
-//! restrictions backend is part of the moderation subsystem (not yet implemented);
-//! returns empty until then.
+//! GET /api/v3/clans/{id}/restrictions — list clan-scoped restrictions.
 
 use axum::{
     Json,
@@ -12,7 +9,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{AppState, auth::AuthUser};
-use crate::models::RestrictionPage;
+use crate::models::{RestrictionPage, RestrictionRow, RestrictionView};
 use crate::routes::v3::utils::permissions::effective_clan_role;
 
 use super::load_clan;
@@ -53,14 +50,34 @@ pub async fn list_clan_restrictions(
 
     let page = q.page.unwrap_or(1).max(1);
     let per_page = q.per_page.unwrap_or(50).clamp(1, 100);
+    let offset = (page - 1) * per_page;
 
-    // restrictions backend is part of the moderation subsystem (not yet implemented);
-    // returns empty until then.
-    Ok(Json(RestrictionPage {
-        items: vec![],
-        page,
-        per_page,
-        total: 0,
-        total_pages: 0,
-    }))
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM restrictions WHERE scope = 'clan' AND clan_id = $1",
+    )
+    .bind(clan_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let rows = sqlx::query_as::<_, RestrictionRow>(
+        r#"SELECT id, user_id, scope, clan_id, applied_by, applied_at, expires_at,
+                  reason, s_mute, s_ban, s_publish_templates, s_invite_to_clan,
+                  s_send_reports, s_send_modmail, removed_at, removed_by, created_at
+             FROM restrictions
+            WHERE scope = 'clan' AND clan_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3"#,
+    )
+    .bind(clan_id)
+    .bind(per_page)
+    .bind(offset)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let items = rows.into_iter().map(RestrictionView::from_row).collect();
+    let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };
+
+    Ok(Json(RestrictionPage { items, page, per_page, total, total_pages }))
 }

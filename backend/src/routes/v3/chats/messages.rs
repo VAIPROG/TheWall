@@ -15,7 +15,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{EditMessageReq, MessageJoinRow, MessageListQuery, MessageView, SendMessageReq},
-    routes::v3::utils::permissions,
+    routes::v3::utils::{permissions, sanctions},
 };
 
 use super::reactions::{attach_reactions, attach_reactions_one};
@@ -126,6 +126,22 @@ pub async fn send_message(
         return Err((StatusCode::FORBIDDEN, "access denied".to_string()));
     }
 
+    // Enforcement: bans block all writes. Mute blocks chat messages, but
+    // modmail is intentionally NOT covered by Mute so a muted user can
+    // appeal via modmail; it uses the separate SendModmail sanction instead.
+    let checks = if chat.chat_type == "modmail" {
+        vec![
+            (sanctions::Sanction::Ban, None),
+            (sanctions::Sanction::SendModmail, None),
+        ]
+    } else {
+        vec![
+            (sanctions::Sanction::Ban, None),
+            (sanctions::Sanction::Mute, chat.clan_id),
+        ]
+    };
+    sanctions::check_sanctions(&state.pool, auth.user_id, &checks).await?;
+
     let content = body.content.trim().to_string();
     if content.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "content cannot be empty".to_string()));
@@ -188,6 +204,14 @@ pub async fn edit_message(
     Path((chat_id, message_id)): Path<(Uuid, Uuid)>,
     Json(body): Json<EditMessageReq>,
 ) -> Result<Json<MessageView>, (StatusCode, String)> {
+    // Enforcement: a ban blocks all writes.
+    sanctions::check_sanctions(
+        &state.pool,
+        auth.user_id,
+        &[(sanctions::Sanction::Ban, None)],
+    )
+    .await?;
+
     // Load the message (must belong to this chat).
     let msg_row = sqlx::query_as::<_, crate::models::MessageV3>(
         "SELECT id, chat_id, author_id, content, reply_to_id, \
@@ -265,6 +289,14 @@ pub async fn delete_message(
     State(state): State<AppState>,
     Path((chat_id, message_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    // Enforcement: a ban blocks all writes.
+    sanctions::check_sanctions(
+        &state.pool,
+        auth.user_id,
+        &[(sanctions::Sanction::Ban, None)],
+    )
+    .await?;
+
     // Load message + its chat.
     let msg_row = sqlx::query_as::<_, crate::models::MessageV3>(
         "SELECT id, chat_id, author_id, content, reply_to_id, \
