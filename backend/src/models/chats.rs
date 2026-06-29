@@ -214,6 +214,14 @@ pub struct MessageListQuery {
     pub limit: Option<i64>,
 }
 
+/// Request body for `POST /api/v3/chats/{cid}/messages/{mid}/report`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportCreate {
+    pub reason: String,
+    pub evidence: Option<String>,
+}
+
 /// Request body for `POST /api/v3/chats/{cid}/read`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -870,9 +870,14 @@ async fn main() {
             "/api/v3/chats/global",
             get(routes::v3::chats::get_global_chat),
         )
+        // Literal sub-paths under /global come before the param-segment /{id}.
         .route(
-            "/api/v3/chats/dm/{account_id}",
-            post(routes::v3::chats::open_dm),
+            "/api/v3/chats/global/modmail",
+            get(routes::v3::chats::get_modmail).post(routes::v3::chats::send_modmail),
+        )
+        .route(
+            "/api/v3/chats/dm/{user_ref}",
+            get(routes::v3::chats::get_dm_thread).post(routes::v3::chats::send_dm),
         )
         .route(
             "/api/v3/chats/{id}",
@@ -892,6 +897,10 @@ async fn main() {
             "/api/v3/chats/{cid}/messages/{mid}/reactions/{emoji}",
             axum::routing::put(routes::v3::chats::add_reaction)
                 .delete(routes::v3::chats::remove_reaction),
+        )
+        .route(
+            "/api/v3/chats/{cid}/messages/{mid}/report",
+            post(routes::v3::chats::report_message),
         )
         .route(
             "/api/v3/chats/{cid}/read",

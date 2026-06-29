@@ -38,7 +38,7 @@ const MSG_COLS: &str = r#"
 // Internal — build ChatDetailView from a loaded ChatV3
 // ---------------------------------------------------------------------------
 
-async fn build_detail(
+pub(super) async fn build_detail(
     pool: &sqlx::PgPool,
     viewer_id: Uuid,
     chat: ChatV3,

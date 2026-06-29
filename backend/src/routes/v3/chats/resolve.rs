@@ -1,9 +1,9 @@
 //! Chat-resolution helpers and access-control predicate.
 
-use axum::{Json, extract::State, http::StatusCode};
+use axum::http::StatusCode;
 use uuid::Uuid;
 
-use crate::{AppState, auth::AuthUser, models::ChatV3, routes::v2::permissions};
+use crate::{models::ChatV3, routes::v2::permissions};
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -67,6 +67,47 @@ pub async fn dm_chat_id(pool: &sqlx::PgPool, a: Uuid, b: Uuid) -> Result<Uuid, (
     .fetch_one(pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+/// Get-or-create the global modmail thread for `opener`.
+pub async fn modmail_chat_id(pool: &sqlx::PgPool, opener: Uuid) -> Result<Uuid, (StatusCode, String)> {
+    sqlx::query(
+        "INSERT INTO chats (id, type, opener_id) \
+         VALUES (gen_random_uuid(), 'modmail', $1) \
+         ON CONFLICT (opener_id) WHERE type = 'modmail' DO NOTHING",
+    )
+    .bind(opener)
+    .execute(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM chats WHERE type = 'modmail' AND opener_id = $1",
+    )
+    .bind(opener)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+/// Resolve a userRef that is either a UUID or a case-insensitive username.
+/// Returns `None` if the user does not exist.
+pub async fn resolve_user_ref(pool: &sqlx::PgPool, user_ref: &str) -> Result<Option<Uuid>, (StatusCode, String)> {
+    if let Ok(uid) = uuid::Uuid::parse_str(user_ref) {
+        // UUID path: verify the row exists.
+        let exists: Option<bool> = sqlx::query_scalar("SELECT TRUE FROM users WHERE id = $1")
+            .bind(uid)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        return Ok(exists.map(|_| uid));
+    }
+    // Username path: case-insensitive lookup.
+    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE LOWER(username) = LOWER($1)")
+        .bind(user_ref)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// Canonical dm_key: `min(a,b):max(a,b)`.
@@ -157,34 +198,3 @@ pub async fn can_access_chat(
     }
 }
 
-// ---------------------------------------------------------------------------
-// POST /api/v3/chats/dm/{account_id}
-// ---------------------------------------------------------------------------
-
-/// Open (or return existing) a DM chat with another user.
-pub async fn open_dm(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    axum::extract::Path(peer): axum::extract::Path<Uuid>,
-) -> Result<(StatusCode, Json<ChatV3>), (StatusCode, String)> {
-    if peer == auth.user_id {
-        return Err((StatusCode::BAD_REQUEST, "cannot DM yourself".to_string()));
-    }
-
-    // Verify peer exists.
-    let exists: Option<bool> = sqlx::query_scalar("SELECT TRUE FROM users WHERE id = $1")
-        .bind(peer)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    if exists.is_none() {
-        return Err((StatusCode::NOT_FOUND, "peer user not found".to_string()));
-    }
-
-    let chat_id = dm_chat_id(&state.pool, auth.user_id, peer).await?;
-    let chat = load_chat(&state.pool, chat_id)
-        .await?
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "dm chat vanished".to_string()))?;
-
-    Ok((StatusCode::OK, Json(chat)))
-}
