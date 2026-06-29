@@ -2,11 +2,13 @@
 //! queue, and the moderation audit log.
 
 mod audit_log;
+mod clans;
 mod queue;
 mod reports;
 mod restrictions;
 
 pub use audit_log::get_audit_log;
+pub use clans::{takedown_clan, unlock_clan};
 pub use queue::{approve_template, get_queue, reject_template};
 pub use reports::{dismiss_report, get_report, list_reports, resolve_report, update_report};
 pub use restrictions::{

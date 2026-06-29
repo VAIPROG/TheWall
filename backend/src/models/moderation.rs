@@ -264,6 +264,30 @@ pub struct ModAction {
 }
 
 // ===========================================================================
+// Clan moderation actions (takedown / unlock)
+// ===========================================================================
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanTakedownRequest {
+    pub fields: Vec<String>,
+    #[serde(default = "default_takedown_action")]
+    pub action: String,
+    pub reason: String,
+}
+
+fn default_takedown_action() -> String {
+    "strip_and_lock".to_string()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanUnlockRequest {
+    pub fields: Vec<String>,
+    pub reason: Option<String>,
+}
+
+// ===========================================================================
 // Audit log
 // ===========================================================================
 

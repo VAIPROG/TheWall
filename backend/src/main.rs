@@ -1017,6 +1017,14 @@ async fn main() {
             "/api/v3/moderation/audit-log",
             get(routes::v3::moderation::get_audit_log),
         )
+        .route(
+            "/api/v3/moderation/clans/{id}/takedown",
+            post(routes::v3::moderation::takedown_clan),
+        )
+        .route(
+            "/api/v3/moderation/clans/{id}/unlock",
+            post(routes::v3::moderation::unlock_clan),
+        )
         // --- V3 restrictions: granular sanctions CRUD -------------------------
         .route(
             "/api/v3/restrictions",
