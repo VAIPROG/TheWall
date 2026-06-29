@@ -16,7 +16,7 @@ mod wall_tiles;
 
 use axum::{
     Router,
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
 };
 use sqlx::postgres::PgPoolOptions;
 use std::env;
@@ -860,6 +860,20 @@ async fn main() {
         .route(
             "/api/v3/admin/templates/backfill-documents",
             post(routes::v3::templates::backfill),
+        )
+        // --- V3 chats: unified chat model (global, clan, DM) ------------------
+        .route("/api/v3/chats", get(routes::v3::chats::list_chats))
+        .route(
+            "/api/v3/chats/{id}/messages",
+            get(routes::v3::chats::list_messages).post(routes::v3::chats::send_message),
+        )
+        .route(
+            "/api/v3/chats/{cid}/messages/{mid}",
+            patch(routes::v3::chats::edit_message).delete(routes::v3::chats::delete_message),
+        )
+        .route(
+            "/api/v3/chats/dm/{account_id}",
+            post(routes::v3::chats::open_dm),
         )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())

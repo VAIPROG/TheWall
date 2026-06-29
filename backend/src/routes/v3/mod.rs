@@ -5,5 +5,6 @@
 //! connections; `provider_links` hold OAuth connections.
 
 pub mod auth;
+pub mod chats;
 pub mod templates;
 pub mod users;
