@@ -16,7 +16,7 @@ mod wall_tiles;
 
 use axum::{
     Router,
-    routing::{delete, get, patch, post, put},
+    routing::{delete, get, post, put},
 };
 use sqlx::postgres::PgPoolOptions;
 use std::env;
