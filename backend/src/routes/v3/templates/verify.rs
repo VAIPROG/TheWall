@@ -19,7 +19,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{TemplateV3, TemplateVerifyRequest},
-    routes::v2::permissions,
+    routes::v3::utils::permissions,
 };
 
 /// Columns for every TemplateV3 RETURNING clause (mirrors read.rs).
@@ -65,7 +65,7 @@ pub async fn verify(
             permissions::effective_clan_role(&state.pool, auth.user_id, cid)
                 .await
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-                .map(|r| r.is_mod())
+                .map(|r| r.is_moderator())
                 .unwrap_or(false)
         } else {
             false

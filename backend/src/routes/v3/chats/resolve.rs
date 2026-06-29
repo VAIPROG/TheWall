@@ -3,7 +3,7 @@
 use axum::http::StatusCode;
 use uuid::Uuid;
 
-use crate::{models::ChatV3, routes::v2::permissions};
+use crate::{models::ChatV3, routes::v3::utils::permissions};
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -173,11 +173,11 @@ pub async fn can_access_chat(
             if chat.opener_id == Some(user_id) {
                 return Ok(true);
             }
-            // Global admin/owner sees all modmail threads.
+            // Global moderator/admin/owner sees all modmail threads.
             if permissions::global_role_of(pool, user_id)
                 .await
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-                .is_admin()
+                .is_moderator()
             {
                 return Ok(true);
             }
@@ -186,7 +186,7 @@ pub async fn can_access_chat(
                 if permissions::effective_clan_role(pool, user_id, clan_id)
                     .await
                     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-                    .map(|r| r.is_mod())
+                    .map(|r| r.is_moderator())
                     .unwrap_or(false)
                 {
                     return Ok(true);

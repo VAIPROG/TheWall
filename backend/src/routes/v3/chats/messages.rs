@@ -15,7 +15,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{EditMessageReq, MessageJoinRow, MessageListQuery, MessageView, SendMessageReq},
-    routes::v2::permissions,
+    routes::v3::utils::permissions,
 };
 
 use super::reactions::{attach_reactions, attach_reactions_one};
@@ -295,27 +295,27 @@ pub async fn delete_message(
         // DM: only the message author may delete.
         is_author
     } else {
-        // Non-DM: author, global admin/owner, or clan mod+ (clan / modmail).
-        let is_global_admin = permissions::global_role_of(&state.pool, auth.user_id)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-            .is_admin();
-
-        let is_clan_mod = if chat.chat_type == "clan" || chat.chat_type == "modmail" {
-            if let Some(clan_id) = chat.clan_id {
-                permissions::effective_clan_role(&state.pool, auth.user_id, clan_id)
-                    .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-                    .map(|r| r.is_mod())
-                    .unwrap_or(false)
-            } else {
-                false
-            }
+        // Non-DM: the author, or anyone with moderator authority over this chat.
+        let can_moderate = if let Some(clan_id) = chat
+            .clan_id
+            .filter(|_| chat.chat_type == "clan" || chat.chat_type == "modmail")
+        {
+            // Clan-scoped: effective clan role already folds in global authority
+            // (a global moderator counts as a clan moderator here).
+            permissions::effective_clan_role(&state.pool, auth.user_id, clan_id)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .map(|r| r.is_moderator())
+                .unwrap_or(false)
         } else {
-            false
+            // Global chat / global modmail: a global moderator+ moderates it.
+            permissions::global_role_of(&state.pool, auth.user_id)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .is_moderator()
         };
 
-        is_author || is_global_admin || is_clan_mod
+        is_author || can_moderate
     };
 
     if !allowed {

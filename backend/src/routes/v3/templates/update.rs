@@ -23,7 +23,7 @@ use crate::{
     auth::AuthUser,
     models::{TemplatePatchV3, TemplateV3},
     routes::templates::validate_template_scale,
-    routes::v2::permissions,
+    routes::v3::utils::permissions,
 };
 
 use super::patch_apply::apply_patch;

@@ -17,7 +17,7 @@ use crate::{
         ChatDetailView, ChatViewerContext, LastMessagePreview, MessageJoinRow, MessageView,
         ParticipantView, ChatV3,
     },
-    routes::v2::permissions,
+    routes::v3::utils::permissions,
 };
 
 use super::reactions::{attach_reactions, attach_reactions_one};

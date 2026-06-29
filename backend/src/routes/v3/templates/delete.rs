@@ -3,7 +3,7 @@
 //! Permission matrix:
 //!   - Owner of the template (user_id = auth.user_id) — always allowed.
 //!   - Global admin / owner (global_role_of().is_admin()) — always allowed.
-//!   - Clan moderator+ of the template's clan (effective_clan_role().is_mod())
+//!   - Clan moderator+ of the template's clan (effective_clan_role().is_moderator())
 //!     — allowed for clan-scoped templates.
 //!
 //! Note: the "membersCanDeleteOwnTemplates" clan setting is deferred to a
@@ -18,7 +18,7 @@ use uuid::Uuid;
 use crate::{
     AppState,
     auth::AuthUser,
-    routes::v2::permissions,
+    routes::v3::utils::permissions,
 };
 
 pub async fn delete(
@@ -50,7 +50,7 @@ pub async fn delete(
             permissions::effective_clan_role(&state.pool, auth.user_id, cid)
                 .await
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-                .map(|r| r.is_mod())
+                .map(|r| r.is_moderator())
                 .unwrap_or(false)
         } else {
             false

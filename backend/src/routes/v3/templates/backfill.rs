@@ -15,7 +15,7 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::{AppState, auth::AuthUser, routes::v2::permissions};
+use crate::{AppState, auth::AuthUser, routes::v3::utils::permissions};
 
 pub async fn backfill(
     auth: AuthUser,

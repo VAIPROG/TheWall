@@ -20,7 +20,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{TemplateCreateV3, TemplateCreated, TemplateV3},
-    routes::v2::permissions,
+    routes::v3::utils::permissions,
     routes::templates::validate_template_scale,
 };
 

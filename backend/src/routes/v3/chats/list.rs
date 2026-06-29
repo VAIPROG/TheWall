@@ -4,7 +4,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::{AppState, auth::AuthUser, models::{ChatSummaryView, ChatV3}, routes::v2::permissions};
+use crate::{AppState, auth::AuthUser, models::{ChatSummaryView, ChatV3}, routes::v3::utils::permissions};
 
 use super::resolve::{clan_chat_id, dm_key_for, global_chat_id};
 
@@ -170,13 +170,13 @@ pub async fn list_chats(
     // Suppress unused import warning for dm_key_for.
     let _ = dm_key_for;
 
-    // 4. Modmail chats: admin/owner sees all; caller sees only their own thread.
-    let is_admin = permissions::global_role_of(&state.pool, auth.user_id)
+    // 4. Modmail chats: moderator+ sees all; caller sees only their own thread.
+    let is_moderator = permissions::global_role_of(&state.pool, auth.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .is_admin();
+        .is_moderator();
 
-    let modmail_chats: Vec<ChatV3> = if is_admin {
+    let modmail_chats: Vec<ChatV3> = if is_moderator {
         sqlx::query_as::<_, ChatV3>(
             "SELECT id, type, clan_id, dm_key, topic, slowmode_seconds, created_at, opener_id \
              FROM chats WHERE type = 'modmail' ORDER BY created_at ASC",
