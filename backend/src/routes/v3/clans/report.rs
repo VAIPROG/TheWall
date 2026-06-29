@@ -43,8 +43,8 @@ pub async fn report_clan(
 
     // ── insert report ─────────────────────────────────────────────────────────
     sqlx::query(
-        r#"INSERT INTO clan_reports (id, clan_id, reporter_id, reason, evidence)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4)"#,
+        r#"INSERT INTO reports (id, type, target_id, clan_id, reporter_id, reason, evidence)
+           VALUES (gen_random_uuid(), 'clan', $1::text, $1, $2, $3, $4)"#,
     )
     .bind(clan_id)
     .bind(auth.user_id)

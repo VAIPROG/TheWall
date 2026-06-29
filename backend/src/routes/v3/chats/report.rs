@@ -71,11 +71,11 @@ pub async fn report_message(
     }
 
     sqlx::query(
-        "INSERT INTO message_reports (id, message_id, chat_id, reporter_id, reason, evidence) \
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)",
+        "INSERT INTO reports (id, type, target_id, clan_id, reporter_id, reason, evidence) \
+         VALUES (gen_random_uuid(), 'message', $1::text, $2, $3, $4, $5)",
     )
     .bind(message_id)
-    .bind(chat_id)
+    .bind(chat.clan_id)
     .bind(auth.user_id)
     .bind(&reason)
     .bind(&body.evidence)

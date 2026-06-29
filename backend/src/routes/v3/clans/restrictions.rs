@@ -8,10 +8,11 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{AppState, auth::AuthUser};
+use crate::models::RestrictionPage;
 use crate::routes::v3::utils::permissions::effective_clan_role;
 
 use super::load_clan;
@@ -24,23 +25,6 @@ use super::load_clan;
 pub struct RestrictionsQuery {
     pub page: Option<i64>,
     pub per_page: Option<i64>,
-}
-
-// ---------------------------------------------------------------------------
-// Empty response shape (RestrictionPage)
-// ---------------------------------------------------------------------------
-
-/// Stub paginated response — matches `RestrictionPage` in
-/// openapi/components/schemas/restrictions.yaml.
-/// Returns empty until the moderation subsystem implements the restrictions table.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RestrictionPage {
-    pub items: Vec<serde_json::Value>,
-    pub page: i64,
-    pub per_page: i64,
-    pub total: i64,
-    pub total_pages: i64,
 }
 
 // ---------------------------------------------------------------------------
