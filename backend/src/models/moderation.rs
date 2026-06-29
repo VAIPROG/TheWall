@@ -147,3 +147,176 @@ pub struct RestrictionUpdate {
     pub reason: Option<String>,
     pub sanctions: Option<Sanctions>,
 }
+
+// ===========================================================================
+// Reports — unified polymorphic report queue
+// ===========================================================================
+
+/// Raw DB row from `reports`.
+#[derive(Debug, Clone, FromRow)]
+pub struct ReportRow {
+    pub id: Uuid,
+    #[sqlx(rename = "type")]
+    pub report_type: String,
+    pub target_id: String,
+    pub clan_id: Option<Uuid>,
+    pub reporter_id: Option<Uuid>,
+    pub reason: String,
+    pub evidence: Option<String>,
+    pub status: String,
+    pub assigned_mod_id: Option<Uuid>,
+    pub resolution: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub resolved_by: Option<Uuid>,
+    pub resolved_at: Option<DateTime<Utc>>,
+    /// Joined from `users.username` (NULL when reporter deleted).
+    #[sqlx(rename = "reporter_username")]
+    pub reporter_username: Option<String>,
+}
+
+/// Wire shape — `Report` in the OpenAPI spec.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportView {
+    pub id: Uuid,
+    #[serde(rename = "type")]
+    pub report_type: String,
+    pub target_id: String,
+    /// Entity type of the target — mirrors `type` (template/message/user/clan).
+    pub target_type: String,
+    pub reporter_id: Option<Uuid>,
+    pub reporter_username: String,
+    pub reason: String,
+    pub evidence: Option<String>,
+    pub status: String,
+    pub assigned_mod_id: Option<Uuid>,
+    pub resolution: Option<String>,
+    /// Internal moderator notes (additive — not in the frozen spec but stored).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl ReportView {
+    pub fn from_row(r: ReportRow) -> Self {
+        Self {
+            id: r.id,
+            report_type: r.report_type.clone(),
+            target_id: r.target_id,
+            target_type: r.report_type,
+            reporter_id: r.reporter_id,
+            reporter_username: r.reporter_username.unwrap_or_else(|| "unknown".to_string()),
+            reason: r.reason,
+            evidence: r.evidence,
+            status: r.status,
+            assigned_mod_id: r.assigned_mod_id,
+            resolution: r.resolution,
+            notes: r.notes,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
+/// Paginated report list response.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportPage {
+    pub items: Vec<ReportView>,
+    pub page: i64,
+    pub per_page: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
+/// PATCH /moderation/reports/{id} body.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportUpdate {
+    pub status: Option<String>,
+    pub assigned_mod_id: Option<Uuid>,
+    pub notes: Option<String>,
+}
+
+/// POST /moderation/reports/{id}/resolve body.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportResolve {
+    pub resolution: String,
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub create_restriction: bool,
+}
+
+/// POST /moderation/reports/{id}/dismiss body.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReportDismiss {
+    pub reason: Option<String>,
+}
+
+/// POST /moderation/queue/{id}/approve|reject body (ModAction).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ModAction {
+    pub notes: Option<String>,
+}
+
+// ===========================================================================
+// Audit log
+// ===========================================================================
+
+/// Raw DB row from `mod_audit_log` with the moderator username joined.
+#[derive(Debug, Clone, FromRow)]
+pub struct AuditLogRow {
+    pub id: Uuid,
+    pub moderator_id: Option<Uuid>,
+    pub action: String,
+    pub target_type: String,
+    pub target_id: String,
+    pub details: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    #[sqlx(rename = "moderator_username")]
+    pub moderator_username: Option<String>,
+}
+
+/// Wire shape — `AuditLogEntry` in the OpenAPI spec.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditLogEntry {
+    pub id: Uuid,
+    pub moderator_id: Option<Uuid>,
+    pub moderator_username: String,
+    pub action: String,
+    pub target_type: String,
+    pub target_id: String,
+    pub details: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl AuditLogEntry {
+    pub fn from_row(r: AuditLogRow) -> Self {
+        Self {
+            id: r.id,
+            moderator_id: r.moderator_id,
+            moderator_username: r.moderator_username.unwrap_or_else(|| "system".to_string()),
+            action: r.action,
+            target_type: r.target_type,
+            target_id: r.target_id,
+            details: if r.details.is_null() { None } else { Some(r.details) },
+            created_at: r.created_at,
+        }
+    }
+}
+
+/// Paginated audit-log response.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditLogPage {
+    pub items: Vec<AuditLogEntry>,
+    pub page: i64,
+    pub per_page: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}

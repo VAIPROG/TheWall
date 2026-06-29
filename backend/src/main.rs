@@ -983,6 +983,56 @@ async fn main() {
             "/api/v3/clans/{id}/restrictions",
             get(routes::v3::clans::list_clan_restrictions),
         )
+        // --- V3 moderation: report queue + template approval + audit log ------
+        .route(
+            "/api/v3/moderation/reports",
+            get(routes::v3::moderation::list_reports),
+        )
+        .route(
+            "/api/v3/moderation/reports/{id}",
+            get(routes::v3::moderation::get_report)
+                .patch(routes::v3::moderation::update_report),
+        )
+        .route(
+            "/api/v3/moderation/reports/{id}/resolve",
+            post(routes::v3::moderation::resolve_report),
+        )
+        .route(
+            "/api/v3/moderation/reports/{id}/dismiss",
+            post(routes::v3::moderation::dismiss_report),
+        )
+        .route(
+            "/api/v3/moderation/queue",
+            get(routes::v3::moderation::get_queue),
+        )
+        .route(
+            "/api/v3/moderation/queue/{tid}/approve",
+            post(routes::v3::moderation::approve_template),
+        )
+        .route(
+            "/api/v3/moderation/queue/{tid}/reject",
+            post(routes::v3::moderation::reject_template),
+        )
+        .route(
+            "/api/v3/moderation/audit-log",
+            get(routes::v3::moderation::get_audit_log),
+        )
+        // --- V3 restrictions: granular sanctions CRUD -------------------------
+        .route(
+            "/api/v3/restrictions",
+            get(routes::v3::moderation::list_restrictions)
+                .post(routes::v3::moderation::create_restriction),
+        )
+        .route(
+            "/api/v3/restrictions/{id}",
+            get(routes::v3::moderation::get_restriction)
+                .patch(routes::v3::moderation::update_restriction)
+                .delete(routes::v3::moderation::delete_restriction),
+        )
+        .route(
+            "/api/v3/users/{user_ref}/restrictions",
+            get(routes::v3::moderation::user_restrictions),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())

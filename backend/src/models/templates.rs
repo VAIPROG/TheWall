@@ -108,6 +108,17 @@ pub struct TemplateSummary {
     pub has_document: bool,
 }
 
+/// Paginated template list (offset pagination) — used by the moderation queue.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplatePage {
+    pub items: Vec<TemplateSummary>,
+    pub page: i64,
+    pub per_page: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
 /// Query parameters for GET /api/v3/templates.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
