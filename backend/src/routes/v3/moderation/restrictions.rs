@@ -27,7 +27,6 @@ use crate::{
     routes::v3::utils::{
         audit,
         permissions::{effective_clan_role, global_role_of},
-        sanctions,
     },
 };
 

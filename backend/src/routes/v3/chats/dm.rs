@@ -1,6 +1,6 @@
 //! DM thread handlers (replaces old open_dm):
-//!   GET  /api/v3/chats/dm/{user_ref}  — get-or-create DM thread with peer, return ChatDetailView
-//!   POST /api/v3/chats/dm/{user_ref}  — send a message into the DM thread with peer
+//!   GET  /api/v3/dm/{user_ref}  — get-or-create DM thread with peer, return ChatDetailView
+//!   POST /api/v3/dm/{user_ref}  — send a message into the DM thread with peer
 
 use axum::{
     Json,
@@ -27,7 +27,7 @@ const MSG_COLS: &str = r#"
 "#;
 
 // ---------------------------------------------------------------------------
-// GET /api/v3/chats/dm/{user_ref}
+// GET /api/v3/dm/{user_ref}
 // ---------------------------------------------------------------------------
 
 pub async fn get_dm_thread(
@@ -53,7 +53,7 @@ pub async fn get_dm_thread(
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/v3/chats/dm/{user_ref}
+// POST /api/v3/dm/{user_ref}
 // ---------------------------------------------------------------------------
 
 pub async fn send_dm(

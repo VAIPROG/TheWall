@@ -851,6 +851,18 @@ async fn main() {
             post(routes::v3::templates::verify),
         )
         .route(
+            "/api/v3/templates/{id}/report",
+            post(routes::v3::templates::report_template),
+        )
+        .route(
+            "/api/v3/templates/{id}/pin",
+            post(routes::v3::templates::pin).delete(routes::v3::templates::unpin),
+        )
+        .route(
+            "/api/v3/templates/pinned",
+            get(routes::v3::templates::list_pinned),
+        )
+        .route(
             "/api/v3/templates/{id}/wall-dev",
             get(routes::v3::templates::wall_dev),
         )
@@ -877,7 +889,7 @@ async fn main() {
             get(routes::v3::chats::get_modmail).post(routes::v3::chats::send_modmail),
         )
         .route(
-            "/api/v3/chats/dm/{user_ref}",
+            "/api/v3/dm/{user_ref}",
             get(routes::v3::chats::get_dm_thread).post(routes::v3::chats::send_dm),
         )
         .route(
@@ -902,6 +914,10 @@ async fn main() {
         .route(
             "/api/v3/chats/{cid}/messages/{mid}/report",
             post(routes::v3::chats::report_message),
+        )
+        .route(
+            "/api/v3/chats/{cid}/messages/{mid}/pin",
+            post(routes::v3::chats::pin_message).delete(routes::v3::chats::unpin_message),
         )
         .route(
             "/api/v3/chats/{cid}/read",

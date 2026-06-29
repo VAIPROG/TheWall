@@ -259,6 +259,14 @@ pub(super) async fn build_detail(
         }
     });
 
+    let pinned_message_ids: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT message_id FROM pinned_messages WHERE chat_id = $1 ORDER BY pinned_at ASC"
+    )
+    .bind(chat.id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     Ok(ChatDetailView {
         id: chat.id,
         chat_type: chat.chat_type,
@@ -274,7 +282,7 @@ pub(super) async fn build_detail(
         viewer,
         participants,
         recent_messages,
-        pinned_message_ids: Vec::new(),
+        pinned_message_ids,
     })
 }
 
