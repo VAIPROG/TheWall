@@ -99,3 +99,48 @@ pub async fn auth_and_ban_middleware(
 
     Ok(next.run(request).await)
 }
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::is_ban_exempt;
+
+    #[test]
+    fn public_templates_exempt() {
+        assert!(is_ban_exempt("/api/v3/templates"));
+        assert!(is_ban_exempt("/api/v3/templates/:id"));
+        assert!(is_ban_exempt("/api/v3/templates/:id/wall-dev"));
+    }
+
+    #[test]
+    fn public_clans_exempt() {
+        assert!(is_ban_exempt("/api/v3/clans"));
+        assert!(is_ban_exempt("/api/v3/clans/:id"));
+        assert!(is_ban_exempt("/api/v3/clans/:id/templates"));
+    }
+
+    #[test]
+    fn auth_and_appeal_exempt() {
+        assert!(is_ban_exempt("/api/v3/auth/site"));
+        assert!(is_ban_exempt("/api/v3/auth/refresh"));
+        assert!(is_ban_exempt("/api/v3/auth/session"));
+        assert!(is_ban_exempt("/api/v3/users/me/appeal"));
+    }
+
+    #[test]
+    fn write_routes_not_exempt() {
+        assert!(!is_ban_exempt("/api/v3/chats/:id/messages"));
+        assert!(!is_ban_exempt("/api/v3/templates/new"));
+        assert!(!is_ban_exempt("/api/v3/clans/:id/invites"));
+        assert!(!is_ban_exempt("/api/v3/moderation/reports"));
+    }
+
+    #[test]
+    fn literal_id_does_not_match_pattern() {
+        // axum MatchedPath uses placeholders, not literal IDs.
+        assert!(!is_ban_exempt("/api/v3/templates/550e8400-e29b-41d4-a716-446655440000"));
+    }
+}

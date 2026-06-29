@@ -166,9 +166,20 @@ pub async fn check_sanctions(
     let rows = active_restrictions(pool, user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    check_sanctions_with_rows(&rows, checks)
+}
 
+/// Pure, DB-free core of `check_sanctions`. Exposed so unit tests can exercise
+/// the scope logic without a database.
+fn check_sanctions_with_rows(
+    rows: &[RestrictionRow],
+    checks: &[(Sanction, Option<Uuid>)],
+) -> Result<(), (StatusCode, String)> {
     for (sanction, clan_id) in checks {
         let applies = rows.iter().any(|r| {
+            if r.removed_at.is_some() {
+                return false;
+            }
             if !sanction.flag_on(r) {
                 return false;
             }
@@ -223,4 +234,99 @@ pub async fn ensure_not_clan_banned(
         return Err((StatusCode::FORBIDDEN, "you are banned from this clan".to_string()));
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    fn restriction_row(scope: &str, clan_id: Option<Uuid>, flags: &[(&str, bool)]) -> RestrictionRow {
+        let mut r = RestrictionRow {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            scope: scope.to_string(),
+            clan_id,
+            applied_by: None,
+            applied_at: Utc::now(),
+            expires_at: None,
+            reason: None,
+            s_mute: false,
+            s_ban: false,
+            s_publish_templates: false,
+            s_invite_to_clan: false,
+            s_send_reports: false,
+            s_send_modmail: false,
+            removed_at: None,
+            removed_by: None,
+            created_at: Utc::now(),
+        };
+        for (flag, val) in flags {
+            match *flag {
+                "s_mute" => r.s_mute = *val,
+                "s_ban" => r.s_ban = *val,
+                "s_publish_templates" => r.s_publish_templates = *val,
+                "s_invite_to_clan" => r.s_invite_to_clan = *val,
+                "s_send_reports" => r.s_send_reports = *val,
+                "s_send_modmail" => r.s_send_modmail = *val,
+                _ => {}
+            }
+        }
+        r
+    }
+
+    #[test]
+    fn sanction_flag_on_maps_columns() {
+        let r = restriction_row("global", None, &[("s_mute", true)]);
+        assert!(Sanction::Mute.flag_on(&r));
+        assert!(!Sanction::Ban.flag_on(&r));
+    }
+
+    #[test]
+    fn check_sanctions_empty_rows_ok() {
+        assert!(check_sanctions_with_rows(&[], &[(Sanction::Ban, None)]).is_ok());
+    }
+
+    #[test]
+    fn global_ban_blocks_everything() {
+        let clan_a = Uuid::new_v4();
+        let rows = vec![restriction_row("global", None, &[("s_ban", true)])];
+        assert!(check_sanctions_with_rows(&rows, &[(Sanction::Ban, None)]).is_err());
+        assert!(check_sanctions_with_rows(&rows, &[(Sanction::Ban, Some(clan_a))]).is_err());
+    }
+
+    #[test]
+    fn clan_mute_only_blocks_in_that_clan() {
+        let clan_a = Uuid::new_v4();
+        let clan_b = Uuid::new_v4();
+        let rows = vec![restriction_row("clan", Some(clan_a), &[("s_mute", true)])];
+
+        assert!(check_sanctions_with_rows(&rows, &[(Sanction::Mute, Some(clan_a))]).is_err());
+        assert!(check_sanctions_with_rows(&rows, &[(Sanction::Mute, Some(clan_b))]).is_ok());
+        assert!(check_sanctions_with_rows(&rows, &[(Sanction::Mute, None)]).is_ok());
+    }
+
+    #[test]
+    fn removed_flag_is_ignored() {
+        let mut r = restriction_row("global", None, &[("s_ban", true)]);
+        r.removed_at = Some(Utc::now());
+        let rows = vec![r];
+        assert!(check_sanctions_with_rows(&rows, &[(Sanction::Ban, None)]).is_ok());
+    }
+
+    #[test]
+    fn multiple_checks_return_first_violation() {
+        let rows = vec![restriction_row("global", None, &[("s_ban", true), ("s_mute", true)])];
+        let err = check_sanctions_with_rows(
+            &rows,
+            &[(Sanction::Mute, None), (Sanction::Ban, None)],
+        )
+        .unwrap_err();
+        assert!(err.1.contains("muted"));
+    }
 }

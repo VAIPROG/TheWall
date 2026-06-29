@@ -234,3 +234,44 @@ pub async fn unlock_clan(
         .ok_or_else(|| (StatusCode::NOT_FOUND, "clan not found".to_string()))?;
     Ok(Json(build_clan_view(&state.pool, Some(auth.user_id), updated).await?))
 }
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::{field_sql_update, LOCKABLE_FIELDS};
+
+    #[test]
+    fn lockable_fields_cover_presentation_columns() {
+        for field in LOCKABLE_FIELDS {
+            assert!(
+                field_sql_update(field).is_some(),
+                "{field} must map to a SQL update"
+            );
+        }
+    }
+
+    #[test]
+    fn field_sql_update_mappings() {
+        assert_eq!(field_sql_update("avatar"), Some(("avatar_url", "NULL")));
+        assert_eq!(field_sql_update("banner"), Some(("banner_url", "NULL")));
+        assert_eq!(field_sql_update("description"), Some(("description", "NULL")));
+        assert_eq!(field_sql_update("tag"), Some(("tag", "NULL")));
+        assert_eq!(field_sql_update("discoverable"), Some(("discoverable", "FALSE")));
+    }
+
+    #[test]
+    fn unknown_field_not_lockable() {
+        assert_eq!(field_sql_update("name"), None);
+        assert_eq!(field_sql_update("owner_id"), None);
+        assert_eq!(field_sql_update(""), None);
+    }
+
+    #[test]
+    fn lockable_fields_are_stable() {
+        let mut fields: Vec<_> = LOCKABLE_FIELDS.iter().copied().collect();
+        fields.sort();
+        assert_eq!(fields, vec!["avatar", "banner", "description", "discoverable", "tag"]);
+    }
+}
