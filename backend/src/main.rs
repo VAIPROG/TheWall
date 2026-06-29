@@ -919,6 +919,26 @@ async fn main() {
             "/api/v3/clans/{id}",
             get(routes::v3::clans::get_clan).patch(routes::v3::clans::update_clan),
         )
+        // --- V3 clans: members roster + role/kick hierarchy ------------------
+        .route(
+            "/api/v3/clans/{id}/members",
+            get(routes::v3::clans::list_members),
+        )
+        .route(
+            "/api/v3/clans/{cid}/members/{uid}",
+            get(routes::v3::clans::get_member)
+                .patch(routes::v3::clans::update_member_role)
+                .delete(routes::v3::clans::kick_member),
+        )
+        // --- V3 clans: lifecycle (leave, disband) ----------------------------
+        .route(
+            "/api/v3/clans/{id}/leave",
+            post(routes::v3::clans::leave_clan),
+        )
+        .route(
+            "/api/v3/clans/{id}/disband",
+            post(routes::v3::clans::disband_clan),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())

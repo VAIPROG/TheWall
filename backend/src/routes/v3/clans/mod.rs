@@ -1,12 +1,16 @@
-//! V3 Clan CRUD — list, create, get, update.
+//! V3 Clan CRUD — list, create, get, update, members, lifecycle.
 
 mod create;
 mod detail;
+mod lifecycle;
 mod list;
+mod members;
 
 pub use create::create_clan;
 pub use detail::{get_clan, update_clan};
+pub use lifecycle::{disband_clan, leave_clan};
 pub use list::list_clans;
+pub use members::{get_member, kick_member, list_members, update_member_role};
 
 use axum::http::StatusCode;
 use sqlx::PgPool;

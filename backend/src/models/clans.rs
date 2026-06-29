@@ -143,3 +143,48 @@ pub struct ClanListQuery {
     pub sort_by: Option<String>,
     pub order: Option<String>,
 }
+
+// ---------------------------------------------------------------------------
+// Member wire shapes (slice 2)
+// ---------------------------------------------------------------------------
+
+/// Single member in the ClanMember wire response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanMemberView {
+    pub user_id: Uuid,
+    pub username: String,
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+    pub role: String,
+    pub joined_at: DateTime<Utc>,
+    pub role_rank: i32,
+    pub permissions: Vec<String>,
+    pub nickname: Option<String>,
+    pub title: Option<String>,
+    pub last_active_at: Option<DateTime<Utc>>,
+}
+
+/// Paginated list response for clan members.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClanMemberPage {
+    pub items: Vec<ClanMemberView>,
+    pub page: i64,
+    pub per_page: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
+/// PATCH /api/v3/clans/{id}/members/{uid} body.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClanMemberRoleUpdate {
+    pub role: String,
+}
+
+/// POST body for destructive confirmation actions.
+/// Matches `admins.yaml#/ConfirmationRequest` — `{ confirm: bool }`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfirmRequest {
+    pub confirm: bool,
+}
