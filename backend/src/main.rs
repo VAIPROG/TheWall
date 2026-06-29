@@ -906,6 +906,19 @@ async fn main() {
             "/api/v3/chats/{cid}/read",
             post(routes::v3::chats::mark_read),
         )
+        // --- V3 clans: core CRUD (list, create, get, update) -----------------
+        .route(
+            "/api/v3/clans",
+            get(routes::v3::clans::list_clans),
+        )
+        .route(
+            "/api/v3/clans/new",
+            post(routes::v3::clans::create_clan),
+        )
+        .route(
+            "/api/v3/clans/{id}",
+            get(routes::v3::clans::get_clan).patch(routes::v3::clans::update_clan),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())

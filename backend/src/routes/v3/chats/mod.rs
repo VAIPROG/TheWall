@@ -19,3 +19,4 @@ pub use modmail::{get_modmail, send_modmail};
 pub use reactions::{add_reaction, remove_reaction};
 pub use read::mark_read;
 pub use report::report_message;
+pub use resolve::clan_chat_id;
