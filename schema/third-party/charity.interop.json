@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/third-party/charity.interop.json",
+  "title": "TheWallDev Interop Tag Embedded in Charity Names",
+  "description": "Schema describing the textual interop tag embedded inside a Charity layer name so that Charity exports can carry their original TheWallDev identity and backend URL. The backend parses and strips this tag during import (see backend/src/formats/charity.rs). Because the tag is a plain substring inside a free-form string, this schema documents the canonical format rather than validating an entire JSON document.",
+
+  "type": "object",
+  "required": ["tag"],
+  "additionalProperties": false,
+
+  "properties": {
+    "tag": {
+      "type": "string",
+      "pattern": "\\(TheWallDev:\\s*ID:[^;\\)\\s]+(?:;\\s*BACKEND:[^\\)]+)?\\s*\\)",
+      "description": "Canonical interop tag format: '(TheWallDev: ID:<id>[;BACKEND:<url>])'. The id is an opaque string (usually a UUID). The optional BACKEND segment points at the originating backend instance. Whitespace is tolerated around the delimiters."
+    },
+    "id": {
+      "type": "string",
+      "description": "The recovered ID from the tag. May be any non-empty string without ';', ')' or whitespace."
+    },
+    "backendUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "The recovered BACKEND URL, if present."
+    }
+  }
+}

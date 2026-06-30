@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/third-party/charity.export.json",
+  "title": "Charity Export / Interop Format",
+  "description": "JSON Schema for the Charity format used by The Wall backend for bidirectional interop. This is the wire shape accepted by POST /api/v3/templates (format=charity) and returned by GET /api/v3/templates/{id}/charity and GET /api/v2/templates/{id}/charity. Derived from the canonical Rust implementation in backend/src/formats/charity.rs and backend/src/routes/v3/templates/export.rs.",
+
+  "type": "object",
+  "required": ["templates"],
+  "additionalProperties": false,
+
+  "properties": {
+    "faction": {
+      "type": "string",
+      "description": "Free-form group or campaign label. On import it is copied into the generated the-wall-dev/2 document as a note. On export it is always set to 'the-wall-dev export'."
+    },
+    "contact": {
+      "type": "string",
+      "description": "Contact identifier for the exported document. On export it is set to the template author username or 'anonymous'. Not used on import."
+    },
+    "templates": {
+      "type": "array",
+      "description": "List of template layers. On import, entries without x/y or with empty sources are skipped. At least one usable entry is required.",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/CharityEntry"
+      }
+    },
+    "whitelist": {
+      "type": "array",
+      "description": "List of allowed consumer identifiers. Always emitted as an empty array on export; may be provided on import but is ignored by the backend.",
+      "items": { "type": "string" }
+    }
+  },
+
+  "definitions": {
+    "CharityEntry": {
+      "type": "object",
+      "required": ["name", "sources", "x", "y"],
+      "additionalProperties": false,
+      "description": "One layer in a Charity config. On import, the name is processed to strip any embedded TheWallDev interop tag (see charity.interop.json). On export, animation fields are only present when the source layer has an animation block.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable layer name. May contain a TheWallDev interop tag that the backend will strip and recover."
+        },
+        "sources": {
+          "type": "array",
+          "description": "Image URLs for this layer. Must contain at least one non-empty string for the entry to be usable.",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "x": {
+          "type": "number",
+          "description": "X coordinate on the shared canvas. Imported values are rounded to the nearest integer."
+        },
+        "y": {
+          "type": "number",
+          "description": "Y coordinate on the shared canvas. Imported values are rounded to the nearest integer."
+        },
+        "frameWidth": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Width of one animation frame in pixels. Imported values are truncated to u64."
+        },
+        "frameHeight": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Height of one animation frame in pixels. Imported values are truncated to u64."
+        },
+        "frameCount": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Total number of animation frames. When greater than 1, the backend produces an animation block."
+        },
+        "secondsPerFrame": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Animation frame duration in seconds. On import this is the canonical key; aliases frameRate and frameSpeed are also accepted but not emitted on export."
+        },
+        "frameRate": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Alias for secondsPerFrame on import (legacy Charity key). Not emitted on export."
+        },
+        "frameSpeed": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Alias for secondsPerFrame on import (legacy Charity key). Not emitted on export."
+        },
+        "startTimestamp": {
+          "type": "number",
+          "description": "Animation start time in seconds. On import this is the canonical key; alias startTime is also accepted but not emitted on export."
+        },
+        "startTime": {
+          "type": "number",
+          "description": "Alias for startTimestamp on import (legacy Charity key). Not emitted on export."
+        },
+        "looping": {
+          "type": "boolean",
+          "description": "Whether the animation loops. Defaults to true on import and export."
+        }
+      }
+    }
+  }
+}
