@@ -1,0 +1,481 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/2.json",
+  "title": "The Wall Dev Format v2",
+  "description": "Official JSON Schema for version 2 of The Wall Dev format. Multi-template layers, access control, contacts, multi-source image fallback, sprite-sheet animation with per-frame image overrides. Privacy-first: author field is opt-in — anonymous exports carry 'anon' or null.",
+
+  "type": "object",
+  "required": ["format", "createdAt", "editedAt", "templates"],
+  "additionalProperties": false,
+
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID v4 string."
+    },
+
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Array of free-form text notes."
+    },
+
+    "contactNotes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional notes about this contact entry."
+    },
+
+    "ImageSource": {
+      "type": "string",
+      "description": "URL or inline data URI pointing to an image.",
+      "anyOf": [{ "format": "uri" }, { "pattern": "^data:image/" }]
+    },
+
+    "SheetLayout": {
+      "type": "string",
+      "enum": ["line", "grid"],
+      "description": "'line' = all frames in a single row or column. 'grid' = frames arranged in a 2D grid."
+    },
+
+    "GridOrder": {
+      "type": "string",
+      "enum": ["row", "column", "serpentine"],
+      "description": "'row' = left-to-right, top-to-bottom. 'column' = top-to-bottom, left-to-right. 'serpentine' = alternating direction per row (boustrophedon scan)."
+    },
+
+    "ScalingMode": {
+      "type": "string",
+      "enum": ["native", "scaled"],
+      "default": "native",
+      "description": "'native' = render at original pixel size (crispy pixel art). 'scaled' = apply template scale to animation frames."
+    },
+
+    "FrameOverride": {
+      "type": "object",
+      "required": ["index"],
+      "additionalProperties": false,
+      "description": "Per-frame override. Controls timing, visibility, and optionally replaces the frame image entirely. When imageSources is provided, the client renders that image instead of slicing the sprite sheet at this index. This enables patching individual frames without rebuilding the entire sheet.",
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based frame index in traversal order (as defined by sheet.order)."
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Custom display duration (ms). Overrides timing.defaultFrameMs."
+        },
+        "skip": {
+          "type": "boolean",
+          "default": false,
+          "description": "Exclude this frame from playback entirely. When true, imageSources and scale are ignored."
+        },
+        "imageSources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ImageSource" },
+          "description": "Replacement image for this frame. Ordered fallback list — client tries each in order until one loads. Last entry SHOULD be a base64 data URI as offline fallback. When present, the client renders this image instead of slicing the frame from the sprite sheet. The image SHOULD match frameWidth × frameHeight but clients MUST handle mismatches gracefully (scale or crop to fit)."
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Width of the replacement image in pixels. Required when imageSources is provided and the replacement has different dimensions than sheet.frameWidth. Clients use this for proper scaling/cropping."
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Height of the replacement image in pixels. Required when imageSources is provided and the replacement has different dimensions than sheet.frameHeight. Clients use this for proper scaling/cropping."
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Scale multiplier for the replacement image relative to the frame slot. 1.0 = render at frameWidth × frameHeight. 0.5 = half size (centered in slot). 2.0 = double size (cropped or overflowing depending on client). Only meaningful when imageSources is present. When absent, defaults to 1.0."
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "When skip is true, imageSources makes no sense — you are removing the frame, not replacing it.",
+          "if": {
+            "properties": { "skip": { "const": true } },
+            "required": ["skip"]
+          },
+          "then": {
+            "not": { "required": ["imageSources"] }
+          }
+        }
+      ]
+    },
+
+    "AnimationBlock": {
+      "type": "object",
+      "description": "Sprite-sheet animation descriptor. Absent for static templates. Supports per-frame image replacement via FrameOverride.imageSources.",
+      "required": ["sheet", "timing"],
+      "additionalProperties": false,
+      "properties": {
+        "sheet": {
+          "type": "object",
+          "description": "Physical layout of frames within the sprite-sheet image.",
+          "required": [
+            "frameWidth",
+            "frameHeight",
+            "frameCount",
+            "layout",
+            "order"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "frameWidth": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Width of each frame (pixels)."
+            },
+            "frameHeight": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Height of each frame (pixels)."
+            },
+            "frameCount": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Total number of frames in the sheet."
+            },
+            "layout": { "$ref": "#/$defs/SheetLayout" },
+            "order": { "$ref": "#/$defs/GridOrder" }
+          }
+        },
+        "timing": {
+          "type": "object",
+          "description": "Playback timing, sync anchor, and looping.",
+          "required": ["startTime", "defaultFrameMs", "looping"],
+          "additionalProperties": false,
+          "properties": {
+            "startTime": {
+              "type": "number",
+              "description": "Epoch ms when timeline begins. All clients sync to this absolute time."
+            },
+            "defaultFrameMs": {
+              "type": "number",
+              "minimum": 1,
+              "description": "Default per-frame duration (ms)."
+            },
+            "looping": {
+              "type": "boolean",
+              "description": "Restart from frame 0 after last frame."
+            },
+            "frames": {
+              "type": "array",
+              "description": "Per-frame overrides. Unlisted frames use defaults and are rendered from the sprite sheet normally.",
+              "items": { "$ref": "#/$defs/FrameOverride" }
+            }
+          }
+        },
+        "scaleMode": { "$ref": "#/$defs/ScalingMode" }
+      }
+    },
+
+    "AuthorObject": {
+      "type": "object",
+      "description": "Structured author information.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid",
+          "description": "Author's unique identifier."
+        },
+        "backendUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "API backend URL. Omit for offline/self-contained files."
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable display name."
+        },
+        "clanId": {
+          "$ref": "#/$defs/uuid",
+          "description": "Author's clan UUID."
+        },
+        "clanName": {
+          "type": "string",
+          "description": "Human-readable clan name."
+        }
+      }
+    },
+
+    "DiscordContact": {
+      "type": "object",
+      "required": ["type", "link"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["user", "guild"],
+          "description": "'user' = profile/DM. 'guild' = server invite."
+        },
+        "link": { "type": "string", "format": "uri" },
+        "notes": { "$ref": "#/$defs/contactNotes" }
+      }
+    },
+
+    "TelegramContact": {
+      "type": "object",
+      "required": ["type", "link"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["user", "group", "channel", "bot"]
+        },
+        "link": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full Telegram URL (e.g. https://t.me/...)."
+        },
+        "startParam": {
+          "type": "string",
+          "description": "Deep-link ?start= parameter for bots."
+        },
+        "notes": { "$ref": "#/$defs/contactNotes" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "not": { "const": "bot" } } },
+            "required": ["type"]
+          },
+          "then": {
+            "not": { "required": ["startParam"] }
+          }
+        }
+      ]
+    },
+
+    "XContact": {
+      "type": "object",
+      "required": ["link"],
+      "additionalProperties": false,
+      "properties": {
+        "link": { "type": "string", "format": "uri" },
+        "notes": { "$ref": "#/$defs/contactNotes" }
+      }
+    },
+
+    "MatrixContact": {
+      "type": "object",
+      "required": ["type", "link"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["user", "group", "bot"],
+          "description": "'bot' = protocol-level user treated as bot by clients for UI purposes."
+        },
+        "link": {
+          "type": "string",
+          "description": "Matrix ID or matrix.to URL."
+        },
+        "notes": { "$ref": "#/$defs/contactNotes" }
+      }
+    },
+
+    "SiteContact": {
+      "type": "object",
+      "required": ["url"],
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "notes": { "$ref": "#/$defs/contactNotes" }
+      }
+    },
+
+    "OtherContact": {
+      "type": "object",
+      "required": ["label", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Human-readable platform name (e.g. 'Bluesky', 'YouTube')."
+        },
+        "type": {
+          "type": "string",
+          "description": "Optional machine-readable type hint. Free-form."
+        },
+        "url": { "type": "string", "format": "uri" },
+        "notes": { "$ref": "#/$defs/contactNotes" }
+      }
+    },
+
+    "TemplateEntry": {
+      "type": "object",
+      "required": [
+        "name",
+        "imageSources",
+        "x",
+        "y",
+        "scale",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name of this template layer."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description or instructions."
+        },
+        "imageSources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ImageSource" },
+          "description": "Ordered fallback list. Client tries each in order. Last entry SHOULD be a base64 data URI as offline fallback."
+        },
+        "x": {
+          "type": "integer",
+          "description": "Horizontal position (px) of top-left corner on canvas."
+        },
+        "y": {
+          "type": "integer",
+          "description": "Vertical position (px) of top-left corner on canvas."
+        },
+        "z": {
+          "type": "integer",
+          "description": "Depth position. Reserved for future 3D support."
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Scale multiplier. 1.0 = native."
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Frame width in pixels (before scaling)."
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Frame height in pixels (before scaling)."
+        },
+        "animation": { "$ref": "#/$defs/AnimationBlock" }
+      }
+    }
+  },
+
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "the-wall-dev/2",
+      "description": "Format identifier. Must be 'the-wall-dev/2'."
+    },
+
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of original creation."
+    },
+
+    "editedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last modification."
+    },
+
+    "author": {
+      "description": "Author identification. Three modes:\n\n1. Full object — structured info with UUID\n2. String 'anon' — explicitly anonymous\n3. Null — silent anonymous\n\nClients MUST handle all three.",
+      "oneOf": [
+        { "$ref": "#/$defs/AuthorObject" },
+        {
+          "type": "string",
+          "const": "anon",
+          "description": "Explicitly anonymous author."
+        },
+        {
+          "type": "null",
+          "description": "No author information."
+        }
+      ]
+    },
+
+    "notes": {
+      "$ref": "#/$defs/notes",
+      "description": "Free-form notes. Changelogs, instructions, warnings."
+    },
+
+    "contacts": {
+      "type": "object",
+      "description": "Contact information. All fields are arrays — multiple entries per platform.",
+      "additionalProperties": false,
+      "properties": {
+        "discord": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DiscordContact" }
+        },
+        "telegram": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TelegramContact" }
+        },
+        "x": { "type": "array", "items": { "$ref": "#/$defs/XContact" } },
+        "matrix": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MatrixContact" }
+        },
+        "sites": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SiteContact" }
+        },
+        "other": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OtherContact" }
+        }
+      }
+    },
+
+    "domainsWhitelist": {
+      "type": "array",
+      "items": { "type": "string", "format": "hostname" },
+      "description": "Allowed domains. CLIENT-SIDE enforcement only."
+    },
+
+    "usersWhitelist": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/uuid" },
+      "description": "User IDs ALLOWED to view. BACKEND MUST ENFORCE."
+    },
+
+    "usersBlocklist": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/uuid" },
+      "description": "User IDs BLOCKED from viewing. BACKEND MUST ENFORCE."
+    },
+
+    "allowedToEdit": {
+      "type": "object",
+      "description": "Edit permissions ACL. BACKEND MUST ENFORCE.",
+      "additionalProperties": false,
+      "properties": {
+        "userIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/uuid" }
+        },
+        "clanIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/uuid" }
+        }
+      }
+    },
+
+    "templates": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Template layers. At least one required.",
+      "items": { "$ref": "#/$defs/TemplateEntry" }
+    }
+  }
+}

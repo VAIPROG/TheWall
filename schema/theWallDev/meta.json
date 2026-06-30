@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/meta.json",
+  "title": "The Wall Dev Format — Meta Schema",
+  "description": "Dispatcher schema for all versions of The Wall Dev format. Inspects the 'format' field and routes validation to the appropriate versioned schema. Clients SHOULD use this meta schema for format detection and version routing rather than sniffing fields manually.",
+  "$comment": "Add a new entry to the 'oneOf' array each time a new versioned schema is published.",
+
+  "type": "object",
+  "required": ["format"],
+
+  "properties": {
+    "format": {
+      "type": "string",
+      "pattern": "^the-wall-dev/\\d+$",
+      "description": "Format identifier string. Pattern: 'the-wall-dev/{versionNumber}'. This field is the single source of truth for version detection.",
+      "examples": ["the-wall-dev/1", "the-wall-dev/2"]
+    }
+  },
+
+  "oneOf": [
+    {
+      "$comment": "Version 1 — Extension-native format. Formally documented from historical implementation. Single static or animated template, inline base64 image, optional author/note.",
+      "if": {
+        "properties": {
+          "format": { "const": "the-wall-dev/1" }
+        },
+        "required": ["format"]
+      },
+      "then": {
+        "$ref": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/1.json"
+      }
+    },
+    {
+      "$comment": "Version 2 — Actively developed specification. Multi-template layers, access control, contacts, multi-source image fallback chain, full animation timing.",
+      "if": {
+        "properties": {
+          "format": { "const": "the-wall-dev/2" }
+        },
+        "required": ["format"]
+      },
+      "then": {
+        "$ref": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/2.json"
+      }
+    }
+  ]
+}

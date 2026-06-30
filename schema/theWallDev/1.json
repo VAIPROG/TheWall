@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/1.json",
+  "title": "The Wall Dev Format v1",
+  "description": "Extension-native export envelope for version 1 of The Wall Dev format. Self-contained: the image is always embedded as an inline PNG data URL, so the file is fully portable with no external hosting required. Supports a single static or animated (sprite-sheet) template layer. Version 1 was not published as a formal schema during active development — this document was reconstructed from the original TypeScript implementation (wall-dev-export.ts).",
+  "$comment": "Privacy design: the most private export is the default. Author and note are opt-in fields omitted entirely when not requested — a stripped file gives no hint of its creator.",
+
+  "type": "object",
+  "required": ["format", "version", "exported_at", "template"],
+  "additionalProperties": false,
+
+  "$defs": {
+    "SheetLayout": {
+      "type": "string",
+      "enum": ["line", "grid"],
+      "description": "'line' = all frames in a single row or column. 'grid' = frames arranged in a 2D grid."
+    },
+
+    "GridOrder": {
+      "type": "string",
+      "enum": ["row", "column", "serpentine"],
+      "description": "'row' = left-to-right, top-to-bottom. 'column' = top-to-bottom, left-to-right. 'serpentine' = alternating direction per row (boustrophedon scan)."
+    },
+
+    "ScalingMode": {
+      "type": "string",
+      "enum": ["native", "scaled"],
+      "description": "'native' = render at original pixel size, template.scale is forced to 1.0 at export time. 'scaled' = apply template.scale to animation frames."
+    },
+
+    "AnimationBlock": {
+      "type": "object",
+      "description": "WallAnim sprite-sheet animation block. Absent for static templates. Older importers that do not recognise this field load the template as static — backward-compatible by design.",
+      "required": ["sheet", "timing"],
+      "additionalProperties": false,
+      "properties": {
+        "sheet": {
+          "type": "object",
+          "description": "Describes the physical layout of frames within the sprite-sheet image.",
+          "required": [
+            "frameWidth",
+            "frameHeight",
+            "frameCount",
+            "layout",
+            "order"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "frameWidth": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Width of each individual frame in the sprite sheet (pixels)."
+            },
+            "frameHeight": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Height of each individual frame in the sprite sheet (pixels)."
+            },
+            "frameCount": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Total number of frames. Importers MUST ignore the animation block and fall back to static rendering when frameCount ≤ 1."
+            },
+            "layout": { "$ref": "#/$defs/SheetLayout" },
+            "order": { "$ref": "#/$defs/GridOrder" }
+          }
+        },
+
+        "timing": {
+          "type": "object",
+          "description": "Controls playback timing, synchronization anchor, and looping.",
+          "required": ["startTime", "defaultFrameMs", "looping"],
+          "additionalProperties": false,
+          "properties": {
+            "startTime": {
+              "type": "number",
+              "description": "Epoch milliseconds (Unix timestamp × 1000) at which the animation timeline begins. All clients synchronize to this absolute timestamp so animations stay in sync across viewers."
+            },
+            "defaultFrameMs": {
+              "type": "number",
+              "minimum": 1,
+              "description": "Default per-frame display duration in milliseconds. Used for every frame not listed in the 'frames' override array."
+            },
+            "looping": {
+              "type": "boolean",
+              "description": "If true, animation restarts from frame 0 after the last frame. If false, playback stops on the last frame."
+            },
+            "frames": {
+              "type": "array",
+              "description": "Optional per-frame overrides. Only frames that need custom behaviour need to be listed. Unlisted frames inherit defaultFrameMs and are not skipped.",
+              "items": {
+                "type": "object",
+                "required": ["index"],
+                "additionalProperties": false,
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based frame index in traversal order (as defined by sheet.order)."
+                  },
+                  "durationMs": {
+                    "type": "number",
+                    "minimum": 1,
+                    "description": "Custom display duration for this frame in milliseconds. Overrides timing.defaultFrameMs."
+                  },
+                  "skip": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "If true, this frame is excluded from the playback timeline entirely."
+                  }
+                }
+              }
+            }
+          }
+        },
+
+        "scaling": {
+          "type": "object",
+          "description": "Scaling policy for animation frames. When mode is 'native', the exporter forces template.scale to 1.0 at export time.",
+          "required": ["mode"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "$ref": "#/$defs/ScalingMode" }
+          }
+        }
+      }
+    }
+  },
+
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "the-wall-dev/1",
+      "description": "Format identifier. Always 'the-wall-dev/1' for this schema version."
+    },
+
+    "version": {
+      "type": "string",
+      "description": "Extension version string at the time of export (e.g. '1.4.2'). Informational only — not used for format routing. Format routing is done exclusively via the 'format' field.",
+      "examples": ["1.0.0", "1.4.2"]
+    },
+
+    "exported_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when this file was exported. Generated via new Date().toISOString() at export time."
+    },
+
+    "author": {
+      "type": "object",
+      "description": "Optional author block. Omitted entirely when the user exports anonymously — a file without this field gives no hint of its creator. Partial presence (e.g. username without clan) is valid.",
+      "$comment": "Privacy design: the ENTIRE block is absent for anonymous exports — not present with null values. Importers MUST treat a missing block as fully anonymous.",
+      "required": ["username"],
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "The author's username. May be a real handle, an override string, or the literal 'anonymous' — the exporter does not validate the value."
+        },
+        "clan_name": {
+          "type": "string",
+          "description": "Display name of the author's primary clan. Omitted when the author declined to share clan info, or when they have no clan."
+        },
+        "clan_role": {
+          "type": "string",
+          "description": "The author's role within their clan. Present only when clan_name is also present."
+        }
+      }
+    },
+
+    "note": {
+      "type": "string",
+      "description": "Free-form plain-text note shown to the importer before the overlay applies. Markdown is intentionally NOT rendered — plain text only to prevent accidental HTML injection from pasted content."
+    },
+
+    "template": {
+      "type": "object",
+      "description": "The single template payload. V1 supports exactly one template per file. V2 introduced the multi-template 'templates' array.",
+      "required": ["image_data_url", "x", "y", "scale", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Optional display name for this template. Absent when the user did not provide one."
+        },
+
+        "image_data_url": {
+          "type": "string",
+          "pattern": "^data:image/",
+          "description": "Inline PNG image as a base64 data URL. Always present — V1 files are fully self-contained and work without any external hosting. Prefer 'data:image/png;base64,...' but any 'data:image/' prefix is accepted.",
+          "$comment": "At export time the exporter prefers overlayData.srcOrig (lossless original) over overlayData.src (possibly downscaled display copy). Importers MUST NOT fetch external URLs from this field."
+        },
+
+        "x": {
+          "type": "integer",
+          "description": "Horizontal position (pixels) of the template's top-left corner on the canvas."
+        },
+
+        "y": {
+          "type": "integer",
+          "description": "Vertical position (pixels) of the template's top-left corner on the canvas."
+        },
+
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Render scale multiplier. 1.0 = native resolution. When animation.scaling.mode is 'native', this field is forced to 1.0 by the exporter regardless of the active overlay scale.",
+          "default": 1.0
+        },
+
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Width of a single frame in pixels before scaling. At export time this is overlayData.origW (original dimensions) falling back to overlayData.w (display dimensions)."
+        },
+
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Height of a single frame in pixels before scaling. At export time this is overlayData.origH (original dimensions) falling back to overlayData.h (display dimensions)."
+        },
+
+        "animation": {
+          "$ref": "#/$defs/AnimationBlock"
+        }
+      }
+    }
+  }
+}
