@@ -28,6 +28,12 @@ pub struct ModApplyRequest {
     pub message: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HigherLimitsRequest {
+    pub justification: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatRelayRequest {
     pub markdown: String,

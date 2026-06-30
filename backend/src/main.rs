@@ -16,7 +16,7 @@ mod wall_tiles;
 
 use axum::{
     Router,
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
 };
 use sqlx::postgres::PgPoolOptions;
 use std::env;
@@ -837,6 +837,20 @@ async fn main() {
         .route("/api/v3/users/me/site-identities", get(routes::v3::users::list_site_identities))
         .route("/api/v3/users/me/site-identities/{source}", delete(routes::v3::users::unlink_site_identity))
         .route("/api/v3/users/me/appeal", post(routes::v3::users::submit_appeal))
+        // --- V3 users: profiles, avatar, socials, keys, block-list ------------
+        .route("/api/v3/users/me", get(routes::v3::users::get_me).patch(routes::v3::users::update_me))
+        .route("/api/v3/users/me/avatar", post(routes::v3::users::upload_avatar).delete(routes::v3::users::delete_avatar))
+        .route("/api/v3/users/me/socials", get(routes::v3::users::get_my_socials).post(routes::v3::users::add_my_social))
+        .route("/api/v3/users/me/socials/{provider}", patch(routes::v3::users::update_my_social).delete(routes::v3::users::delete_my_social))
+        .route("/api/v3/users/me/keys", get(routes::v3::users::get_my_keys).post(routes::v3::users::create_key))
+        .route("/api/v3/users/me/keys/{id}", get(routes::v3::users::get_key).patch(routes::v3::users::update_key).delete(routes::v3::users::delete_key))
+        .route("/api/v3/users/me/keys/{id}/request-higher-limits", post(routes::v3::users::request_higher_limits))
+        .route("/api/v3/users/me/block-list", get(routes::v3::users::get_block_list))
+        .route("/api/v3/users/{user_ref}", get(routes::v3::users::get_user_by_ref))
+        .route("/api/v3/users/{user_ref}/socials", get(routes::v3::users::get_user_socials))
+        .route("/api/v3/users/{user_ref}/templates", get(routes::v3::users::get_user_templates))
+        .route("/api/v3/users/{user_ref}/block", post(routes::v3::users::block_user))
+        .route("/api/v3/users/{user_ref}/unblock", post(routes::v3::users::unblock_user))
         // --- templates: V3 CRUD with the-wall-dev/2 canonical document ------
         .route("/api/v3/templates", get(routes::v3::templates::list))
         .route("/api/v3/templates/new", post(routes::v3::templates::create))
