@@ -279,7 +279,8 @@ pub async fn health_check(
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
 
-    let maintenance = state.config.maintenance.enabled || state.config.maintenance.reason.is_some();
+    let rt = state.config.runtime.read().await;
+    let maintenance = rt.maintenance_mode;
 
     let status = if !db_ok || maintenance {
         "maintenance"
@@ -292,7 +293,7 @@ pub async fn health_check(
         uptime,
         database: if db_ok { "connected".to_string() } else { "disconnected".to_string() },
         maintenance_mode: maintenance,
-        maintenance_reason: state.config.maintenance.reason.clone(),
+        maintenance_reason: rt.maintenance_reason.clone(),
         version: env!("CARGO_PKG_VERSION").to_string(),
     }))
 }

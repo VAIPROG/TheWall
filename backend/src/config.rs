@@ -4,7 +4,10 @@
 //! boot-time config should receive it through `AppState` rather than calling
 //! `std::env::var` directly.
 
-use std::env;
+use std::{collections::HashMap, env, sync::Arc};
+
+use chrono::{DateTime, Utc};
+use tokio::sync::RwLock;
 
 /// Full application configuration.
 #[derive(Clone, Debug)]
@@ -19,6 +22,7 @@ pub struct AppConfig {
     pub limits: LimitsConfig,
     pub notify: NotifyTargets,
     pub maintenance: MaintenanceConfig,
+    pub runtime: Arc<RwLock<RuntimeConfig>>,
 }
 
 impl AppConfig {
@@ -37,9 +41,14 @@ impl AppConfig {
             limits: LimitsConfig::load(),
             notify: NotifyTargets::load(),
             maintenance: MaintenanceConfig::load(),
+            runtime: {
+                let maintenance = MaintenanceConfig::load();
+                Arc::new(RwLock::new(RuntimeConfig::from_env_defaults(&maintenance)))
+            },
         }
     }
 }
+
 
 #[derive(Clone, Debug, Default)]
 pub struct OAuthConfig {
@@ -189,6 +198,45 @@ impl MaintenanceConfig {
             estimated_duration_minutes: env::var("WALL_MAINTENANCE_DURATION_MINUTES")
                 .ok()
                 .and_then(|v| v.parse().ok()),
+        }
+    }
+}
+
+/// Runtime server configuration that can be mutated by admin endpoints.
+/// Initialised from defaults; env vars provide the boot defaults but admins
+/// can toggle feature flags and maintenance mode without a restart.
+#[derive(Clone, Debug, Default)]
+pub struct RuntimeConfig {
+    pub max_users_per_clan: i32,
+    pub max_templates_per_user: i32,
+    pub max_api_keys_per_user: i32,
+    pub max_file_size_mb: i32,
+    pub rate_limit_per_minute: i32,
+    pub maintenance_mode: bool,
+    pub maintenance_reason: Option<String>,
+    pub maintenance_estimated_end: Option<DateTime<Utc>>,
+    pub feature_flags: HashMap<String, bool>,
+    pub allow_public_template_publishing: bool,
+    pub auto_approve_moderator_templates: bool,
+}
+
+impl RuntimeConfig {
+    /// Initialise from env defaults and boot-time maintenance config.
+    pub fn from_env_defaults(maintenance: &MaintenanceConfig) -> Self {
+        Self {
+            max_users_per_clan: 100,
+            max_templates_per_user: 50,
+            max_api_keys_per_user: 5,
+            max_file_size_mb: 10,
+            rate_limit_per_minute: 60,
+            maintenance_mode: maintenance.enabled,
+            maintenance_reason: maintenance.reason.clone(),
+            maintenance_estimated_end: maintenance
+                .estimated_duration_minutes
+                .map(|m| Utc::now() + chrono::Duration::minutes(m)),
+            feature_flags: HashMap::new(),
+            allow_public_template_publishing: true,
+            auto_approve_moderator_templates: true,
         }
     }
 }

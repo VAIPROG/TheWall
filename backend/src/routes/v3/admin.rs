@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::{
     AppState,
     auth::AuthUser,
+    config::RuntimeConfig,
     models::{
         auth::SessionSummary,
         moderation::{AuditLogEntry, AuditLogPage, AuditLogRow, RestrictionRow, RestrictionView},
@@ -839,4 +840,338 @@ pub async fn admin_audit_log(
         total,
         total_pages,
     }))
+}
+
+// ===========================================================================
+// Admin system endpoints: config, maintenance, broadcast, shutdown, restart
+// ===========================================================================
+
+/// Wire shape for `ServerConfig`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerConfig {
+    pub max_users_per_clan: i32,
+    pub max_templates_per_user: i32,
+    pub max_api_keys_per_user: i32,
+    pub max_file_size_mb: i32,
+    pub rate_limit_per_minute: i32,
+    pub maintenance_mode: bool,
+    pub feature_flags: std::collections::HashMap<String, bool>,
+    pub allow_public_template_publishing: bool,
+    pub auto_approve_moderator_templates: bool,
+}
+
+impl From<RuntimeConfig> for ServerConfig {
+    fn from(r: RuntimeConfig) -> Self {
+        Self {
+            max_users_per_clan: r.max_users_per_clan,
+            max_templates_per_user: r.max_templates_per_user,
+            max_api_keys_per_user: r.max_api_keys_per_user,
+            max_file_size_mb: r.max_file_size_mb,
+            rate_limit_per_minute: r.rate_limit_per_minute,
+            maintenance_mode: r.maintenance_mode,
+            feature_flags: r.feature_flags,
+            allow_public_template_publishing: r.allow_public_template_publishing,
+            auto_approve_moderator_templates: r.auto_approve_moderator_templates,
+        }
+    }
+}
+
+/// Partial update body for `ServerConfig`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerConfigUpdate {
+    pub max_users_per_clan: Option<i32>,
+    pub max_templates_per_user: Option<i32>,
+    pub max_api_keys_per_user: Option<i32>,
+    pub max_file_size_mb: Option<i32>,
+    pub rate_limit_per_minute: Option<i32>,
+    pub maintenance_mode: Option<bool>,
+    pub feature_flags: Option<std::collections::HashMap<String, bool>>,
+    pub allow_public_template_publishing: Option<bool>,
+    pub auto_approve_moderator_templates: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaintenanceStatus {
+    pub enabled: bool,
+    pub reason: Option<String>,
+    pub estimated_end_time: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaintenanceRequest {
+    pub enabled: bool,
+    pub reason: Option<String>,
+    pub estimated_duration_minutes: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BroadcastRequest {
+    pub message: String,
+    pub target_role: Option<String>,
+    pub target_user_ids: Option<Vec<Uuid>>,
+}
+
+pub async fn admin_get_config(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<ServerConfig>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+    let rt = state.config.runtime.read().await;
+    Ok(Json(ServerConfig::from(rt.clone())))
+}
+
+pub async fn admin_update_config(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<ServerConfigUpdate>,
+) -> Result<Json<ServerConfig>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Owner).await?;
+
+    {
+        let mut rt = state.config.runtime.write().await;
+        if let Some(v) = body.max_users_per_clan {
+            rt.max_users_per_clan = v.max(1);
+        }
+        if let Some(v) = body.max_templates_per_user {
+            rt.max_templates_per_user = v.max(1);
+        }
+        if let Some(v) = body.max_api_keys_per_user {
+            rt.max_api_keys_per_user = v.max(1);
+        }
+        if let Some(v) = body.max_file_size_mb {
+            rt.max_file_size_mb = v.max(1);
+        }
+        if let Some(v) = body.rate_limit_per_minute {
+            rt.rate_limit_per_minute = v.max(1);
+        }
+        if let Some(v) = body.maintenance_mode {
+            rt.maintenance_mode = v;
+        }
+        if let Some(v) = body.feature_flags {
+            rt.feature_flags = v;
+        }
+        if let Some(v) = body.allow_public_template_publishing {
+            rt.allow_public_template_publishing = v;
+        }
+        if let Some(v) = body.auto_approve_moderator_templates {
+            rt.auto_approve_moderator_templates = v;
+        }
+    }
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_config_updated",
+        "server",
+        "config",
+        json!({}),
+    )
+    .await;
+
+    let rt = state.config.runtime.read().await;
+    Ok(Json(ServerConfig::from(rt.clone())))
+}
+
+pub async fn admin_get_maintenance(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<MaintenanceStatus>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+    let rt = state.config.runtime.read().await;
+    Ok(Json(MaintenanceStatus {
+        enabled: rt.maintenance_mode,
+        reason: rt.maintenance_reason.clone(),
+        estimated_end_time: rt.maintenance_estimated_end,
+    }))
+}
+
+pub async fn admin_set_maintenance(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<MaintenanceRequest>,
+) -> Result<Json<MaintenanceStatus>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Owner).await?;
+
+    {
+        let mut rt = state.config.runtime.write().await;
+        rt.maintenance_mode = body.enabled;
+        rt.maintenance_reason = body.reason.clone();
+        rt.maintenance_estimated_end = body
+            .estimated_duration_minutes
+            .map(|m| Utc::now() + chrono::Duration::minutes(m));
+    }
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        if body.enabled { "admin_maintenance_enabled" } else { "admin_maintenance_disabled" },
+        "server",
+        "maintenance",
+        json!({ "reason": body.reason }),
+    )
+    .await;
+
+    let rt = state.config.runtime.read().await;
+    Ok(Json(MaintenanceStatus {
+        enabled: rt.maintenance_mode,
+        reason: rt.maintenance_reason.clone(),
+        estimated_end_time: rt.maintenance_estimated_end,
+    }))
+}
+
+pub async fn admin_broadcast(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<BroadcastRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+
+    let message = body.message.trim();
+    if message.is_empty() || message.len() > 2000 {
+        return Err((StatusCode::BAD_REQUEST, "message must be 1-2000 characters".to_string()));
+    }
+
+    let target_ids: Vec<Uuid> = if let Some(ids) = body.target_user_ids {
+        ids
+    } else {
+        let role_filter = body.target_role.as_deref().unwrap_or("all");
+        let rows: Vec<(Uuid,)> = if role_filter == "all" {
+            sqlx::query_as("SELECT id FROM users")
+                .fetch_all(&state.pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        } else {
+            sqlx::query_as("SELECT id FROM users WHERE global_role = $1")
+                .bind(role_filter)
+                .fetch_all(&state.pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        };
+        rows.into_iter().map(|(id,)| id).collect()
+    };
+
+    let mut sent = 0usize;
+    for user_id in &target_ids {
+        if let Ok(Some(_)) = crate::routes::v3::notifications::notify(
+            &state.pool,
+            *user_id,
+            "system_announcement",
+            "Broadcast",
+            Some(message),
+            None,
+            json!({"fromAdmin": auth.user_id}),
+        )
+        .await
+        {
+            sent += 1;
+        }
+    }
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_broadcast",
+        "server",
+        "broadcast",
+        json!({ "message": message, "recipients": sent }),
+    )
+    .await;
+
+    Ok(Json(json!({"ok": true, "message": "broadcast sent", "recipients": sent})))
+}
+
+pub async fn admin_shutdown(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<ConfirmationRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Owner).await?;
+
+    if body.confirmation != "SHUTDOWN" {
+        return Err((StatusCode::BAD_REQUEST, "confirmation required".to_string()));
+    }
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_shutdown_requested",
+        "server",
+        "shutdown",
+        json!({}),
+    )
+    .await;
+
+    // In this process model we cannot stop the Tokio runtime from inside an
+    // HTTP handler without a shutdown handle. The action is logged; an operator
+    // or orchestrator must terminate the process.
+    Ok(Json(json!({"ok": true, "message": "shutdown requested — operator action required"})))
+}
+
+pub async fn admin_restart(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<ConfirmationRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Owner).await?;
+
+    if body.confirmation != "RESTART" {
+        return Err((StatusCode::BAD_REQUEST, "confirmation required".to_string()));
+    }
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_restart_requested",
+        "server",
+        "restart",
+        json!({}),
+    )
+    .await;
+
+    // Same as shutdown: no in-process restart handle wired up yet.
+    Ok(Json(json!({"ok": true, "message": "restart requested — operator action required"})))
+}
+
+pub async fn admin_metrics(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<(axum::http::header::HeaderMap, String), (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+
+    let pool_active = state.pool.size() as i64;
+    let db_ok = sqlx::query("SELECT 1")
+        .fetch_one(&state.pool)
+        .await
+        .is_ok();
+    let uptime = std::time::SystemTime::now()
+        .duration_since(state.started_at)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    let body = format!(
+        "# HELP wall_uptime_seconds Server uptime in seconds\n\
+         # TYPE wall_uptime_seconds gauge\n\
+         wall_uptime_seconds {}\n\
+         # HELP wall_db_pool_active Active DB connections\n\
+         # TYPE wall_db_pool_active gauge\n\
+         wall_db_pool_active {}\n\
+         # HELP wall_db_ok Database connectivity (1 = ok, 0 = fail)\n\
+         # TYPE wall_db_ok gauge\n\
+         wall_db_ok {}\n",
+        uptime,
+        pool_active,
+        if db_ok { 1 } else { 0 }
+    );
+
+    let mut headers = axum::http::header::HeaderMap::new();
+    headers.insert(
+        axum::http::header::CONTENT_TYPE,
+        "text/plain; version=0.0.4; charset=utf-8".parse().unwrap(),
+    );
+    Ok((headers, body))
 }

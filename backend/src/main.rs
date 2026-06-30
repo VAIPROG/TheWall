@@ -783,6 +783,12 @@ async fn main() {
         .route("/api/v3/admin/users/{user_ref}/notes", get(routes::v3::admin::admin_get_user_notes).post(routes::v3::admin::admin_add_user_note))
         .route("/api/v3/admin/users/{user_ref}/impersonate", post(routes::v3::admin::admin_impersonate_user))
         .route("/api/v3/admin/audit", get(routes::v3::admin::admin_audit_log))
+        .route("/api/v3/admin/config", get(routes::v3::admin::admin_get_config).patch(routes::v3::admin::admin_update_config))
+        .route("/api/v3/admin/maintenance", get(routes::v3::admin::admin_get_maintenance).post(routes::v3::admin::admin_set_maintenance))
+        .route("/api/v3/admin/broadcast", post(routes::v3::admin::admin_broadcast))
+        .route("/api/v3/admin/metrics", get(routes::v3::admin::admin_metrics))
+        .route("/api/v3/admin/shutdown", post(routes::v3::admin::admin_shutdown))
+        .route("/api/v3/admin/restart", post(routes::v3::admin::admin_restart))
         // --- V3 moderation: report queue + template approval + audit log ------
         .route(
             "/api/v3/moderation/reports",
