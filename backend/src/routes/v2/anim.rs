@@ -336,7 +336,7 @@ pub async fn shared(
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.strip_prefix("Bearer "))
-        .and_then(|tok| verify_token(tok, &state.jwt_secret).ok())
+        .and_then(|tok| verify_token(tok, &state.config.jwt_secret).ok())
         .and_then(|c| Uuid::parse_str(&c.sub).ok());
     let Some(user_id) = user_id else {
         return Err((StatusCode::NOT_FOUND, "not found".into()));

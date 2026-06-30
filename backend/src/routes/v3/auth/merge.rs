@@ -23,7 +23,7 @@ pub async fn merge_initiate(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> Result<Json<MergeInitiateResponse>, StatusCode> {
-    let token = create_merge_token(&auth.user_id, &state.jwt_secret)
+    let token = create_merge_token(&auth.user_id, &state.config.jwt_secret)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(MergeInitiateResponse {
@@ -54,7 +54,7 @@ pub async fn merge(
     let a: Uuid = auth.user_id;
 
     // 1. Verify the merge token to get B.
-    let b: Uuid = verify_merge_token(&body.merge_token, &state.jwt_secret).map_err(|_| {
+    let b: Uuid = verify_merge_token(&body.merge_token, &state.config.jwt_secret).map_err(|_| {
         (
             StatusCode::UNAUTHORIZED,
             Json(json!({"error": "invalid or expired merge token"})),
@@ -349,7 +349,7 @@ pub async fn merge(
     })?;
 
     // 8. Issue fresh session for A and load account row.
-    let (access, refresh_tok) = issue_session_pair(&state.pool, &state.jwt_secret, a)
+    let (access, refresh_tok) = issue_session_pair(&state.pool, &state.config.jwt_secret, a)
         .await
         .map_err(|e| {
             (

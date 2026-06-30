@@ -44,7 +44,7 @@ pub async fn site(
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
-        .and_then(|token| verify_token(token, &state.jwt_secret).ok())
+        .and_then(|token| verify_token(token, &state.config.jwt_secret).ok())
         .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
 
     // 4. Look up an existing site identity for (source, external_id).
@@ -151,7 +151,7 @@ pub async fn site(
     // NOTE: best-effort clan sync (verified.clan) is deferred to a later slice.
 
     // 6. Issue the session pair.
-    let (access, refresh) = issue_session_pair(&state.pool, &state.jwt_secret, account_id)
+    let (access, refresh) = issue_session_pair(&state.pool, &state.config.jwt_secret, account_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

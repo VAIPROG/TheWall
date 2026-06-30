@@ -1,5 +1,6 @@
 mod auth;
 mod bot_commands;
+mod config;
 mod bot_core;
 mod discord_commands;
 mod discord_gateway;
@@ -20,6 +21,7 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::env;
+use crate::config::AppConfig;
 use tower_http::compression::CompressionLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
@@ -28,253 +30,49 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 #[derive(Clone)]
 pub struct AppState {
     pub pool: sqlx::PgPool,
-    pub jwt_secret: String,
-    pub site_url: String,
-    pub oauth: OAuthConfig,
-    pub limits: LimitsConfig,
-    pub notify: NotifyTargets,
+    pub config: AppConfig,
     pub started_at: std::time::SystemTime,
 }
 
-#[derive(Clone, Default)]
-pub struct OAuthConfig {
-    /// Telegram bot token from @BotFather. Used as Bearer for Bot API calls
-    /// (sendDocument, etc.). NOT used as the OIDC client_secret anymore.
-    pub telegram_bot_token: Option<String>,
-    /// Optional human-readable bot username (e.g. "@MyAppBot") for UI hints.
-    pub telegram_bot_username: Option<String>,
-    /// Telegram OIDC Client ID — bot's numeric ID from @BotFather → Web Login.
-    pub telegram_client_id: Option<String>,
-    /// Telegram OIDC Client Secret — distinct value from @BotFather → Web Login.
-    pub telegram_client_secret: Option<String>,
-    pub discord_client_id: Option<String>,
-    pub discord_client_secret: Option<String>,
-    /// GitHub OAuth app Client ID.
-    pub github_client_id: Option<String>,
-    /// GitHub OAuth app Client Secret.
-    pub github_client_secret: Option<String>,
-    /// Discord *bot* token (separate from OAuth secret) used for Bot API
-    /// calls like opening a DM channel + posting attachments.
-    pub discord_bot_token: Option<String>,
-    /// Discord application id — needed to register global slash commands.
-    pub discord_application_id: Option<String>,
-    /// Ed25519 public key (hex) from the Discord developer portal; verifies
-    /// interaction webhook signatures. Without it the endpoint is disabled.
-    pub discord_public_key: Option<String>,
-    /// Shared callback page on the static site for both providers' redirects.
-    pub discord_redirect_uri: String,
-    pub support_email: String,
-}
-
-/// Length caps for user-supplied strings. Every limit is bounded by a hard
-/// ceiling (`HARD_MAX`); env-supplied values above the ceiling are clamped.
-#[derive(Clone)]
-pub struct LimitsConfig {
-    pub message_chars: usize,
-    pub bio_chars: usize,
-    pub social_link_label: usize,
-    pub social_link_count: usize,
-}
-
-impl LimitsConfig {
-    pub const HARD_MAX: usize = 4096;
-    fn cap(v: usize, default: usize) -> usize {
-        v.clamp(1, Self::HARD_MAX).min(default.max(1))
-    }
-}
-
-impl Default for LimitsConfig {
-    fn default() -> Self {
-        Self {
-            message_chars: 4000,
-            bio_chars: 500,
-            social_link_label: 40,
-            social_link_count: 12,
-        }
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct NotifyTargets {
-    /// Where to drop the periodic wall snapshot files.
-    pub discord_user_id: Option<String>,
-    pub telegram_user_id: Option<String>,
-    pub telegram_channel_id: Option<String>,
-    pub telegram_channel_username: Option<String>, // for building https://t.me/<name>/<msg_id>
-    /// Period between automatic snapshots, seconds. Default 240 (4 min).
-    /// Snapshots are aligned to the wall clock so they always land on a
-    /// minute that's a multiple of `snapshot_interval_secs / 60`.
-    pub snapshot_interval_secs: u64,
-    /// Send the periodic snapshot album to `telegram_user_id` as a DM.
-    /// Default OFF — the channel is the broadcast target; admins pull the
-    /// latest on demand with the bot's /snapshot command.
-    pub telegram_snapshot_dm: bool,
-    /// Telegram user ids allowed to run admin bot commands (also seeded into
-    /// the bot_admins table at boot).
-    pub telegram_admin_ids: Vec<String>,
-    /// Discord parity registry — stored now, transport lands later.
-    pub discord_admin_ids: Vec<String>,
-}
-
-/// Boot-time env loader.
-///
-/// Priority:
-///   1. If `THE_WALL_DEV_ENV_FILE` is set, every variable in that file is
-///      loaded *and overrides* anything that was already in the process
-///      environment. This is the "config file is the source of truth" mode —
-///      handy when you keep secrets in `/etc/the-wall/secrets.env` and want a
-///      sysadmin edit to take effect on next restart without touching the
-///      systemd unit.
-///   2. Otherwise we fall back to the default behaviour: read `.env` from the
-///      current working directory, *without* overriding anything systemd or
-///      the shell already provided.
-///
-/// In both cases we never panic on a missing file: env vars from the actual
-/// environment still work, so a misconfigured `THE_WALL_DEV_ENV_FILE` only
-/// produces a warning in the log.
-fn load_env_config() {
-    if let Ok(path) = std::env::var("THE_WALL_DEV_ENV_FILE") {
-        match dotenvy::from_path_override(&path) {
-            Ok(_) => eprintln!("[boot] loaded env from THE_WALL_DEV_ENV_FILE={path} (override)"),
-            Err(e) => eprintln!("[boot] THE_WALL_DEV_ENV_FILE={path} unreadable: {e}"),
-        }
-        warn_unknown_env_keys(dotenvy::from_path_iter(&path).ok());
-        return;
-    }
-    let loaded = dotenvy::dotenv().is_ok();
-    if loaded {
-        warn_unknown_env_keys(dotenvy::dotenv_iter().ok());
-    }
-}
-
-/// Every env var the backend reads anywhere. Keep in sync when adding a new
-/// `env::var(...)` — the boot check below flags any file key that's not in
-/// this list, which is how a typo'd key gets caught instead of silently
-/// evaluating to "feature off".
-const KNOWN_ENV_KEYS: &[&str] = &[
-    "DATABASE_URL",
-    "JWT_SECRET",
-    "PORT",
-    "SITE_URL",
-    "RUST_LOG",
-    "PUBLIC_BASE_URL",
-    "LIMIT_MESSAGE_CHARS",
-    "LIMIT_BIO_CHARS",
-    "LIMIT_SOCIAL_LABEL",
-    "LIMIT_SOCIAL_COUNT",
-    "SNAPSHOT_INTERVAL_SECS",
-    "SUPPORT_EMAIL",
-    "EXTENSION_VERSION",
-    "TELEGRAM_BOT_TOKEN",
-    "TELEGRAM_BOT_USERNAME",
-    "TELEGRAM_CLIENT_ID",
-    "TELEGRAM_CLIENT_SECRET",
-    "TELEGRAM_NOTIFY_USER_ID",
-    "TELEGRAM_NOTIFY_CHANNEL_ID",
-    "TELEGRAM_NOTIFY_CHANNEL_USERNAME",
-    "TELEGRAM_SNAPSHOT_DM",
-    "TELEGRAM_ADMIN_IDS",
-    "DISCORD_CLIENT_ID",
-    "DISCORD_CLIENT_SECRET",
-    "GITHUB_CLIENT_ID",
-    "GITHUB_CLIENT_SECRET",
-    "DISCORD_BOT_TOKEN",
-    "DISCORD_BOT", // legacy fallback read by routes/avatar.rs
-    "DISCORD_REDIRECT_URI",
-    "DISCORD_NOTIFY_USER_ID",
-    "DISCORD_ADMIN_IDS",
-    "DISCORD_APPLICATION_ID",
-    "DISCORD_PUBLIC_KEY",
-    "THE_WALL_DEV_ENV_FILE",
-];
-
-/// Flag env-file keys the backend never reads. Runs before tracing is up, so
-/// it speaks `eprintln!` like the rest of the boot path. A misspelled key is
-/// otherwise invisible: the right key stays unset and the feature silently
-/// turns off — exactly the failure mode this exists to surface.
-fn warn_unknown_env_keys<I>(iter: Option<I>)
-where
-    I: Iterator<Item = Result<(String, String), dotenvy::Error>>,
-{
-    let Some(iter) = iter else { return };
-    for (key, _) in iter.flatten() {
-        if KNOWN_ENV_KEYS.contains(&key.as_str()) {
-            continue;
-        }
-        match KNOWN_ENV_KEYS
-            .iter()
-            .map(|k| (k, levenshtein(&key, k)))
-            .min_by_key(|(_, d)| *d)
-            .filter(|(_, d)| *d <= 3)
-        {
-            Some((suggestion, _)) => eprintln!(
-                "[boot] WARNING: env key {key} is not recognised — did you mean {suggestion}?"
-            ),
-            None => eprintln!("[boot] WARNING: env key {key} is not recognised (typo?)"),
-        }
-    }
-}
-
-/// Plain O(m·n) edit distance — only runs once per unknown env key at boot.
-fn levenshtein(a: &str, b: &str) -> usize {
-    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
-    let mut prev: Vec<usize> = (0..=b.len()).collect();
-    for (i, ca) in a.iter().enumerate() {
-        let mut cur = vec![i + 1];
-        for (j, cb) in b.iter().enumerate() {
-            let cost = if ca == cb { 0 } else { 1 };
-            cur.push((prev[j] + cost).min(prev[j + 1] + 1).min(cur[j] + 1));
-        }
-        prev = cur;
-    }
-    prev[b.len()]
-}
-
-/// Read an optional env var, treating empty/whitespace-only values as unset.
-/// `KEY=` left in the file would otherwise arrive as `Some("")` and sail
-/// through `if let Some(...)` guards into confusing mid-request failures.
-fn opt_env(key: &str) -> Option<String> {
-    env::var(key)
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-}
+// Re-export config types so the rest of the crate can keep using
+// `crate::OAuthConfig` etc. while the canonical definitions live in `config.rs`.
+pub use crate::config::{LimitsConfig, NotifyTargets, OAuthConfig};
 
 /// One boot-time pass over the optional feature knobs: every unset value
 /// logs a warning naming the feature it turns off. Loud beats silent — a
 /// missing var here is the difference between "bot offline, no idea why" and
 /// a one-line answer in the journal.
-fn warn_unset_config(oauth: &OAuthConfig, notify: &NotifyTargets) {
+fn warn_unset_config(config: &AppConfig) {
     let checks: &[(&str, bool, &str)] = &[
-        ("TELEGRAM_BOT_TOKEN", oauth.telegram_bot_token.is_some(),
+        ("TELEGRAM_BOT_TOKEN", config.oauth.telegram_bot_token.is_some(),
          "Telegram bot disabled (snapshots, DMs, admin commands)"),
-        ("TELEGRAM_CLIENT_ID", oauth.telegram_client_id.is_some(),
+        ("TELEGRAM_CLIENT_ID", config.oauth.telegram_client_id.is_some(),
          "Telegram OAuth linking/sign-in disabled"),
-        ("TELEGRAM_CLIENT_SECRET", oauth.telegram_client_secret.is_some(),
+        ("TELEGRAM_CLIENT_SECRET", config.oauth.telegram_client_secret.is_some(),
          "Telegram OAuth linking/sign-in disabled"),
-        ("DISCORD_CLIENT_ID", oauth.discord_client_id.is_some(),
+        ("DISCORD_CLIENT_ID", config.oauth.discord_client_id.is_some(),
          "Discord OAuth linking/sign-in disabled"),
-        ("DISCORD_CLIENT_SECRET", oauth.discord_client_secret.is_some(),
+        ("DISCORD_CLIENT_SECRET", config.oauth.discord_client_secret.is_some(),
          "Discord OAuth linking/sign-in disabled"),
-        ("GITHUB_CLIENT_ID", oauth.github_client_id.is_some(),
+        ("GITHUB_CLIENT_ID", config.oauth.github_client_id.is_some(),
          "GitHub OAuth linking/sign-in disabled"),
-        ("GITHUB_CLIENT_SECRET", oauth.github_client_secret.is_some(),
+        ("GITHUB_CLIENT_SECRET", config.oauth.github_client_secret.is_some(),
          "GitHub OAuth linking/sign-in disabled"),
-        ("DISCORD_BOT_TOKEN", oauth.discord_bot_token.is_some(),
+        ("DISCORD_BOT_TOKEN", config.oauth.discord_bot_token.is_some(),
          "Discord bot disabled (gateway presence, DMs, slash registration)"),
-        ("DISCORD_APPLICATION_ID", oauth.discord_application_id.is_some(),
+        ("DISCORD_APPLICATION_ID", config.oauth.discord_application_id.is_some(),
          "Discord slash-command registration disabled"),
-        ("DISCORD_PUBLIC_KEY", oauth.discord_public_key.is_some(),
+        ("DISCORD_PUBLIC_KEY", config.oauth.discord_public_key.is_some(),
          "Discord interactions webhook disabled — the portal's endpoint URL check will fail with 503"),
-        ("TELEGRAM_NOTIFY_USER_ID", notify.telegram_user_id.is_some(),
+        ("TELEGRAM_NOTIFY_USER_ID", config.notify.telegram_user_id.is_some(),
          "Telegram snapshot/alert DMs disabled"),
-        ("TELEGRAM_NOTIFY_CHANNEL_ID", notify.telegram_channel_id.is_some(),
+        ("TELEGRAM_NOTIFY_CHANNEL_ID", config.notify.telegram_channel_id.is_some(),
          "Telegram channel snapshots disabled"),
-        ("DISCORD_NOTIFY_USER_ID", notify.discord_user_id.is_some(),
+        ("DISCORD_NOTIFY_USER_ID", config.notify.discord_user_id.is_some(),
          "Discord snapshot/alert DMs disabled"),
-        ("TELEGRAM_ADMIN_IDS", !notify.telegram_admin_ids.is_empty(),
+        ("TELEGRAM_ADMIN_IDS", !config.notify.telegram_admin_ids.is_empty(),
          "no Telegram bot admins seeded"),
-        ("DISCORD_ADMIN_IDS", !notify.discord_admin_ids.is_empty(),
+        ("DISCORD_ADMIN_IDS", !config.notify.discord_admin_ids.is_empty(),
          "no Discord bot admins seeded"),
     ];
     let mut missing = 0;
@@ -291,8 +89,10 @@ fn warn_unset_config(oauth: &OAuthConfig, notify: &NotifyTargets) {
 
 #[tokio::main]
 async fn main() {
-    load_env_config();
+    crate::config::load_env_file();
     routes::meta::boot();
+
+    let config = AppConfig::load();
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
@@ -301,13 +101,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    let site_url = env::var("SITE_URL").unwrap_or_else(|_| "https://filianislost.com".to_string());
-
     let pool = PgPoolOptions::new()
         .max_connections(20)
-        .connect(&database_url)
+        .connect(&config.database_url)
         .await
         .expect("Failed to connect to database");
 
@@ -316,87 +112,25 @@ async fn main() {
         .await
         .expect("Failed to run database migrations");
 
-    let oauth = OAuthConfig {
-        telegram_bot_token: opt_env("TELEGRAM_BOT_TOKEN"),
-        telegram_bot_username: opt_env("TELEGRAM_BOT_USERNAME"),
-        telegram_client_id: opt_env("TELEGRAM_CLIENT_ID"),
-        telegram_client_secret: opt_env("TELEGRAM_CLIENT_SECRET"),
-        discord_client_id: opt_env("DISCORD_CLIENT_ID"),
-        discord_client_secret: opt_env("DISCORD_CLIENT_SECRET"),
-        github_client_id: opt_env("GITHUB_CLIENT_ID"),
-        github_client_secret: opt_env("GITHUB_CLIENT_SECRET"),
-        discord_bot_token: opt_env("DISCORD_BOT_TOKEN"),
-        discord_application_id: opt_env("DISCORD_APPLICATION_ID"),
-        discord_public_key: opt_env("DISCORD_PUBLIC_KEY"),
-        discord_redirect_uri: env::var("DISCORD_REDIRECT_URI")
-            .unwrap_or_else(|_| "https://the-wall.vai-rice.space/vai-auth/".to_string()),
-        support_email: env::var("SUPPORT_EMAIL")
-            .unwrap_or_else(|_| "vadim+the_wall@vai-rice.space".to_string()),
-    };
-
-    let parse_usize =
-        |k: &str, d: usize| env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
-    let limits = LimitsConfig {
-        message_chars: LimitsConfig::cap(parse_usize("LIMIT_MESSAGE_CHARS", 4000), 4096),
-        bio_chars: LimitsConfig::cap(parse_usize("LIMIT_BIO_CHARS", 500), 4096),
-        social_link_label: LimitsConfig::cap(parse_usize("LIMIT_SOCIAL_LABEL", 40), 4096),
-        social_link_count: parse_usize("LIMIT_SOCIAL_COUNT", 12).clamp(1, 64),
-    };
-    let notify = NotifyTargets {
-        discord_user_id: opt_env("DISCORD_NOTIFY_USER_ID"),
-        telegram_user_id: opt_env("TELEGRAM_NOTIFY_USER_ID"),
-        telegram_channel_id: opt_env("TELEGRAM_NOTIFY_CHANNEL_ID"),
-        telegram_channel_username: opt_env("TELEGRAM_NOTIFY_CHANNEL_USERNAME"),
-        // Default 240s = 4 minutes. Each tick is wall-clock aligned (HH:00,
-        // HH:04, HH:08, …) — see `snapshot_worker::next_aligned_delay`.
-        snapshot_interval_secs: env::var("SNAPSHOT_INTERVAL_SECS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(240),
-        telegram_snapshot_dm: env::var("TELEGRAM_SNAPSHOT_DM")
-            .map(|v| v == "on" || v == "1" || v == "true")
-            .unwrap_or(false),
-        telegram_admin_ids: env::var("TELEGRAM_ADMIN_IDS")
-            .map(|v| {
-                v.split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect()
-            })
-            .unwrap_or_default(),
-        discord_admin_ids: env::var("DISCORD_ADMIN_IDS")
-            .map(|v| {
-                v.split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect()
-            })
-            .unwrap_or_default(),
-    };
-
     // Loud config audit: name every optional feature that's off and why.
-    warn_unset_config(&oauth, &notify);
+    warn_unset_config(&config);
 
     // Periodic full-wall snapshot worker — see `snapshot_worker.rs`. Also
     // pulls the signal feed each tick.
-    snapshot_worker::spawn(pool.clone(), oauth.clone(), notify.clone());
+    snapshot_worker::spawn(pool.clone(), config.oauth.clone(), config.notify.clone());
     // Protected-region guard: server-side state verification + alerts.
-    region_guard::spawn(pool.clone(), oauth.clone(), notify.clone());
+    region_guard::spawn(pool.clone(), config.oauth.clone(), config.notify.clone());
     // Telegram admin command bot (/help /status /snapshot /logs /regions).
-    bot_commands::spawn(pool.clone(), oauth.clone(), notify.clone());
+    bot_commands::spawn(pool.clone(), config.oauth.clone(), config.notify.clone());
     // Paint refill reminders: 10s sweep, DM delivery via linked channels.
-    reminder_worker::spawn(pool.clone(), oauth.clone());
+    reminder_worker::spawn(pool.clone(), config.oauth.clone());
     // Discord slash-command registration (commands answered via the
     // /api/v2/discord/interactions webhook below).
-    discord_commands::register_commands(oauth.clone());
+    discord_commands::register_commands(config.oauth.clone());
 
     let state = AppState {
         pool,
-        jwt_secret,
-        site_url,
-        oauth,
-        limits,
-        notify,
+        config,
         started_at: std::time::SystemTime::now(),
     };
 
@@ -1114,10 +848,9 @@ async fn main() {
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
-        .with_state(state);
+        .with_state(state.clone());
 
-    let port = env::var("PORT").unwrap_or_else(|_| "3080".to_string());
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("0.0.0.0:{}", state.config.port);
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .expect("Failed to bind address");

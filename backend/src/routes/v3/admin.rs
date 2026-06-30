@@ -720,7 +720,7 @@ pub async fn admin_impersonate_user(
     let mins = body.duration_minutes.unwrap_or(60).clamp(1, 240);
     let expires = Utc::now() + chrono::Duration::minutes(mins);
 
-    let token = crate::auth::create_token(&target_id, &state.jwt_secret, mins)
+    let token = crate::auth::create_token(&target_id, &state.config.jwt_secret, mins)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:?}")))?;
 
     sqlx::query(

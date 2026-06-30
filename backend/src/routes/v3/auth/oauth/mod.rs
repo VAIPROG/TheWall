@@ -56,7 +56,7 @@ pub async fn start(
             .get(axum::http::header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "))
-            .and_then(|tok| verify_token(tok, &state.jwt_secret).ok())
+            .and_then(|tok| verify_token(tok, &state.config.jwt_secret).ok())
             .and_then(|claims| Uuid::parse_str(&claims.sub).ok())
             .ok_or((
                 StatusCode::UNAUTHORIZED,
@@ -70,7 +70,7 @@ pub async fn start(
     // 5. Resolve redirect URI.
     let redirect_uri = q
         .redirect_uri
-        .unwrap_or_else(|| state.oauth.discord_redirect_uri.clone());
+        .unwrap_or_else(|| state.config.oauth.discord_redirect_uri.clone());
 
     // 6. Generate PKCE verifier + challenge, and a random state token.
     let state_token = random_state();
@@ -143,7 +143,7 @@ pub async fn callback(
         "no pkce verifier in state row".to_string(),
     ))?;
     let redirect_uri = redirect_uri_opt
-        .unwrap_or_else(|| state.oauth.discord_redirect_uri.clone());
+        .unwrap_or_else(|| state.config.oauth.discord_redirect_uri.clone());
 
     // 3. Exchange code for provider identity.
     let identity = providers::code_to_identity(
@@ -276,7 +276,7 @@ pub async fn callback(
     };
 
     // 5. Issue session pair.
-    let (access, refresh) = issue_session_pair(&state.pool, &state.jwt_secret, account_id)
+    let (access, refresh) = issue_session_pair(&state.pool, &state.config.jwt_secret, account_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
@@ -299,15 +299,15 @@ fn provider_client_id(
     provider: Provider,
 ) -> Result<String, (StatusCode, String)> {
     match provider {
-        Provider::Telegram => state.oauth.telegram_client_id.clone().ok_or((
+        Provider::Telegram => state.config.oauth.telegram_client_id.clone().ok_or((
             StatusCode::SERVICE_UNAVAILABLE,
             "TELEGRAM_CLIENT_ID not configured".to_string(),
         )),
-        Provider::Discord => state.oauth.discord_client_id.clone().ok_or((
+        Provider::Discord => state.config.oauth.discord_client_id.clone().ok_or((
             StatusCode::SERVICE_UNAVAILABLE,
             "DISCORD_CLIENT_ID not configured".to_string(),
         )),
-        Provider::GitHub => state.oauth.github_client_id.clone().ok_or((
+        Provider::GitHub => state.config.oauth.github_client_id.clone().ok_or((
             StatusCode::SERVICE_UNAVAILABLE,
             "GITHUB_CLIENT_ID not configured".to_string(),
         )),

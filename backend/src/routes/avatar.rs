@@ -431,7 +431,10 @@ pub async fn clear_discord_cache(Query(params): Query<AvatarQuery>) -> Response 
 }
 
 // GET /discord/avatar?userId=<discord_snowflake>
-pub async fn get_discord_avatar(Query(params): Query<AvatarQuery>) -> Response {
+pub async fn get_discord_avatar(
+    State(state): State<AppState>,
+    Query(params): Query<AvatarQuery>,
+) -> Response {
     let discord_id = params.user_id;
     tracing::debug!("get_discord_avatar: discord_id={discord_id}");
 
@@ -457,9 +460,12 @@ pub async fn get_discord_avatar(Query(params): Query<AvatarQuery>) -> Response {
     // Match the env name used by main.rs (DISCORD_BOT_TOKEN). The historical
     // `DISCORD_BOT` is kept as a fallback so an existing operator env file
     // with the older name keeps working.
-    let bot_token = std::env::var("DISCORD_BOT_TOKEN")
-        .ok()
-        .or_else(|| std::env::var("DISCORD_BOT").ok());
+    let bot_token = state
+        .config
+        .oauth
+        .discord_bot_token
+        .clone()
+        .or_else(|| crate::config::opt_env("DISCORD_BOT"));
     if bot_token.is_none() {
         tracing::warn!(
             "get_discord_avatar({discord_id}): no bot token (DISCORD_BOT_TOKEN unset) — falling back to embed avatar"

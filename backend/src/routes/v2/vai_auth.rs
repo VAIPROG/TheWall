@@ -147,7 +147,7 @@ pub async fn signup(
         }
         return Err((StatusCode::INTERNAL_SERVER_ERROR, msg));
     }
-    let token = issue_vai_jwt(&id, &state.jwt_secret)
+    let token = issue_vai_jwt(&id, &state.config.jwt_secret)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(AuthOk {
         token,
@@ -182,7 +182,7 @@ pub async fn login(
     if !verify_password(&b.password, &row.2) {
         return Err((StatusCode::UNAUTHORIZED, "invalid credentials".into()));
     }
-    let token = issue_vai_jwt(&row.0, &state.jwt_secret)
+    let token = issue_vai_jwt(&row.0, &state.config.jwt_secret)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(AuthOk {
         token,
@@ -205,7 +205,7 @@ pub async fn link_to_wall(
     State(state): State<AppState>,
     Json(b): Json<LinkRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let claims = verify_vai_jwt(&b.vai_token, &state.jwt_secret)
+    let claims = verify_vai_jwt(&b.vai_token, &state.config.jwt_secret)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e))?;
     let vai_id: Uuid = claims
         .sub

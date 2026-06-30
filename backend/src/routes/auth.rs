@@ -114,7 +114,7 @@ pub async fn site(
     // 1. Verify token with filianislost.com
     let client = reqwest::Client::new();
     let site_resp = client
-        .get(format!("{}/user/me", state.site_url))
+        .get(format!("{}/user/me", state.config.site_url))
         .header("Authorization", body.site_token.as_str())
         .send()
         .await
@@ -166,7 +166,7 @@ pub async fn site(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // 3. Issue token pair
-    let token = create_token(&user.id, &state.jwt_secret, 24)
+    let token = create_token(&user.id, &state.config.jwt_secret, 24)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let refresh_token = generate_refresh_token();
     let refresh_hash = hash_token(&refresh_token);
@@ -265,7 +265,7 @@ pub async fn refresh(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Issue new token pair
-    let token = create_token(&user.id, &state.jwt_secret, 24)
+    let token = create_token(&user.id, &state.config.jwt_secret, 24)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let new_refresh = generate_refresh_token();
     let new_refresh_hash = hash_token(&new_refresh);

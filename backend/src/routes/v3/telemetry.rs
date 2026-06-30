@@ -279,9 +279,7 @@ pub async fn health_check(
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
 
-    let maintenance = std::env::var("WALL_MAINTENANCE_MODE")
-        .map(|v| v == "1" || v.to_lowercase() == "true")
-        .unwrap_or(false);
+    let maintenance = state.config.maintenance.enabled || state.config.maintenance.reason.is_some();
 
     let status = if !db_ok || maintenance {
         "maintenance"
@@ -294,11 +292,7 @@ pub async fn health_check(
         uptime,
         database: if db_ok { "connected".to_string() } else { "disconnected".to_string() },
         maintenance_mode: maintenance,
-        maintenance_reason: if maintenance {
-            Some(std::env::var("WALL_MAINTENANCE_REASON").unwrap_or_default())
-        } else {
-            None
-        },
+        maintenance_reason: state.config.maintenance.reason.clone(),
         version: env!("CARGO_PKG_VERSION").to_string(),
     }))
 }

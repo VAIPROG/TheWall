@@ -212,10 +212,10 @@ pub async fn send_dm(
     if body.body.trim().is_empty() {
         return Err((StatusCode::BAD_REQUEST, "empty body".into()));
     }
-    if body.body.chars().count() > state.limits.message_chars {
+    if body.body.chars().count() > state.config.limits.message_chars {
         return Err((
             StatusCode::PAYLOAD_TOO_LARGE,
-            format!("max {} chars", state.limits.message_chars),
+            format!("max {} chars", state.config.limits.message_chars),
         ));
     }
     sqlx::query(

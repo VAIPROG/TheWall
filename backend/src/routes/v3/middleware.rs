@@ -70,7 +70,7 @@ pub async fn auth_and_ban_middleware(
 ) -> Result<Response, (StatusCode, String)> {
     // 1. Verify JWT if present and store AuthUser in extensions.
     if let Some(token) = extract_bearer(&request) {
-        if let Ok(claims) = crate::auth::verify_token(token, &state.jwt_secret) {
+        if let Ok(claims) = crate::auth::verify_token(token, &state.config.jwt_secret) {
             if let Ok(user_id) = uuid::Uuid::parse_str(&claims.sub) {
                 request.extensions_mut().insert(AuthUser { user_id });
             }

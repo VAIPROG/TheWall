@@ -137,7 +137,7 @@ impl FromRequestParts<AppState> for AuthUser {
             .strip_prefix("Bearer ")
             .ok_or(AuthError::InvalidHeaderFormat)?;
 
-        let claims = verify_token(token, &state.jwt_secret)?;
+        let claims = verify_token(token, &state.config.jwt_secret)?;
 
         let user_id = Uuid::parse_str(&claims.sub).map_err(|_| {
             AuthError::TokenVerification(

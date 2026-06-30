@@ -69,26 +69,26 @@ pub async fn update_me(
     Json(body): Json<UpdateProfile>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     if let Some(ref bio) = body.bio {
-        if bio.chars().count() > state.limits.bio_chars {
+        if bio.chars().count() > state.config.limits.bio_chars {
             return Err((
                 StatusCode::PAYLOAD_TOO_LARGE,
-                format!("bio max {} chars", state.limits.bio_chars),
+                format!("bio max {} chars", state.config.limits.bio_chars),
             ));
         }
     }
     let social_json = match body.social_links {
         Some(links) => {
-            if links.len() > state.limits.social_link_count {
+            if links.len() > state.config.limits.social_link_count {
                 return Err((
                     StatusCode::BAD_REQUEST,
-                    format!("max {} social links", state.limits.social_link_count),
+                    format!("max {} social links", state.config.limits.social_link_count),
                 ));
             }
             for link in &links {
-                if link.label.chars().count() > state.limits.social_link_label {
+                if link.label.chars().count() > state.config.limits.social_link_label {
                     return Err((
                         StatusCode::BAD_REQUEST,
-                        format!("label max {} chars", state.limits.social_link_label),
+                        format!("label max {} chars", state.config.limits.social_link_label),
                     ));
                 }
                 validate_url(&link.url).map_err(|e| (StatusCode::BAD_REQUEST, e))?;

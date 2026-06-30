@@ -174,11 +174,11 @@ async fn telegram_code_to_identity(
     code_verifier: &str,
     redirect_uri: &str,
 ) -> Result<ProviderIdentity, (StatusCode, String)> {
-    let client_id = state.oauth.telegram_client_id.clone().ok_or((
+    let client_id = state.config.oauth.telegram_client_id.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "TELEGRAM_CLIENT_ID not configured".to_string(),
     ))?;
-    let client_secret = state.oauth.telegram_client_secret.clone().ok_or((
+    let client_secret = state.config.oauth.telegram_client_secret.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "TELEGRAM_CLIENT_SECRET not configured".to_string(),
     ))?;
@@ -326,11 +326,11 @@ async fn discord_code_to_identity(
     code_verifier: &str,
     redirect_uri: &str,
 ) -> Result<ProviderIdentity, (StatusCode, String)> {
-    let client_id = state.oauth.discord_client_id.clone().ok_or((
+    let client_id = state.config.oauth.discord_client_id.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "discord oauth not configured".to_string(),
     ))?;
-    let client_secret = state.oauth.discord_client_secret.clone().ok_or((
+    let client_secret = state.config.oauth.discord_client_secret.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "discord oauth secret missing".to_string(),
     ))?;
@@ -425,11 +425,11 @@ async fn github_code_to_identity(
     code_verifier: &str,
     redirect_uri: &str,
 ) -> Result<ProviderIdentity, (StatusCode, String)> {
-    let client_id = state.oauth.github_client_id.clone().ok_or((
+    let client_id = state.config.oauth.github_client_id.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "GITHUB_CLIENT_ID not configured".to_string(),
     ))?;
-    let client_secret = state.oauth.github_client_secret.clone().ok_or((
+    let client_secret = state.config.oauth.github_client_secret.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "GITHUB_CLIENT_SECRET not configured".to_string(),
     ))?;
