@@ -29,6 +29,13 @@ use crate::{
 };
 
 const TILE: u32 = 256;
+/// Max tile requests in flight at once. The large layer is ~400 tiles;
+/// firing them all together saturated the pool and caused blank squares.
+const TILE_FETCH_CONCURRENCY: usize = 96;
+/// Attempts per tile before it's left as brick texture.
+const TILE_FETCH_ATTEMPTS: u32 = 4;
+/// Per-attempt request timeout (the client's overall timeout is the ceiling).
+const TILE_FETCH_TIMEOUT_SECS: u64 = 45;
 const BRICK_URL: &str = "https://filianislost.com/static/brick-background-hi.webp";
 
 #[derive(Debug, Clone, Copy)]
@@ -130,12 +137,7 @@ pub fn spawn(pool: PgPool, oauth: OAuthConfig, notify: NotifyTargets) {
 /// Run one full snapshot pass plus the side-effect followups (signal mirror,
 /// anti-grief scan). Each side-effect is logged but never aborts the loop —
 /// a Telegram outage shouldn't stop us from taking the next snapshot.
-async fn run_pass(
-    pool: &PgPool,
-    oauth: &OAuthConfig,
-    notify: &NotifyTargets,
-    brick: &BrickCache,
-) {
+async fn run_pass(pool: &PgPool, oauth: &OAuthConfig, notify: &NotifyTargets, brick: &BrickCache) {
     if let Err(e) = run_once(pool, oauth, notify, brick).await {
         tracing::warn!("snapshot_worker tick: {e}");
     }
@@ -392,7 +394,16 @@ async fn build_snapshot(
 
     // 2. Fan out tile fetches. Grid starts at top-left = (0,0); the tile at
     //    (tx, ty) draws onto stage at pixel (tx * TILE, ty * TILE).
+    //
+    // Reliability: the large layer is ~24×17 ≈ 400 tiles. Firing all of them
+    // at once saturates the connection pool and individual requests time out,
+    // which is exactly what left blank squares in finished snapshots. So we
+    // (a) cap in-flight requests with a semaphore and (b) retry each tile a
+    // few times with a bounded per-attempt timeout before giving up. A tile
+    // that still fails leaves the brick texture showing (not a hard error),
+    // and we log the count so a flaky run is visible.
     let bust = chrono::Utc::now().timestamp();
+    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(TILE_FETCH_CONCURRENCY));
     let mut handles: Vec<(
         u32,
         u32,
@@ -402,26 +413,56 @@ async fn build_snapshot(
         for tx in 0..cols {
             let url = format!("{tile_base}/tiles/{layer}/{tx}/{ty}.png?v={bust}");
             let c = client.clone();
+            let sem = sem.clone();
             handles.push((
                 tx,
                 ty,
                 tokio::spawn(async move {
-                    let r = c.get(&url).send().await.ok()?;
-                    if !r.status().is_success() {
-                        return None;
+                    let _permit = sem.acquire().await.ok()?;
+                    for attempt in 1..=TILE_FETCH_ATTEMPTS {
+                        let res = c
+                            .get(&url)
+                            .timeout(Duration::from_secs(TILE_FETCH_TIMEOUT_SECS))
+                            .send()
+                            .await;
+                        if let Ok(r) = res {
+                            if r.status().is_success() {
+                                if let Ok(b) = r.bytes().await {
+                                    if let Ok(img) = image::load_from_memory(&b) {
+                                        return Some(img);
+                                    }
+                                }
+                            }
+                        }
+                        if attempt < TILE_FETCH_ATTEMPTS {
+                            // Linear backoff: 300ms, 600ms, …
+                            tokio::time::sleep(Duration::from_millis(300 * attempt as u64)).await;
+                        }
                     }
-                    let b = r.bytes().await.ok()?;
-                    image::load_from_memory(&b).ok()
+                    None
                 }),
             ));
         }
     }
+    let total_tiles = cols * rows;
+    let mut failed_tiles = 0u32;
     for (tx, ty, hh) in handles {
-        let Ok(Some(tile)) = hh.await else {
-            continue;
-        };
-        let tile = tile.to_rgba8();
-        image::imageops::overlay(&mut stage, &tile, (tx * TILE) as i64, (ty * TILE) as i64);
+        match hh.await {
+            Ok(Some(tile)) => {
+                let tile = tile.to_rgba8();
+                image::imageops::overlay(&mut stage, &tile, (tx * TILE) as i64, (ty * TILE) as i64);
+            }
+            _ => failed_tiles += 1,
+        }
+    }
+    if failed_tiles > 0 {
+        tracing::warn!(
+            "snapshot {}: {}/{} tiles missing after {} attempts — brick shows through those squares",
+            size.as_str(),
+            failed_tiles,
+            total_tiles,
+            TILE_FETCH_ATTEMPTS,
+        );
     }
     let cropped = image::imageops::crop_imm(&stage, 0, 0, w, h).to_image();
 
