@@ -11,15 +11,17 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
 };
-use chrono::Utc;
-use serde::Deserialize;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::{
     AppState,
     auth::AuthUser,
     models::{
+        auth::SessionSummary,
         moderation::{AuditLogEntry, AuditLogPage, AuditLogRow, RestrictionRow, RestrictionView},
         users::User,
     },
@@ -551,6 +553,211 @@ pub async fn admin_reset_username(
     .await;
 
     Ok(Json(json!({"ok": true, "message": "username reset", "newUsername": new_username})))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v3/admin/users/{userRef}/sessions
+// DELETE /api/v3/admin/users/{userRef}/sessions
+// ---------------------------------------------------------------------------
+
+pub async fn admin_get_user_sessions(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(user_ref): Path<String>,
+) -> Result<Json<Vec<SessionSummary>>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+
+    let rows: Vec<SessionSummary> = sqlx::query_as(
+        r#"SELECT id AS session_id, ip::TEXT AS ip, user_agent, created_at, last_activity AS last_activity_at
+             FROM sessions
+            WHERE user_id = $1
+         ORDER BY created_at DESC"#,
+    )
+    .bind(target_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(rows))
+}
+
+pub async fn admin_terminate_user_sessions(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(user_ref): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+
+    let result = sqlx::query("DELETE FROM sessions WHERE user_id = $1")
+        .bind(target_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_terminate_sessions",
+        "user",
+        &target_id.to_string(),
+        json!({ "count": result.rows_affected() }),
+    )
+    .await;
+
+    Ok(Json(json!({"ok": true, "message": "sessions terminated", "count": result.rows_affected()})))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v3/admin/users/{userRef}/notes
+// POST /api/v3/admin/users/{userRef}/notes
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminNoteCreate {
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminNote {
+    pub id: Uuid,
+    pub author_id: Uuid,
+    pub author_username: Option<String>,
+    pub content: String,
+    pub created_at: DateTime<Utc>,
+}
+
+pub async fn admin_get_user_notes(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(user_ref): Path<String>,
+) -> Result<Json<Vec<AdminNote>>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+
+    let rows: Vec<AdminNote> = sqlx::query_as(
+        r#"SELECT n.id, n.author_id, u.username AS author_username, n.content, n.created_at
+             FROM admin_notes n
+             LEFT JOIN users u ON u.id = n.author_id
+            WHERE n.user_id = $1
+         ORDER BY n.created_at DESC"#,
+    )
+    .bind(target_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(rows))
+}
+
+pub async fn admin_add_user_note(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(user_ref): Path<String>,
+    Json(body): Json<AdminNoteCreate>,
+) -> Result<Json<AdminNote>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+
+    let content = body.content.trim();
+    if content.is_empty() || content.len() > 2000 {
+        return Err((StatusCode::BAD_REQUEST, "content must be 1-2000 characters".to_string()));
+    }
+
+    let row: AdminNote = sqlx::query_as(
+        r#"INSERT INTO admin_notes (user_id, author_id, content)
+           VALUES ($1, $2, $3)
+           RETURNING id, author_id,
+                     (SELECT username FROM users WHERE id = $2) AS author_username,
+                     content, created_at"#,
+    )
+    .bind(target_id)
+    .bind(auth.user_id)
+    .bind(content)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_note_added",
+        "user",
+        &target_id.to_string(),
+        json!({ "noteId": row.id }),
+    )
+    .await;
+
+    Ok(Json(row))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v3/admin/users/{userRef}/impersonate
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImpersonateRequest {
+    pub duration_minutes: Option<i64>,
+}
+
+pub async fn admin_impersonate_user(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(user_ref): Path<String>,
+    Json(body): Json<ImpersonateRequest>,
+) -> Result<Json<crate::models::auth::V3AuthResponse>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+
+    let target = load_user(&state.pool, target_id)
+        .await?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
+
+    let mins = body.duration_minutes.unwrap_or(60).clamp(1, 240);
+    let expires = Utc::now() + chrono::Duration::minutes(mins);
+
+    let token = crate::auth::create_token(&target_id, &state.jwt_secret, mins)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:?}")))?;
+
+    sqlx::query(
+        r#"INSERT INTO sessions (id, user_id, token_hash, refresh_hash, expires_at, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(target_id)
+    .bind(crate::auth::hash_token(&token))
+    .bind(None::<String>)
+    .bind(expires)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_impersonate",
+        "user",
+        &target_id.to_string(),
+        json!({ "durationMinutes": mins }),
+    )
+    .await;
+
+    Ok(Json(crate::models::auth::V3AuthResponse {
+        access_token: token,
+        refresh_token: String::new(),
+        expires_in: mins * 60,
+        token_type: "Bearer".to_string(),
+        user: crate::models::users::AccountPublic {
+            id: target.id,
+            username: target.username,
+            display_name: target.display_name,
+            role: target.role,
+        },
+    }))
 }
 
 // ---------------------------------------------------------------------------

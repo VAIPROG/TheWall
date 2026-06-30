@@ -13,6 +13,20 @@ pub struct Session {
     pub refresh_hash: Option<String>,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+    pub ip: Option<String>,
+    pub user_agent: Option<String>,
+    pub last_activity: Option<DateTime<Utc>>,
+}
+
+/// Wire shape for admin session summaries.
+#[derive(Debug, Clone, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSummary {
+    pub session_id: Uuid,
+    pub ip: Option<String>,
+    pub user_agent: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub last_activity_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

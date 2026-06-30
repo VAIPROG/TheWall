@@ -1045,6 +1045,9 @@ async fn main() {
         .route("/api/v3/admin/users/{user_ref}/remove-from-clan", post(routes::v3::admin::admin_remove_from_clan))
         .route("/api/v3/admin/users/{user_ref}/reset-avatar", post(routes::v3::admin::admin_reset_avatar))
         .route("/api/v3/admin/users/{user_ref}/reset-username", post(routes::v3::admin::admin_reset_username))
+        .route("/api/v3/admin/users/{user_ref}/sessions", get(routes::v3::admin::admin_get_user_sessions).delete(routes::v3::admin::admin_terminate_user_sessions))
+        .route("/api/v3/admin/users/{user_ref}/notes", get(routes::v3::admin::admin_get_user_notes).post(routes::v3::admin::admin_add_user_note))
+        .route("/api/v3/admin/users/{user_ref}/impersonate", post(routes::v3::admin::admin_impersonate_user))
         .route("/api/v3/admin/audit", get(routes::v3::admin::admin_audit_log))
         // --- V3 moderation: report queue + template approval + audit log ------
         .route(
