@@ -26,7 +26,7 @@ use crate::{
 
 /// Load a template row restricted to the caller's visibility, returning
 /// `(owner_id, scope, clan_id, author, document, version)` or a 404 error.
-async fn load_visible(
+pub async fn load_visible(
     state: &AppState,
     user_id: Uuid,
     template_id: Uuid,
@@ -113,13 +113,17 @@ pub async fn wall_dev(
 ///
 /// Projection rules (mirrors `src/formats/charity/encode.ts`):
 ///   Each `document.templates[]` layer → a CharityEntry:
-///     { name, sources: layer.imageSources, x, y }
+///     { name, sources: layer.imageSources + backend /png URL, x, y }
 ///   If `layer.animation` is present:
 ///     frameWidth/frameHeight from animation.sheet
 ///     frameCount from animation.sheet.frameCount
 ///     secondsPerFrame = animation.timing.defaultFrameMs / 1000
 ///     startTimestamp = animation.timing.startTime / 1000
 ///     looping = animation.timing.looping
+///
+/// The backend /png URL is always injected as the first source because Charity
+/// cannot consume data: URLs and has no native scale field; the /png endpoint
+/// bakes the layer's scale into the rendered image.
 ///
 /// Wrapped as:
 ///   { faction: "the-wall-dev export", contact: <author or "anonymous">,
@@ -149,7 +153,12 @@ pub async fn charity(
             )
         })?;
 
-    let entries: Vec<Value> = layers.iter().map(layer_to_charity_entry).collect();
+    let base_url = super::render::public_base_url(&state.config);
+    let entries: Vec<Value> = layers
+        .iter()
+        .enumerate()
+        .map(|(idx, layer)| layer_to_charity_entry(layer, id, idx, &base_url))
+        .collect();
 
     let contact = author
         .filter(|a| !a.trim().is_empty())
@@ -169,11 +178,19 @@ pub async fn charity(
 // Projection helper
 // ---------------------------------------------------------------------------
 
-fn layer_to_charity_entry(layer: &Value) -> Value {
+fn layer_to_charity_entry(layer: &Value, template_id: Uuid, layer_idx: usize, base_url: &str) -> Value {
     let name = layer.get("name").and_then(|v| v.as_str()).unwrap_or("Untitled");
-    let sources = layer.get("imageSources").cloned().unwrap_or(json!([]));
     let x = layer.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let y = layer.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+
+    let mut sources = layer
+        .get("imageSources")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    // Prepend the backend-rendered PNG URL so Charity always has a real image URL.
+    let png_url = format!("{}/api/v3/templates/{}/png?layer={}", base_url, template_id, layer_idx);
+    sources.insert(0, Value::String(png_url));
 
     let mut entry = json!({
         "name": name,

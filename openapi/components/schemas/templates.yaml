@@ -763,7 +763,14 @@ CharityEntry:
       type: array
       items:
         type: string
-      description: Ordered fallback image URLs.
+        format: uri
+      description: |
+        Ordered fallback image URLs. The first entry is always a backend
+        `/api/v3/templates/{id}/png?layer={idx}` URL, because Charity cannot
+        consume `data:` URLs and has no native `scale` field; the PNG
+        endpoint bakes the layer's scale into the rendered image. Any
+        original `imageSources` from the the-wall-dev/2 document follow
+        as fallback entries.
     x:
       type: number
       description: X coordinate on canvas.

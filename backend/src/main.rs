@@ -621,6 +621,14 @@ async fn main() {
             get(routes::v3::templates::charity),
         )
         .route(
+            "/api/v3/templates/{id}/png",
+            get(routes::v3::templates::get_png),
+        )
+        .route(
+            "/api/v3/templates/{id}/preview",
+            get(routes::v3::templates::get_preview),
+        )
+        .route(
             "/api/v3/admin/templates/backfill-documents",
             post(routes::v3::templates::backfill),
         )

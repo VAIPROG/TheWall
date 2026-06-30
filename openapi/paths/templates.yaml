@@ -303,48 +303,82 @@ TemplateById:
 TemplatePreview:
   get:
     tags: [Templates]
-    summary: Get template preview image
+    summary: Get template layer preview thumbnail
     operationId: getTemplatePreview
+    description: |
+      Returns a square WebP thumbnail of a single layer from the stored
+      the-wall-dev/2 document. The layer is scaled server-side before the
+      thumbnail is generated, so the preview reflects the actual on-canvas
+      appearance (Charity and other consumers have no native `scale` field).
+      Defaults to layer 0 and size 128.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
-      - name: width
+      - name: size
         in: query
+        description: Thumbnail side length.
         schema:
           type: integer
-          minimum: 1
-      - name: height
+          enum: [64, 128, 256]
+          default: 128
+      - name: layer
         in: query
+        description: Zero-based layer index in document.templates[].
         schema:
           type: integer
-          minimum: 1
+          minimum: 0
+          default: 0
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
     responses:
       "200":
-        description: Preview image.
+        description: Preview image (WebP).
         content:
-          image/png:
+          image/webp:
             schema:
               type: string
               format: binary
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
 
-TemplateImage:
+TemplatePng:
   get:
     tags: [Templates]
-    summary: Get template source image
-    operationId: getTemplateImage
+    summary: Get template layer as PNG
+    operationId: getTemplatePng
+    description: |
+      Renders a single layer from the stored the-wall-dev/2 document as a
+      PNG image. The layer's `scale` is applied server-side because Charity
+      and similar tools cannot scale images themselves. Use `?layer={idx}` to
+      select a layer other than the first one.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - name: layer
+        in: query
+        description: Zero-based layer index in document.templates[].
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
     responses:
       "200":
-        description: Source image (PNG).
+        description: Layer rendered as PNG.
         content:
           image/png:
             schema:
               type: string
               format: binary
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
 
@@ -359,8 +393,12 @@ TemplateCharity:
       The stored canonical form is always the-wall-dev/2; this response
       is assembled on demand. Conversion is lossy — some v2 features
       (per-frame image overrides, access control, contacts) are not
-      expressible in the Charity format. Charity compatibility is
-      permanent and supported indefinitely.
+      expressible in the Charity format.
+
+      Each Charity entry's `sources` array is prepended with a backend
+      `/api/v3/templates/{id}/png?layer={idx}` URL because Charity cannot
+      consume `data:` URLs and has no native `scale` field; the PNG endpoint
+      bakes the layer's scale into the rendered image.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -369,7 +407,7 @@ TemplateCharity:
       - ApiKeyAuth: []
     responses:
       "200":
-        description: Charity format derived from the stored v2 document.
+        description: Charity format derived from the stored the-wall-dev/2 document.
         content:
           application/json:
             schema:

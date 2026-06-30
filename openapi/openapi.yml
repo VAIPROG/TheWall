@@ -416,8 +416,8 @@ paths:
   /templates/{templateId}/preview:
     $ref: "./paths/templates.yaml#/TemplatePreview"
 
-  /templates/{templateId}/image:
-    $ref: "./paths/templates.yaml#/TemplateImage"
+  /templates/{templateId}/png:
+    $ref: "./paths/templates.yaml#/TemplatePng"
 
   /templates/{templateId}/charity:
     $ref: "./paths/templates.yaml#/TemplateCharity"

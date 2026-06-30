@@ -26,7 +26,7 @@ const BAN_ALLOW_LIST: &[&str] = &[
     "/api/v3/templates",
     "/api/v3/templates/:id",
     "/api/v3/templates/:id/preview",
-    "/api/v3/templates/:id/image",
+    "/api/v3/templates/:id/png",
     "/api/v3/templates/:id/wall-dev",
     "/api/v3/templates/:id/charity",
     "/api/v3/templates/pinned",
