@@ -1036,6 +1036,16 @@ async fn main() {
         .route("/api/v3/telemetry/logs/export", get(routes::v3::telemetry::export_logs))
         .route("/api/v3/telemetry/health", get(routes::v3::telemetry::health_check))
         .route("/api/v3/telemetry/metrics", get(routes::v3::telemetry::get_metrics))
+        // --- V3 admin: user management + audit --------------------------------
+        .route("/api/v3/admin/users/{user_ref}", get(routes::v3::admin::admin_get_user).patch(routes::v3::admin::admin_update_user))
+        .route("/api/v3/admin/users/{user_ref}/ban", post(routes::v3::admin::admin_ban_user).delete(routes::v3::admin::admin_unban_user))
+        .route("/api/v3/admin/users/{user_ref}/mute", post(routes::v3::admin::admin_mute_user).delete(routes::v3::admin::admin_unmute_user))
+        .route("/api/v3/admin/users/{user_ref}/promote", post(routes::v3::admin::admin_promote_user))
+        .route("/api/v3/admin/users/{user_ref}/wipeout", post(routes::v3::admin::admin_wipeout_user))
+        .route("/api/v3/admin/users/{user_ref}/remove-from-clan", post(routes::v3::admin::admin_remove_from_clan))
+        .route("/api/v3/admin/users/{user_ref}/reset-avatar", post(routes::v3::admin::admin_reset_avatar))
+        .route("/api/v3/admin/users/{user_ref}/reset-username", post(routes::v3::admin::admin_reset_username))
+        .route("/api/v3/admin/audit", get(routes::v3::admin::admin_audit_log))
         // --- V3 moderation: report queue + template approval + audit log ------
         .route(
             "/api/v3/moderation/reports",

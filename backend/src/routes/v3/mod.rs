@@ -4,6 +4,7 @@
 //! `users` is the canonical Account; `site_identities` hold per-site
 //! connections; `provider_links` hold OAuth connections.
 
+pub mod admin;
 pub mod auth;
 pub mod chats;
 pub mod clans;
