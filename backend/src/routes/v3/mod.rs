@@ -9,6 +9,7 @@ pub mod chats;
 pub mod clans;
 pub mod middleware;
 pub mod moderation;
+pub mod notifications;
 pub mod templates;
 pub mod users;
 pub mod utils;

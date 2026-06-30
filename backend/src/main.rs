@@ -1014,6 +1014,20 @@ async fn main() {
             "/api/v3/clans/{id}/restrictions",
             get(routes::v3::clans::list_clan_restrictions),
         )
+        // --- V3 notifications --------------------------------------------------
+        .route("/api/v3/notifications", get(routes::v3::notifications::list_notifications))
+        .route("/api/v3/notifications/ack", post(routes::v3::notifications::ack_notifications))
+        .route("/api/v3/notifications/ack/all", post(routes::v3::notifications::ack_all_notifications))
+        .route(
+            "/api/v3/notifications/settings",
+            get(routes::v3::notifications::get_settings)
+                .patch(routes::v3::notifications::update_settings),
+        )
+        .route(
+            "/api/v3/notifications/{id}",
+            get(routes::v3::notifications::get_notification)
+                .delete(routes::v3::notifications::dismiss_notification),
+        )
         // --- V3 moderation: report queue + template approval + audit log ------
         .route(
             "/api/v3/moderation/reports",

@@ -19,7 +19,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{TemplateV3, TemplateVerifyRequest},
-    routes::v3::utils::permissions,
+    routes::v3::{notifications, utils::permissions},
 };
 
 /// Columns for every TemplateV3 RETURNING clause (mirrors read.rs).
@@ -115,7 +115,7 @@ pub async fn verify(
 
     let template = updated.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
 
-    // ── 5. Mailbox notification (best-effort) ─────────────────────────────────
+    // ── 5. Mailbox + notification center (best-effort) ───────────────────────
     let (title, body_text, event_name) = if body.decision == "approve" {
         ("Template approved", "Your template was approved.", "approved")
     } else {
@@ -137,6 +137,23 @@ pub async fn verify(
     .execute(&state.pool)
     .await
     .ok();
+
+    let action_url = format!("/templates/{id}");
+    let metadata = serde_json::json!({
+        "templateId": id.to_string(),
+        "decision": body.decision,
+        "rejectionReason": body.reason,
+    });
+    let _ = notifications::notify(
+        &state.pool,
+        owner_id,
+        "template_status_change",
+        title,
+        Some(body_text),
+        Some(&action_url),
+        metadata,
+    )
+    .await;
 
     Ok(Json(template))
 }
