@@ -33,6 +33,7 @@ pub struct AppState {
     pub oauth: OAuthConfig,
     pub limits: LimitsConfig,
     pub notify: NotifyTargets,
+    pub started_at: std::time::SystemTime,
 }
 
 #[derive(Clone, Default)]
@@ -396,6 +397,7 @@ async fn main() {
         oauth,
         limits,
         notify,
+        started_at: std::time::SystemTime::now(),
     };
 
     // Discord gateway: keeps the bot's presence Online and serves slash
@@ -1028,6 +1030,12 @@ async fn main() {
             get(routes::v3::notifications::get_notification)
                 .delete(routes::v3::notifications::dismiss_notification),
         )
+        // --- V3 telemetry: events, logs, health, metrics -----------------------
+        .route("/api/v3/telemetry/events", post(routes::v3::telemetry::submit_events))
+        .route("/api/v3/telemetry/logs", post(routes::v3::telemetry::upload_logs).get(routes::v3::telemetry::query_logs))
+        .route("/api/v3/telemetry/logs/export", get(routes::v3::telemetry::export_logs))
+        .route("/api/v3/telemetry/health", get(routes::v3::telemetry::health_check))
+        .route("/api/v3/telemetry/metrics", get(routes::v3::telemetry::get_metrics))
         // --- V3 moderation: report queue + template approval + audit log ------
         .route(
             "/api/v3/moderation/reports",

@@ -98,3 +98,104 @@ pub struct HigherLimitsRequest {
 pub struct ChatRelayRequest {
     pub markdown: String,
 }
+
+// ===========================================================================
+// Telemetry models
+// ===========================================================================
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
+    pub data: serde_json::Value,
+    pub session_id: Option<Uuid>,
+    pub page_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryBatch {
+    pub events: Vec<TelemetryEvent>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogEntry {
+    pub level: String,
+    pub message: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub source: Option<String>,
+    pub session_id: Option<Uuid>,
+    #[serde(default)]
+    pub context: Option<serde_json::Value>,
+    pub stack: Option<String>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogBatch {
+    pub client_version: String,
+    pub session_id: Option<Uuid>,
+    pub logs: Vec<LogEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct LogRecord {
+    pub id: Uuid,
+    pub account_id: Option<Uuid>,
+    pub level: String,
+    pub message: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub source: Option<String>,
+    pub session_id: Option<Uuid>,
+    pub context: Option<serde_json::Value>,
+    pub stack: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub client_version: String,
+    pub ip: Option<String>,
+    pub received_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogIngestResult {
+    pub accepted: i64,
+    pub rejected: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthStatus {
+    pub status: String,
+    pub uptime: i64,
+    pub database: String,
+    pub maintenance_mode: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maintenance_reason: Option<String>,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabasePoolStats {
+    pub active: i64,
+    pub idle: i64,
+    pub waiting: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetricsSnapshot {
+    pub request_rate: f64,
+    pub average_latency_ms: f64,
+    pub active_connections: i64,
+    pub database_pool: DatabasePoolStats,
+    pub memory_usage_mb: f64,
+    pub cpu_usage_percent: f64,
+}
