@@ -360,9 +360,11 @@ fn json_response(body: String) -> Response {
  * the backend sits behind a reverse proxy that rewrites paths). When the
  * env var is missing we fall back to the request path style.
  * --------------------------------------------------------------------- */
-fn public_base_url() -> String {
-    std::env::var("PUBLIC_BASE_URL")
-        .unwrap_or_else(|_| "https://the-wall.vai-rice.space".to_string())
+fn public_base_url(config: &crate::config::AppConfig) -> String {
+    config
+        .public_base_url
+        .as_deref()
+        .unwrap_or("https://the-wall.vai-rice.space")
         .trim_end_matches('/')
         .to_string()
 }
@@ -466,7 +468,7 @@ pub async fn get_charity(State(state): State<AppState>, Path(id): Path<Uuid>) ->
         return StatusCode::NOT_FOUND.into_response();
     };
     let author = row.author.as_deref().unwrap_or("anonymous");
-    let png_url = format!("{}/api/v2/templates/{}/png", public_base_url(), id);
+    let png_url = format!("{}/api/v2/templates/{}/png", public_base_url(&state.config), id);
     let payload = serde_json::json!({
         "faction":  author,
         "contact":  author,

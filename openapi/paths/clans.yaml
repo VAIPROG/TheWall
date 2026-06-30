@@ -108,6 +108,10 @@ ClanById:
     description: |
       Updates clan name, description, avatar, or other public fields.
       Requires clan `owner` or `admin` role.
+
+      Fields listed in `Clan.moderation.lockedFields` cannot be changed by
+      clan-level roles — attempts return `423 Locked`. Only a global moderator
+      or higher can release locks via `POST /moderation/clans/{clanId}/unlock`.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/ClanIdPath"
@@ -135,6 +139,8 @@ ClanById:
         $ref: "../components/responses/common.yaml#/Forbidden"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
+      "423":
+        $ref: "../components/responses/common.yaml#/Locked"
 
 ClanMembers:
   get:
@@ -457,6 +463,13 @@ ClanSettings:
     tags: [Clans]
     summary: Update clan settings
     operationId: updateClanSettings
+    description: |
+      Updates clan configuration settings. Requires clan `owner` or `admin` role.
+
+      Settings that correspond to fields listed in `Clan.moderation.lockedFields`
+      (e.g. `discoverable`) cannot be changed by clan-level roles — attempts
+      return `423 Locked`. Only a global moderator or higher can release locks via
+      `POST /moderation/clans/{clanId}/unlock`.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/ClanIdPath"
@@ -482,6 +495,8 @@ ClanSettings:
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "403":
         $ref: "../components/responses/common.yaml#/Forbidden"
+      "423":
+        $ref: "../components/responses/common.yaml#/Locked"
 
 ClanApplyRole:
   post:
@@ -601,3 +616,91 @@ ClanRestrictions:
         $ref: "../components/responses/common.yaml#/Forbidden"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanApplications:
+  get:
+    tags: [Clans]
+    summary: List pending join applications
+    operationId: listClanApplications
+    description: |
+      Returns all pending join applications for the clan.
+      Requires `manage_members` or `manage_invites` permission.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Pending join applications.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/clans.yaml#/ClanJoinApplication"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanApplicationReview:
+  post:
+    tags: [Clans]
+    summary: Review a join application
+    operationId: reviewClanApplication
+    description: |
+      Approve or reject a pending clan join application.
+      Requires `manage_members` or `manage_invites` permission.
+      Approved applicants are added as members with the `defaultMemberRole`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Unique identifier of the join application.
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - decision
+            properties:
+              decision:
+                type: string
+                enum:
+                  - approve
+                  - reject
+                description: Whether to approve or reject the application.
+              reason:
+                type: string
+                description: Optional reason communicated to the applicant on rejection.
+    responses:
+      "200":
+        description: Application reviewed.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/clans.yaml#/ClanJoinApplication"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"

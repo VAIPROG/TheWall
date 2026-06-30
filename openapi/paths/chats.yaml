@@ -156,13 +156,11 @@ ChatMessages:
       - ApiKeyAuth: []
     responses:
       "200":
-        description: Messages.
+        description: Cursor-paginated message page.
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: "../components/schemas/chats.yaml#/Message"
+              $ref: "../components/schemas/chats.yaml#/MessagePage"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "403":
@@ -334,6 +332,132 @@ ChatRead:
               $ref: "../components/schemas/common.yaml#/SuccessMessage"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+MessageReaction:
+  put:
+    tags: [Chats]
+    summary: Add a reaction to a message
+    operationId: addMessageReaction
+    description: |
+      Adds the authenticated user's reaction with the given emoji to the
+      specified message. Idempotent — no-op if the user already reacted.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+      - name: emoji
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Emoji character or shortcode to react with.
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Reaction added (or already present).
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/Message"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Chats]
+    summary: Remove a reaction from a message
+    operationId: removeMessageReaction
+    description: |
+      Removes the authenticated user's reaction with the given emoji from
+      the specified message. No-op if the user had not reacted.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+      - name: emoji
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Emoji character or shortcode to remove.
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Reaction removed (or was not present).
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+MessagePin:
+  post:
+    tags: [Chats]
+    summary: Pin a message
+    operationId: pinChatMessage
+    description: |
+      Pins the specified message in the chat. Requires moderator or owner
+      role in the chat. Pinned message IDs appear in `ChatDetail.pinnedMessageIds`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Message pinned.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/chats.yaml#/Message"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+  delete:
+    tags: [Chats]
+    summary: Unpin a message
+    operationId: unpinChatMessage
+    description: |
+      Removes the pin from the specified message. Requires moderator or
+      owner role in the chat.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ChatIdPath"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Message unpinned.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
 

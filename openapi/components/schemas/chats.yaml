@@ -33,6 +33,34 @@ ChatSummary:
       format: date-time
       nullable: true
       description: Timestamp of the last message.
+    topic:
+      type: string
+      nullable: true
+      description: Optional channel topic or description.
+    slowmodeSeconds:
+      type: integer
+      description: Minimum seconds between messages per user. 0 means no slowmode.
+    lastMessage:
+      nullable: true
+      description: Preview of the most recent message. Null if the chat has no messages.
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID of the last message.
+        authorUsername:
+          type: string
+          description: Username of the last message's author.
+        contentPreview:
+          type: string
+          description: Truncated content preview of the last message.
+        createdAt:
+          type: string
+          format: date-time
+          description: When the last message was sent.
+    viewer:
+      $ref: "#/ChatViewerContext"
 
 ChatDetail:
   allOf:
@@ -49,6 +77,12 @@ ChatDetail:
           items:
             $ref: "#/Message"
           description: Recent messages in the chat.
+        pinnedMessageIds:
+          type: array
+          description: IDs of messages currently pinned in this chat.
+          items:
+            type: string
+            format: uuid
 
 Participant:
   type: object
@@ -76,6 +110,23 @@ Participant:
       type: string
       nullable: true
       description: User's role in the chat (if any).
+    roleRank:
+      type: integer
+      nullable: true
+      description: Numeric rank of the participant's role — higher means more authority.
+    lastReadMessageId:
+      type: string
+      format: uuid
+      nullable: true
+      description: ID of the last message this participant has read.
+    joinedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When this participant joined the chat.
+    isMuted:
+      type: boolean
+      description: Whether this participant is currently muted in the chat.
 
 Message:
   type: object
@@ -123,6 +174,57 @@ Message:
       type: string
       format: date-time
       description: When the message was sent.
+    replyToId:
+      type: string
+      format: uuid
+      nullable: true
+      description: ID of the message this is replying to, if any.
+    replyTo:
+      nullable: true
+      description: Inline preview of the parent message. Null if this is not a reply.
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID of the parent message.
+        authorUsername:
+          type: string
+          description: Username of the parent message's author.
+        contentPreview:
+          type: string
+          description: Truncated content preview of the parent message.
+    reactions:
+      type: array
+      description: Aggregated emoji reactions on this message.
+      items:
+        $ref: "#/Reaction"
+    mentions:
+      type: array
+      description: Account UUIDs mentioned in this message.
+      items:
+        type: string
+        format: uuid
+    isPinned:
+      type: boolean
+      description: Whether this message is currently pinned in the chat.
+    isSystem:
+      type: boolean
+      description: Whether this is a system-generated event message (e.g. join, leave).
+    isDeleted:
+      type: boolean
+      description: Whether this message has been deleted (tombstone record).
+    deletedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the message was deleted. Null if not deleted.
+    editCount:
+      type: integer
+      description: How many times this message has been edited.
+    version:
+      type: integer
+      description: Optimistic concurrency token. Incremented on each edit.
 
 MessageCreate:
   type: object
@@ -134,6 +236,19 @@ MessageCreate:
       minLength: 1
       maxLength: 4000
       description: Message content to send.
+    replyToId:
+      type: string
+      format: uuid
+      description: ID of the message to reply to (optional thread reference).
+    clientNonce:
+      type: string
+      description: Client-supplied idempotency key to deduplicate sends. If a message with this nonce was already accepted within a short window, the server returns the existing message instead of creating a new one.
+    mentions:
+      type: array
+      description: Account UUIDs explicitly mentioned in the message.
+      items:
+        type: string
+        format: uuid
 
 MessageEdit:
   type: object
@@ -145,6 +260,9 @@ MessageEdit:
       minLength: 1
       maxLength: 4000
       description: New message content.
+    expectedVersion:
+      type: integer
+      description: Optimistic concurrency guard. If provided, the server rejects the edit with 409 Conflict if the stored message version does not match.
 
 ChatReadRequest:
   type: object
@@ -153,3 +271,60 @@ ChatReadRequest:
       type: string
       format: uuid
       description: Mark messages up to this ID as read.
+
+Reaction:
+  type: object
+  description: An aggregated emoji reaction on a message.
+  required:
+    - emoji
+    - count
+    - reactedByMe
+  properties:
+    emoji:
+      type: string
+      description: The emoji character or shortcode representing this reaction.
+      example: "👍"
+    count:
+      type: integer
+      description: Total number of users who reacted with this emoji.
+    reactedByMe:
+      type: boolean
+      description: Whether the authenticated caller has added this reaction.
+
+ChatViewerContext:
+  type: object
+  description: The authenticated caller's context within a specific chat.
+  required:
+    - role
+    - canPost
+    - isMuted
+    - lastReadMessageId
+  properties:
+    role:
+      type: string
+      nullable: true
+      description: The caller's role in this chat, or null if no special role.
+    canPost:
+      type: boolean
+      description: Whether the caller is currently allowed to post messages.
+    isMuted:
+      type: boolean
+      description: Whether the caller is muted in this chat.
+    lastReadMessageId:
+      type: string
+      format: uuid
+      nullable: true
+      description: ID of the last message the caller has read. Null if unread history is unknown.
+
+MessagePage:
+  allOf:
+    - $ref: "./common.yaml#/CursorPage"
+    - type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: Messages on this page, ordered newest-first unless otherwise specified.
+          items:
+            $ref: "#/Message"

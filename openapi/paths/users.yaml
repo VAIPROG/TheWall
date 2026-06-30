@@ -742,6 +742,42 @@ UsersMeMerge:
       "429":
         $ref: "../components/responses/common.yaml#/TooManyRequests"
 
+UsersMeAppeal:
+  post:
+    tags: [Users]
+    summary: Submit an appeal
+    operationId: submitAppeal
+    description: |
+      Submits a moderation appeal from the authenticated user. The endpoint is
+      reachable even when the caller is globally banned, so a banned user can
+      explain their case and request a review. Only one pending appeal per user
+      is allowed at a time.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/users.yaml#/UserAppealCreate"
+    responses:
+      "201":
+        description: Appeal submitted.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/users.yaml#/UserAppeal"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "409":
+        $ref: "../components/responses/common.yaml#/Conflict"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
 UsersMeRecoveryPhrase:
   post:
     tags: [Users]

@@ -113,7 +113,7 @@ pub async fn telegram_oauth_url(
     State(state): State<AppState>,
 ) -> Result<Json<TelegramAuthUrl>, (StatusCode, String)> {
     let client_id = telegram_client_id(&state)?;
-    let redirect = state.oauth.discord_redirect_uri.clone(); // shared static page
+    let redirect = state.config.oauth.discord_redirect_uri.clone(); // shared static page
     // 'tg.'-prefix lets the shared callback page identify the provider
     // without any client-side storage (extension-initiated flows have none).
     let s = format!("tg.{}", random_state());
@@ -180,7 +180,7 @@ pub async fn telegram_exchange(
     // Fail fast on missing config BEFORE consuming the one-shot state row —
     // the identity exchange re-reads these values itself.
     telegram_client_id(&state)?;
-    state.oauth.telegram_client_secret.as_deref().ok_or((
+    state.config.oauth.telegram_client_secret.as_deref().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "TELEGRAM_CLIENT_SECRET not configured".to_string(),
     ))?;
@@ -243,11 +243,11 @@ async fn telegram_code_to_identity(
     verifier: &str,
 ) -> Result<(String, Option<String>, Option<String>), (StatusCode, String)> {
     let client_id = telegram_client_id(state)?;
-    let client_secret = state.oauth.telegram_client_secret.clone().ok_or((
+    let client_secret = state.config.oauth.telegram_client_secret.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "TELEGRAM_CLIENT_SECRET not configured".to_string(),
     ))?;
-    let redirect = state.oauth.discord_redirect_uri.clone();
+    let redirect = state.config.oauth.discord_redirect_uri.clone();
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
@@ -322,7 +322,7 @@ pub async fn unlink_telegram(
 }
 
 fn telegram_client_id(state: &AppState) -> Result<String, (StatusCode, String)> {
-    state.oauth.telegram_client_id.clone().ok_or((
+    state.config.oauth.telegram_client_id.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "TELEGRAM_CLIENT_ID env missing".to_string(),
     ))
@@ -400,11 +400,11 @@ pub async fn discord_oauth_url(
     auth: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Json<DiscordAuthUrl>, (StatusCode, String)> {
-    let client_id = state.oauth.discord_client_id.clone().ok_or((
+    let client_id = state.config.oauth.discord_client_id.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "discord oauth not configured".to_string(),
     ))?;
-    let redirect = state.oauth.discord_redirect_uri.clone();
+    let redirect = state.config.oauth.discord_redirect_uri.clone();
 
     // 32 chars of base64 — used as the OAuth `state` parameter to bind the
     // returned `code` back to our user.
@@ -456,11 +456,11 @@ pub async fn discord_exchange(
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Fail fast on missing config BEFORE consuming the one-shot state row —
     // the identity exchange re-reads these values itself.
-    state.oauth.discord_client_id.as_deref().ok_or((
+    state.config.oauth.discord_client_id.as_deref().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "discord oauth not configured".to_string(),
     ))?;
-    state.oauth.discord_client_secret.as_deref().ok_or((
+    state.config.oauth.discord_client_secret.as_deref().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "discord oauth secret missing".to_string(),
     ))?;
@@ -581,7 +581,7 @@ pub async fn request_email_link(
 
     Ok(Json(EmailRequestResponse {
         code,
-        send_to: state.oauth.support_email.clone(),
+        send_to: state.config.oauth.support_email.clone(),
         subject: "LINK-MAIL".into(),
         body_template: body,
         status: "pending".into(),
@@ -629,15 +629,15 @@ async fn discord_code_to_identity(
     state: &AppState,
     code: &str,
 ) -> Result<DiscordUserResp, (StatusCode, String)> {
-    let client_id = state.oauth.discord_client_id.clone().ok_or((
+    let client_id = state.config.oauth.discord_client_id.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "discord oauth not configured".to_string(),
     ))?;
-    let client_secret = state.oauth.discord_client_secret.clone().ok_or((
+    let client_secret = state.config.oauth.discord_client_secret.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "discord oauth secret missing".to_string(),
     ))?;
-    let redirect = state.oauth.discord_redirect_uri.clone();
+    let redirect = state.config.oauth.discord_redirect_uri.clone();
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
@@ -714,7 +714,7 @@ pub async fn telegram_login_url(
     State(state): State<AppState>,
 ) -> Result<Json<TelegramAuthUrl>, (StatusCode, String)> {
     let client_id = telegram_client_id(&state)?;
-    let redirect = state.oauth.discord_redirect_uri.clone();
+    let redirect = state.config.oauth.discord_redirect_uri.clone();
     // 'ltg.' prefix → the callback page routes to the login exchange.
     let s = format!("ltg.{}", random_state());
     let verifier = random_state();
@@ -742,11 +742,11 @@ pub async fn telegram_login_url(
 pub async fn discord_login_url(
     State(state): State<AppState>,
 ) -> Result<Json<DiscordAuthUrl>, (StatusCode, String)> {
-    let client_id = state.oauth.discord_client_id.clone().ok_or((
+    let client_id = state.config.oauth.discord_client_id.clone().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "discord oauth not configured".to_string(),
     ))?;
-    let redirect = state.oauth.discord_redirect_uri.clone();
+    let redirect = state.config.oauth.discord_redirect_uri.clone();
     let s = format!("ldc.{}", random_state());
     sqlx::query(
         "INSERT INTO oauth_states (state, user_id, provider, purpose)
@@ -800,7 +800,7 @@ pub async fn telegram_login_exchange(
             .to_string(),
     ))?;
     let (token, refresh_token) =
-        crate::auth::issue_session_pair(&state.pool, &state.jwt_secret, uid)
+        crate::auth::issue_session_pair(&state.pool, &state.config.jwt_secret, uid)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(LoginResponse {
@@ -842,7 +842,7 @@ pub async fn discord_login_exchange(
             .to_string(),
     ))?;
     let (token, refresh_token) =
-        crate::auth::issue_session_pair(&state.pool, &state.jwt_secret, uid)
+        crate::auth::issue_session_pair(&state.pool, &state.config.jwt_secret, uid)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(LoginResponse {

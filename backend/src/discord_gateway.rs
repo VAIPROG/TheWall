@@ -28,7 +28,7 @@ use crate::{AppState, discord_commands};
 const GATEWAY_URL: &str = "wss://gateway.discord.gg/?v=10&encoding=json";
 
 pub fn spawn(state: AppState) {
-    let Some(token) = state.oauth.discord_bot_token.clone() else {
+    let Some(token) = state.config.oauth.discord_bot_token.clone() else {
         tracing::info!("discord_gateway: DISCORD_BOT_TOKEN missing — presence disabled");
         return;
     };

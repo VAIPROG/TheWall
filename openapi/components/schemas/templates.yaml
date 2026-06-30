@@ -362,6 +362,79 @@ WallDevFrameOverride:
       exclusiveMinimum: 0
       description: "Scale multiplier for the replacement image relative to the frame slot. 1.0 = render at frameWidth × frameHeight."
 
+TemplateSummaryV3:
+  type: object
+  description: |
+    Light projection returned by `GET /api/v3/templates` (list). The `document`
+    field is intentionally omitted — v3-native documents embed base64 inline
+    images and returning them in a list would be very large. Use
+    `GET /api/v3/templates/{id}` or `GET /api/v3/templates/{id}/wall-dev` to
+    fetch the full document for a single template.
+  required:
+    - id
+    - userId
+    - name
+    - x
+    - y
+    - scale
+    - scope
+    - status
+    - version
+    - hasDocument
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique template identifier.
+    userId:
+      type: string
+      format: uuid
+      description: Account UUID of the template owner.
+    name:
+      type: string
+      description: Template name (copied from the primary document layer).
+    x:
+      type: integer
+      description: Horizontal canvas position (px) of the primary layer.
+    y:
+      type: integer
+      description: Vertical canvas position (px) of the primary layer.
+    scale:
+      type: number
+      description: Scale multiplier. 1.0 = native.
+    scope:
+      type: string
+      enum: [public, clan, private]
+      description: Visibility scope.
+    status:
+      type: string
+      enum: [pending, approved, rejected]
+      description: Moderation status.
+    version:
+      type: integer
+      description: Optimistic concurrency token. Incremented on each update.
+    clanId:
+      type: string
+      format: uuid
+      nullable: true
+      description: UUID of the owning clan for clan-scoped templates.
+    verifiedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the moderation decision was recorded.
+    createdAt:
+      type: string
+      format: date-time
+      description: Creation timestamp.
+    hasDocument:
+      type: boolean
+      description: |
+        True when the `document` column is non-NULL (i.e. the row has been
+        backfilled to the the-wall-dev/2 format). When false, the `/wall-dev`
+        and `/charity` export endpoints will return 409 Conflict.
+
 Template:
   type: object
   description: Server metadata record wrapping an embedded the-wall-dev/2 document.
@@ -429,6 +502,41 @@ Template:
       description: Last update timestamp.
     document:
       $ref: "#/WallDevDocument"
+    version:
+      type: integer
+      description: Optimistic concurrency token. Incremented on each update. Pass as `expectedVersion` in TemplatePatch to guard against lost updates.
+    verifiedBy:
+      type: string
+      format: uuid
+      nullable: true
+      description: Account UUID of the moderator who approved or rejected this template. Null until a moderation decision is made.
+    verifiedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the moderation decision was recorded. Null until a decision is made.
+    rejectionReason:
+      type: string
+      nullable: true
+      description: Human-readable reason supplied by the moderator when the template was rejected. Null if not rejected or no reason was provided.
+    viewer:
+      type: object
+      readOnly: true
+      nullable: true
+      description: |
+        Caller's allowed actions on this template. Null when unauthenticated.
+        Clients should use these flags to gate UI affordances rather than
+        inferring from role alone.
+      properties:
+        canEdit:
+          type: boolean
+          description: Whether the caller may patch this template.
+        canDelete:
+          type: boolean
+          description: Whether the caller may delete this template.
+        canVerify:
+          type: boolean
+          description: Whether the caller may approve or reject this template via `POST /templates/{templateId}/verify`.
     bounds:
       type: object
       readOnly: true
@@ -446,6 +554,31 @@ Template:
         h:
           type: integer
           description: Total height spanning all layers.
+
+TemplateCreated:
+  type: object
+  description: |
+    Response envelope returned by `POST /templates/new`. Wraps the created
+    template record with any non-fatal conversion warnings produced during
+    ingest. Warnings are emitted when the submitted `source.format` is not
+    `the-wall-dev/2` and the server converts it server-side before storage.
+    Empty array for native v2 submissions.
+  required:
+    - template
+    - warnings
+  properties:
+    template:
+      $ref: "#/Template"
+    warnings:
+      type: array
+      items:
+        type: string
+      description: |
+        Non-fatal messages from the server-side format conversion. Present
+        (possibly empty) on every response. Non-empty only when the input
+        format was `the-wall-dev/1` or `charity` and was converted to
+        `the-wall-dev/2` on ingest.
+      example: ["converted from the-wall-dev/1 to the-wall-dev/2"]
 
 TemplateCreate:
   type: object
@@ -500,6 +633,9 @@ TemplatePatch:
     Significant changes (e.g. new layers, access changes) may re-trigger
     the moderation queue.
   properties:
+    expectedVersion:
+      type: integer
+      description: Optimistic concurrency guard. If provided, the server rejects the patch with 409 Conflict when the stored template version does not match.
     scope:
       type: string
       enum:
@@ -595,6 +731,23 @@ TemplatePage:
   allOf:
     - $ref: "#/Template"
     - $ref: "./common.yaml#/Pagination"
+
+TemplateVerifyRequest:
+  type: object
+  description: Body for the template verification endpoint. Submitted by a moderator to approve or reject a pending template.
+  required:
+    - decision
+  properties:
+    decision:
+      type: string
+      enum:
+        - approve
+        - reject
+      description: Moderation decision — `approve` sets status to `approved`; `reject` sets status to `rejected`.
+    reason:
+      type: string
+      maxLength: 1000
+      description: Optional moderator-supplied reason. Required (by convention) when decision is `reject`; ignored on approval.
 
 CharityEntry:
   type: object

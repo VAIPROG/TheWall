@@ -197,3 +197,48 @@ AuditLogPage:
   allOf:
     - $ref: "./moderation.yaml#/AuditLogEntry"
     - $ref: "./common.yaml#/Pagination"
+
+ClanTakedownRequest:
+  type: object
+  required:
+    - fields
+    - reason
+  description: |
+    Request body for a global-moderator clan takedown. Strips (and optionally locks)
+    one or more presentation fields on the targeted clan. Never deletes the clan itself.
+  properties:
+    fields:
+      type: array
+      minItems: 1
+      description: Presentation fields to act upon. At least one field is required.
+      items:
+        $ref: "./clans.yaml#/ClanLockableField"
+    action:
+      type: string
+      enum:
+        - strip
+        - strip_and_lock
+      default: strip_and_lock
+      description: |
+        - `strip` — clears the field value immediately; the clan can set it again.
+        - `strip_and_lock` (default) — clears the value and prevents clan-level roles
+          from modifying it until a global moderator calls the unlock endpoint.
+    reason:
+      type: string
+      maxLength: 1000
+      description: Mandatory moderator-supplied reason, recorded in the audit log and surfaced to clan leadership.
+
+ClanUnlockRequest:
+  type: object
+  description: Request body to remove a global-moderation field lock from a clan.
+  properties:
+    fields:
+      type: array
+      minItems: 1
+      description: Locked fields to release. Only previously locked fields need be listed.
+      items:
+        $ref: "./clans.yaml#/ClanLockableField"
+    reason:
+      type: string
+      maxLength: 1000
+      description: Optional moderator-supplied reason for the unlock, recorded in the audit log.

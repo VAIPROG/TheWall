@@ -1,3 +1,37 @@
+ClanLockableField:
+  type: string
+  description: A presentation field on a clan that a global moderator can lock, preventing clan-level roles from modifying it.
+  enum:
+    - avatar
+    - banner
+    - description
+    - tag
+    - discoverable
+
+ClanModerationState:
+  type: object
+  description: Global-moderation lock state applied to this clan. Present when the clan has been actioned by a global moderator.
+  properties:
+    lockedFields:
+      type: array
+      description: Fields currently locked by global moderation. Clan-level roles cannot modify these fields until a global moderator unlocks them.
+      items:
+        $ref: "#/ClanLockableField"
+    lockedBy:
+      type: string
+      format: uuid
+      nullable: true
+      description: Account UUID of the global moderator who applied the lock, or null if no lock is active.
+    lockedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the lock was applied, or null if no lock is active.
+    reason:
+      type: string
+      nullable: true
+      description: Moderator-supplied reason for the lock, surfaced to clan leadership.
+
 Clan:
   type: object
   required:
@@ -59,6 +93,64 @@ Clan:
       type: string
       format: date-time
       description: Last update timestamp.
+    tag:
+      type: string
+      nullable: true
+      maxLength: 6
+      description: Short unique clan tag (≤ 6 characters), e.g. "PXWRR".
+      example: "PXWRR"
+    bannerUrl:
+      type: string
+      format: uri
+      nullable: true
+      description: URL to the clan's banner image.
+    verified:
+      type: boolean
+      description: Whether the clan has been officially verified.
+    discoverable:
+      type: boolean
+      description: Whether the clan appears in public search and discovery listings.
+    lang:
+      type: string
+      nullable: true
+      description: Primary language code for the clan (e.g. "en", "ru").
+      example: "en"
+    links:
+      type: array
+      nullable: true
+      description: Clan social links (e.g. Discord, website).
+      items:
+        type: object
+        required:
+          - label
+          - url
+        properties:
+          label:
+            type: string
+            description: Human-readable link label (e.g. "Discord", "Website").
+          url:
+            type: string
+            format: uri
+            description: Full URL.
+    maxMembers:
+      type: integer
+      nullable: true
+      description: Maximum allowed clan member count. Null means no cap.
+    stats:
+      $ref: "#/ClanStats"
+    viewer:
+      $ref: "#/ClanViewerContext"
+      nullable: true
+      description: Caller's relationship to this clan. Null when unauthenticated or not a member.
+    moderation:
+      $ref: "#/ClanModerationState"
+      nullable: true
+      readOnly: true
+      description: |
+        Global-moderation state for this clan. Null when no moderation action has been applied.
+        Clients must check `moderation.lockedFields` and disable editing of those fields for
+        clan-level roles; only a global moderator+ can unlock them via
+        `POST /moderation/clans/{clanId}/unlock`.
 
 ClanCreate:
   type: object
@@ -85,6 +177,32 @@ ClanUpdate:
       type: string
       nullable: true
       description: New clan description.
+    avatarUrl:
+      type: string
+      format: uri
+      nullable: true
+      description: |
+        URL to the clan's avatar image. Set to null to clear.
+        Rejected with `423 Locked` if `avatar` is in `moderation.lockedFields`.
+    bannerUrl:
+      type: string
+      format: uri
+      nullable: true
+      description: |
+        URL to the clan's banner image. Set to null to clear.
+        Rejected with `423 Locked` if `banner` is in `moderation.lockedFields`.
+    tag:
+      type: string
+      maxLength: 6
+      nullable: true
+      description: |
+        Short unique clan tag (≤ 6 characters), e.g. "PXWRR". Set to null to clear.
+        Rejected with `423 Locked` if `tag` is in `moderation.lockedFields`.
+    discoverable:
+      type: boolean
+      description: |
+        Whether the clan appears in public search and discovery listings.
+        Rejected with `423 Locked` if `discoverable` is in `moderation.lockedFields`.
 
 ClanMember:
   type: object
@@ -122,6 +240,27 @@ ClanMember:
       type: string
       format: date-time
       description: When the user joined the clan.
+    roleRank:
+      type: integer
+      description: Numeric rank of the member's role — higher value means more authority. Owner holds the highest rank.
+    permissions:
+      type: array
+      description: Effective capability set for this member, derived from their role.
+      items:
+        $ref: "#/ClanPermission"
+    nickname:
+      type: string
+      nullable: true
+      description: Clan-specific nickname overriding display name (if set).
+    title:
+      type: string
+      nullable: true
+      description: Decorative title granted by clan leadership.
+    lastActiveAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp of the member's last activity in the clan context.
 
 ClanMemberPage:
   allOf:
@@ -214,6 +353,9 @@ ClanSettings:
     - templateScopeDefault
     - moderationPreferences
     - chatPermissions
+    - discoverable
+    - defaultMemberRole
+    - memberCap
   properties:
     joinPolicy:
       type: string
@@ -230,11 +372,20 @@ ClanSettings:
         - private
       description: Default template visibility for clan members.
     moderationPreferences:
-      type: object
-      description: Clan moderation settings.
+      $ref: "#/ClanModerationPreferences"
     chatPermissions:
-      type: object
-      description: Clan chat permission settings.
+      $ref: "#/ClanChatPermissions"
+    discoverable:
+      type: boolean
+      description: Whether the clan is listed in public discovery.
+    defaultMemberRole:
+      type: string
+      enum:
+        - member
+      description: Role assigned to new members on join.
+    memberCap:
+      type: integer
+      description: Maximum number of members allowed. 0 means no cap.
 
 ClanSettingsUpdate:
   type: object
@@ -254,11 +405,20 @@ ClanSettingsUpdate:
         - private
       description: New default template scope.
     moderationPreferences:
-      type: object
-      description: Updated moderation settings.
+      $ref: "#/ClanModerationPreferences"
     chatPermissions:
-      type: object
-      description: Updated chat permission settings.
+      $ref: "#/ClanChatPermissions"
+    discoverable:
+      type: boolean
+      description: Whether the clan should appear in public discovery.
+    defaultMemberRole:
+      type: string
+      enum:
+        - member
+      description: Role assigned to new members on join.
+    memberCap:
+      type: integer
+      description: Maximum number of members allowed. 0 means no cap.
 
 ClanRoleApplication:
   type: object
@@ -272,3 +432,208 @@ ClanPage:
   allOf:
     - $ref: "#/Clan"
     - $ref: "./common.yaml#/Pagination"
+
+ClanStats:
+  type: object
+  description: Aggregated statistics for a clan.
+  required:
+    - memberCount
+    - templateCount
+  properties:
+    memberCount:
+      type: integer
+      description: Current number of clan members.
+    templateCount:
+      type: integer
+      description: Number of templates published by this clan.
+    onlineCount:
+      type: integer
+      description: Approximate number of members currently online (optional; omitted if unknown).
+
+ClanViewerContext:
+  type: object
+  description: The authenticated caller's relationship to a specific clan.
+  required:
+    - role
+    - membershipStatus
+    - canManageMembers
+    - canManageSettings
+    - canModerateChat
+    - canPostTemplates
+  properties:
+    role:
+      type: string
+      nullable: true
+      description: The caller's role in this clan, or null if not a member.
+      example: "moderator"
+    membershipStatus:
+      type: string
+      enum:
+        - none
+        - member
+        - pending
+        - invited
+      description: |
+        Caller's membership state:
+        - `none` — no relationship.
+        - `member` — active member.
+        - `pending` — join application awaiting review.
+        - `invited` — has a pending direct invite.
+    canManageMembers:
+      type: boolean
+      description: Whether the caller can add/remove/update members.
+    canManageSettings:
+      type: boolean
+      description: Whether the caller can change clan settings.
+    canModerateChat:
+      type: boolean
+      description: Whether the caller can moderate the clan chat.
+    canPostTemplates:
+      type: boolean
+      description: Whether the caller can post templates on behalf of the clan.
+
+ClanPermission:
+  type: string
+  description: A single capability that can be held by a clan member.
+  enum:
+    - manage_settings
+    - manage_members
+    - kick_members
+    - invite_members
+    - manage_roles
+    - moderate_chat
+    - manage_templates
+    - manage_invites
+    - disband_clan
+    - view_audit
+
+ClanModerationPreferences:
+  type: object
+  description: Fine-grained moderation configuration for a clan.
+  required:
+    - autoApproveJoins
+    - requireApprovalForTemplates
+    - minAccountAgeDays
+    - blockReportedUsers
+    - membersCanDeleteOwnTemplates
+  properties:
+    autoApproveJoins:
+      type: boolean
+      description: Automatically approve join applications without manual review.
+    requireApprovalForTemplates:
+      type: boolean
+      description: Require moderator sign-off before a member's template becomes visible.
+    minAccountAgeDays:
+      type: integer
+      description: Minimum account age in days required to join. 0 means no restriction.
+    blockReportedUsers:
+      type: boolean
+      description: Automatically block users who have active reports from joining.
+    membersCanDeleteOwnTemplates:
+      type: boolean
+      default: true
+      description: |
+        When true (default), clan members may delete their own clan-scoped templates.
+        When false, only clan moderator+ can delete clan-scoped templates — individual
+        members lose self-delete rights within this clan's template scope.
+
+ClanChatPermissions:
+  type: object
+  description: Permission rules governing the clan chat channel.
+  required:
+    - whoCanPost
+    - slowmodeSeconds
+    - whoCanInvite
+    - whoCanPostTemplates
+  properties:
+    whoCanPost:
+      type: string
+      enum:
+        - everyone
+        - members
+        - moderators
+      description: Minimum role required to send messages in the clan chat.
+    slowmodeSeconds:
+      type: integer
+      description: Minimum seconds between messages per user. 0 disables slowmode.
+    whoCanInvite:
+      type: string
+      enum:
+        - owner
+        - admins
+        - moderators
+        - members
+      description: Minimum role required to create clan invites.
+    whoCanPostTemplates:
+      type: string
+      enum:
+        - everyone
+        - members
+        - moderators
+      description: Minimum role required to post templates in the clan chat.
+
+ClanJoinApplication:
+  type: object
+  description: A member's application to join the clan when approval is required.
+  required:
+    - id
+    - clanId
+    - applicant
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique application identifier.
+    clanId:
+      type: string
+      format: uuid
+      description: The clan this application targets.
+    applicant:
+      type: object
+      required:
+        - userId
+        - username
+        - displayName
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Applicant's account UUID.
+        username:
+          type: string
+          description: Applicant's username.
+        displayName:
+          type: string
+          description: Applicant's display name.
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Applicant's avatar URL.
+    message:
+      type: string
+      nullable: true
+      description: Optional message the applicant submitted with their application.
+    status:
+      type: string
+      enum:
+        - pending
+        - approved
+        - rejected
+      description: Current review status of the application.
+    createdAt:
+      type: string
+      format: date-time
+      description: When the application was submitted.
+    reviewedBy:
+      type: string
+      format: uuid
+      nullable: true
+      description: UUID of the clan member who reviewed this application.
+    reviewedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the application was reviewed.

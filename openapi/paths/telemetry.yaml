@@ -34,6 +34,228 @@ TelemetryEvents:
       "403":
         $ref: "../components/responses/common.yaml#/Forbidden"
 
+TelemetryLogs:
+  post:
+    tags: [Telemetry]
+    summary: Upload structured logs or crash reports
+    operationId: telemetryUploadLogs
+    description: |
+      Client uploads a batch of structured log entries or crash reports for
+      server-side analysis. Honouring the user's telemetry opt-in setting;
+      entries from opted-out users may be dropped silently. The endpoint is
+      rate-limited and enforces a maximum payload size; large batches should
+      be split into multiple requests.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/telemetry.yaml#/LogBatch"
+    responses:
+      "200":
+        description: Batch processed; counts of accepted and rejected entries returned.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/telemetry.yaml#/LogIngestResult"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "413":
+        $ref: "../components/responses/common.yaml#/PayloadTooLarge"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+  get:
+    tags: [Telemetry]
+    summary: Query stored log records (admin)
+    operationId: telemetryQueryLogs
+    description: |
+      Returns stored log records with optional filtering. Requires a global
+      admin or owner role. Supports cursor-based pagination via `cursor` and
+      `limit` parameters. IP addresses are included in each record only for
+      callers with global admin / owner authority.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: level
+        in: query
+        description: Filter by log severity level.
+        schema:
+          type: string
+          enum:
+            - trace
+            - debug
+            - info
+            - warn
+            - error
+            - fatal
+      - name: from
+        in: query
+        description: Include only records with `timestamp` at or after this value (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: Include only records with `timestamp` at or before this value (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+      - name: userRef
+        in: query
+        description: >-
+          Filter by uploader. Accepts a UUID or a username (case-insensitive);
+          UUID parsing takes precedence.
+        schema:
+          type: string
+      - name: sessionId
+        in: query
+        description: Filter by client session identifier (UUID).
+        schema:
+          type: string
+          format: uuid
+      - name: source
+        in: query
+        description: Filter by the module or component name recorded in `source`.
+        schema:
+          type: string
+      - name: q
+        in: query
+        description: Full-text search across the `message` field.
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        description: Opaque pagination cursor from a previous response's `nextCursor`.
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Maximum number of records to return per page.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Paginated list of log records matching the applied filters.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/telemetry.yaml#/LogPage"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+TelemetryLogsExport:
+  get:
+    tags: [Telemetry]
+    summary: Export log records as NDJSON or CSV (admin)
+    operationId: telemetryExportLogs
+    description: |
+      Streams all log records matching the supplied filters as NDJSON
+      (`application/x-ndjson`) or CSV (`text/csv`). Requires a global admin
+      or owner role. Accepts the same filter parameters as
+      `GET /telemetry/logs`. The response is streamed; callers should expect
+      chunked transfer encoding for large exports.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: level
+        in: query
+        description: Filter by log severity level.
+        schema:
+          type: string
+          enum:
+            - trace
+            - debug
+            - info
+            - warn
+            - error
+            - fatal
+      - name: from
+        in: query
+        description: Include only records with `timestamp` at or after this value (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: Include only records with `timestamp` at or before this value (ISO 8601).
+        schema:
+          type: string
+          format: date-time
+      - name: userRef
+        in: query
+        description: >-
+          Filter by uploader. Accepts a UUID or a username (case-insensitive);
+          UUID parsing takes precedence.
+        schema:
+          type: string
+      - name: sessionId
+        in: query
+        description: Filter by client session identifier (UUID).
+        schema:
+          type: string
+          format: uuid
+      - name: source
+        in: query
+        description: Filter by the module or component name recorded in `source`.
+        schema:
+          type: string
+      - name: q
+        in: query
+        description: Full-text search across the `message` field.
+        schema:
+          type: string
+      - name: format
+        in: query
+        description: Output serialisation format for the export stream.
+        schema:
+          type: string
+          enum:
+            - ndjson
+            - csv
+          default: ndjson
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: >-
+          Streamed NDJSON or CSV export of matching log records. The
+          `Content-Type` header reflects the requested `format`.
+        content:
+          application/x-ndjson:
+            schema:
+              type: string
+              description: >-
+                Newline-delimited JSON stream; each line is a JSON-serialised
+                `LogRecord` object.
+          text/csv:
+            schema:
+              type: string
+              description: >-
+                CSV export with a header row. Column order matches the
+                `LogRecord` field order.
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "429":
+        $ref: "../components/responses/common.yaml#/TooManyRequests"
+
 TelemetryHealth:
   get:
     tags: [Telemetry]

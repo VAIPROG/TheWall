@@ -138,7 +138,7 @@ pub async fn interactions(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let Some(pubkey) = state.oauth.discord_public_key.as_deref() else {
+    let Some(pubkey) = state.config.oauth.discord_public_key.as_deref() else {
         tracing::warn!("discord interactions hit but DISCORD_PUBLIC_KEY not set");
         return (StatusCode::SERVICE_UNAVAILABLE, "interactions not configured").into_response();
     };
@@ -185,6 +185,7 @@ pub(crate) fn spawn_followup(state: AppState, v: Value) {
         .unwrap_or("")
         .to_string();
     let app_id = state
+        .config
         .oauth
         .discord_application_id
         .clone()

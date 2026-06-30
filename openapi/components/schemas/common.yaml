@@ -59,3 +59,28 @@ SortOrder:
     - asc
     - desc
   description: Sort direction.
+
+CursorPage:
+  type: object
+  description: |
+    Generic cursor-pagination envelope. List endpoints embed their items array
+    alongside these fields (typically via allOf or by inlining the cursor fields
+    next to an `items` property). `nextCursor` / `prevCursor` are opaque tokens
+    to pass as `after` / `before` on the next request; they are `null` when
+    there is no further page in that direction.
+  required:
+    - nextCursor
+    - prevCursor
+    - hasMore
+  properties:
+    nextCursor:
+      type: string
+      nullable: true
+      description: Opaque cursor pointing to the next page. Null if this is the last page.
+    prevCursor:
+      type: string
+      nullable: true
+      description: Opaque cursor pointing to the previous page. Null if this is the first page.
+    hasMore:
+      type: boolean
+      description: Whether additional items exist beyond this page.

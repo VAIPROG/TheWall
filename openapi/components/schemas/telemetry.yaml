@@ -77,6 +77,141 @@ HealthStatus:
       type: string
       description: Server version string.
 
+LogEntry:
+  type: object
+  required:
+    - level
+    - message
+    - timestamp
+  properties:
+    level:
+      type: string
+      enum:
+        - trace
+        - debug
+        - info
+        - warn
+        - error
+        - fatal
+      description: Severity level of the log entry.
+    message:
+      type: string
+      maxLength: 8000
+      description: Human-readable log message.
+    timestamp:
+      type: string
+      format: date-time
+      description: When the log event occurred on the client.
+    source:
+      type: string
+      nullable: true
+      description: Module or component that emitted the log entry.
+    sessionId:
+      type: string
+      format: uuid
+      nullable: true
+      description: Client session identifier for correlating log entries.
+    context:
+      type: object
+      nullable: true
+      description: Arbitrary key-value metadata attached to the log entry.
+    stack:
+      type: string
+      nullable: true
+      description: Stack trace, typically populated for error or fatal entries.
+    tags:
+      type: array
+      nullable: true
+      items:
+        type: string
+      description: Optional labels for filtering and grouping log entries.
+
+LogBatch:
+  type: object
+  required:
+    - clientVersion
+    - logs
+  properties:
+    clientVersion:
+      type: string
+      description: Version string of the client application emitting the logs.
+    sessionId:
+      type: string
+      format: uuid
+      nullable: true
+      description: Session identifier shared across all entries in this batch.
+    logs:
+      type: array
+      minItems: 1
+      maxItems: 200
+      items:
+        $ref: "./telemetry.yaml#/LogEntry"
+      description: Ordered list of log entries to ingest.
+
+LogRecord:
+  allOf:
+    - $ref: "./telemetry.yaml#/LogEntry"
+    - type: object
+      required:
+        - id
+        - accountId
+        - clientVersion
+        - ip
+        - receivedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique server-assigned identifier for the stored log record.
+        accountId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            UUID of the account that uploaded this record. Null when the
+            uploader was anonymous or opted out of identity linking.
+        clientVersion:
+          type: string
+          description: Client version string reported in the originating batch.
+        ip:
+          type: string
+          nullable: true
+          description: >-
+            Source IP address of the uploading client. Returned only for
+            global admin / owner callers; always null in other contexts.
+        receivedAt:
+          type: string
+          format: date-time
+          description: Timestamp at which the server received and stored this record.
+
+LogPage:
+  allOf:
+    - $ref: "./common.yaml#/CursorPage"
+    - type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "./telemetry.yaml#/LogRecord"
+          description: Log records on this page.
+
+LogIngestResult:
+  type: object
+  required:
+    - accepted
+    - rejected
+  properties:
+    accepted:
+      type: integer
+      description: Number of log entries accepted and stored.
+    rejected:
+      type: integer
+      description: >-
+        Number of log entries rejected (e.g. failed validation, exceeded
+        per-entry size limit, or filtered by server policy).
+
 MetricsSnapshot:
   type: object
   required:

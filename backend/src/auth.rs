@@ -137,7 +137,7 @@ impl FromRequestParts<AppState> for AuthUser {
             .strip_prefix("Bearer ")
             .ok_or(AuthError::InvalidHeaderFormat)?;
 
-        let claims = verify_token(token, &state.jwt_secret)?;
+        let claims = verify_token(token, &state.config.jwt_secret)?;
 
         let user_id = Uuid::parse_str(&claims.sub).map_err(|_| {
             AuthError::TokenVerification(
@@ -148,6 +148,65 @@ impl FromRequestParts<AppState> for AuthUser {
 
         Ok(AuthUser { user_id })
     }
+}
+
+// ---------------------------------------------------------------------------
+// Merge token (single-use, short-lived, scope-locked)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MergeClaims {
+    /// Subject — account B UUID as a string.
+    pub sub: String,
+    /// Scope must equal "merge" — distinguishes these tokens from access JWTs.
+    pub scope: String,
+    /// Expiry (Unix timestamp seconds).
+    pub exp: usize,
+    /// Issued-at (Unix timestamp seconds).
+    pub iat: usize,
+}
+
+/// Mint a merge token proving ownership of `account_id`.  Expires after 600 s.
+pub fn create_merge_token(account_id: &Uuid, secret: &str) -> Result<String, AuthError> {
+    let now = Utc::now().timestamp() as usize;
+    let exp = (Utc::now() + chrono::Duration::seconds(600)).timestamp() as usize;
+
+    let claims = MergeClaims {
+        sub: account_id.to_string(),
+        scope: "merge".to_string(),
+        iat: now,
+        exp,
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .map_err(AuthError::TokenCreation)
+}
+
+/// Verify a merge token and return the account-B UUID it names.
+/// Returns an error if the token is expired, malformed, or has the wrong scope.
+pub fn verify_merge_token(token: &str, secret: &str) -> Result<Uuid, AuthError> {
+    let token_data = decode::<MergeClaims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map_err(AuthError::TokenVerification)?;
+
+    if token_data.claims.scope != "merge" {
+        return Err(AuthError::TokenVerification(
+            jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidSubject),
+        ));
+    }
+
+    Uuid::parse_str(&token_data.claims.sub).map_err(|_| {
+        AuthError::TokenVerification(
+            jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidSubject),
+        )
+    })
 }
 
 // ---------------------------------------------------------------------------

@@ -43,72 +43,145 @@ AuthSite:
       "429":
         $ref: "../components/responses/common.yaml#/TooManyRequests"
 
-OAuthTelegram:
+OAuthStart:
   get:
     tags: [Auth]
-    summary: Initiate Telegram OAuth flow
-    operationId: authOAuthTelegramInit
+    summary: Start OAuth authorization-code + PKCE flow
+    operationId: oauthStart
     description: |
-      Redirects the user to Telegram's OAuth authorization page.
-      On success, Telegram redirects back to the callback URL
-      with credentials.
+      Begins the OAuth2 authorization-code flow for the given `provider`.
+
+      The backend generates a PKCE code-verifier server-side, stores it
+      against a single-use, short-lived `state` token, and returns the
+      provider's `authorizeUrl` for the client to redirect to. The `state`
+      token also encodes the `intent` and, when `intent=link`, the current
+      `accountId` from the authenticated session.
+
+      **PKCE is handled entirely server-side** — clients never see the
+      code-verifier or code-challenge.
+
+      For `intent=link` an authenticated session is required (Bearer token
+      must be present); the endpoint returns `401` otherwise.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/OAuthProviderPath"
+      - name: intent
+        in: query
+        required: true
+        description: >-
+          OAuth flow intent. `login` authenticates or creates an account;
+          `link` attaches the provider identity to the current account
+          (requires an active session).
+        schema:
+          $ref: "../components/schemas/auth.yaml#/OAuthIntent"
+      - name: redirectUri
+        in: query
+        required: false
+        description: >-
+          Where the browser should be sent after the callback completes.
+          If omitted the server uses a default post-auth landing URL.
+        schema:
+          type: string
+    security:
+      - {}
+      - BearerAuth: []
     responses:
+      "200":
+        description: |
+          Authorization URL ready. Redirect the user's browser to
+          `authorizeUrl`. Alternatively the server may issue a `302`
+          directly if the client supports it.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/OAuthStartResponse"
       "302":
-        description: Redirect to Telegram authorization page.
+        description: Direct redirect to the provider authorization page.
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        description: |
+          `intent=link` was requested but no authenticated session is
+          present. Provide a valid Bearer token.
+        $ref: "../components/responses/common.yaml#/Unauthorized"
       "429":
         $ref: "../components/responses/common.yaml#/TooManyRequests"
+
+OAuthCallback:
   post:
     tags: [Auth]
-    summary: Complete Telegram OAuth callback
-    operationId: authOAuthTelegramCallback
+    summary: Handle OAuth provider callback
+    operationId: oauthCallback
     description: |
-      Receives the OAuth callback payload from Telegram. Creates a
-      new user account or links to an existing one. Returns session
-      tokens.
+      Completes the OAuth2 authorization-code + PKCE flow. The static
+      callback page captures `code` and `state` from the provider redirect
+      and POSTs them here as a JSON body — this keeps tokens out of the URL
+      and avoids server-side redirects.
+
+      The server:
+      1. Validates the `state` (single-use, checks expiry and CSRF).
+      2. Looks up the stored PKCE code-verifier for this state token.
+      3. Exchanges the `code` for provider tokens entirely server-side
+         (PKCE code-verifier is included in the exchange).
+      4. Resolves the provider user identity.
+      5. Executes the stored intent:
+         - **login**: finds the Wall-Dev account linked to this provider
+           identity and returns `AuthResponse` with a fresh session pair.
+           Returns `404` if no account is linked (link it first).
+         - **link**: upserts the provider identity onto the authenticated
+           account and returns `AuthResponse` confirming the link.
+
+      Returns `409` when the provider identity is already bound to a
+      **different** account.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/OAuthProviderPath"
     requestBody:
       required: true
       content:
         application/json:
           schema:
-            $ref: "../components/schemas/auth.yaml#/OAuthCallbackRequest"
+            $ref: "../components/schemas/auth.yaml#/OAuthCallbackBody"
     responses:
       "200":
-        description: Successfully authenticated via Telegram.
+        description: |
+          OAuth flow completed successfully. Body is `AuthResponse` for
+          both `login` and `link` intents.
         content:
           application/json:
             schema:
               $ref: "../components/schemas/auth.yaml#/AuthResponse"
       "400":
         $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        description: >-
+          `intent=login`: no Wall-Dev account is linked to this provider
+          identity. Link the provider from the extension or overlay first.
+        $ref: "../components/responses/common.yaml#/NotFound"
       "409":
+        description: >-
+          The resolved provider identity is already linked to a different
+          Wall-Dev account. The client should prompt the user to unlink
+          first or use a different provider account.
         $ref: "../components/responses/common.yaml#/Conflict"
       "429":
         $ref: "../components/responses/common.yaml#/TooManyRequests"
 
-OAuthDiscord:
-  get:
-    tags: [Auth]
-    summary: Initiate Discord OAuth flow
-    operationId: authOAuthDiscordInit
-    description: Redirects to Discord's OAuth2 authorization page.
-    parameters:
-      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
-    responses:
-      "302":
-        description: Redirect to Discord authorization page.
-      "429":
-        $ref: "../components/responses/common.yaml#/TooManyRequests"
+OAuthTelegramLegacy:
   post:
     tags: [Auth]
-    summary: Complete Discord OAuth callback
-    operationId: authOAuthDiscordCallback
+    summary: "Authenticate via Telegram Login Widget (legacy)"
+    operationId: oauthTelegramLegacy
+    deprecated: true
     description: |
-      Receives the OAuth callback from Discord. Creates or links
-      the account and returns session tokens.
+      **Deprecated.** Accepts the signed hash payload emitted by the old
+      Telegram Login Widget and exchanges it for a Wall-Dev session.
+
+      The server verifies the `hash` field using the bot token secret
+      (HMAC-SHA256 over the sorted data fields). Prefer the modern
+      OAuth2 flow: `GET /auth/oauth/telegram/start`.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
     requestBody:
@@ -116,52 +189,10 @@ OAuthDiscord:
       content:
         application/json:
           schema:
-            $ref: "../components/schemas/auth.yaml#/OAuthCallbackRequest"
+            $ref: "../components/schemas/auth.yaml#/TelegramWidgetAuth"
     responses:
       "200":
-        description: Successfully authenticated via Discord.
-        content:
-          application/json:
-            schema:
-              $ref: "../components/schemas/auth.yaml#/AuthResponse"
-      "400":
-        $ref: "../components/responses/common.yaml#/BadRequest"
-      "409":
-        $ref: "../components/responses/common.yaml#/Conflict"
-      "429":
-        $ref: "../components/responses/common.yaml#/TooManyRequests"
-
-OAuthGitHub:
-  get:
-    tags: [Auth]
-    summary: Initiate GitHub OAuth flow
-    operationId: authOAuthGitHubInit
-    description: Redirects to GitHub's OAuth authorization page.
-    parameters:
-      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
-    responses:
-      "302":
-        description: Redirect to GitHub authorization page.
-      "429":
-        $ref: "../components/responses/common.yaml#/TooManyRequests"
-  post:
-    tags: [Auth]
-    summary: Complete GitHub OAuth callback
-    operationId: authOAuthGitHubCallback
-    description: |
-      Receives the OAuth callback from GitHub. Creates or links
-      the account and returns session tokens.
-    parameters:
-      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: "../components/schemas/auth.yaml#/OAuthCallbackRequest"
-    responses:
-      "200":
-        description: Successfully authenticated via GitHub.
+        description: Successfully authenticated via Telegram Login Widget.
         content:
           application/json:
             schema:

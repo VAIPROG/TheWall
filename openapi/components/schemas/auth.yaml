@@ -16,17 +16,84 @@ AuthSiteRequest:
       type: string
       description: Authentication token/cookie from the target site.
 
+OAuthIntent:
+  type: string
+  enum:
+    - login
+    - link
+  description: |
+    OAuth flow intent.
+    - `login`: authenticate or create a Wall-Dev account for the provider identity and return a session.
+    - `link`: attach this provider identity to the already-authenticated account (requires an active session).
+
+OAuthStartResponse:
+  type: object
+  required:
+    - authorizeUrl
+    - state
+  properties:
+    authorizeUrl:
+      type: string
+      format: uri
+      description: Provider authorize URL to redirect the user to.
+    state:
+      type: string
+      description: Single-use, short-lived token that binds the PKCE verifier, intent, and (for link) the current accountId. Must be round-tripped as-is to the callback.
+
 OAuthCallbackRequest:
+  $ref: "#/OAuthCallbackBody"
+
+OAuthCallbackBody:
   type: object
   required:
     - code
+    - state
   properties:
     code:
       type: string
-      description: Authorization code received from OAuth provider.
+      description: Authorization code received from the OAuth provider.
     state:
       type: string
-      description: CSRF state parameter.
+      description: >-
+        Single-use CSRF/PKCE binding token from `OAuthStart`.
+        Must be round-tripped exactly as returned by the start endpoint.
+
+TelegramWidgetAuth:
+  type: object
+  required:
+    - id
+    - first_name
+    - auth_date
+    - hash
+  description: |
+    **Deprecated.** Signed payload from the legacy Telegram Login Widget.
+    The server verifies the `hash` using the bot token secret.
+    Prefer the modern OAuth2 flow via `GET /auth/oauth/telegram/start`.
+  properties:
+    id:
+      type: integer
+      description: Telegram user id.
+    first_name:
+      type: string
+      description: User's first name as reported by Telegram.
+    last_name:
+      type: string
+      nullable: true
+      description: User's last name (optional).
+    username:
+      type: string
+      nullable: true
+      description: Telegram username (optional).
+    photo_url:
+      type: string
+      nullable: true
+      description: URL of the user's profile photo (optional).
+    auth_date:
+      type: integer
+      description: Unix timestamp of authentication (used to check freshness).
+    hash:
+      type: string
+      description: HMAC-SHA256 signature of the data fields, keyed with the bot token secret.
 
 RefreshRequest:
   type: object
