@@ -20,6 +20,7 @@ Notification:
         - restriction_update
         - mod_action
         - system_announcement
+        - news_announcement
         - mention
       description: Notification category.
     title:

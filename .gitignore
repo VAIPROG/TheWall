@@ -3,6 +3,8 @@
 
 # Build output
 dist/
+docs/
+From*.md
 backend/target/
 
 # Secrets and local environment (commit example.env instead)

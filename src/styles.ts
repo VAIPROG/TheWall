@@ -209,10 +209,118 @@ export function styleSheet3(): string {
 `;
 }
 
+/**
+ * Mobile / touch adaptation.
+ *
+ * The panel ships as a fixed Win95 window (top-right, 320px base) that the user
+ * drags and resizes with the MOUSE — ui-wire.ts writes inline `left/top/width`
+ * on drag, inline `width` + `.wp-content` `max-height` on resize, and theme.ts
+ * writes inline `zoom = cfg.uiScale` (0.8–1.6) for the UI-scale slider. On
+ * phones that desktop model breaks down in four concrete ways:
+ *
+ *   1. A saved width (up to WINDOW_MAX_WIDTH_PX = 640) overflows a narrow
+ *      viewport — and so does any `zoom > 1`, which CSS cannot clamp width
+ *      against because it can't read the inline zoom value.
+ *   2. `vh` is measured against the largest viewport, so a `68vh` list hides
+ *      behind the mobile URL bar; `dvh` tracks the visible area instead.
+ *   3. iOS/WebKit auto-zooms the page when a field with font-size < 16px gains
+ *      focus — jarring, and it leaves the panel off-centre.
+ *   4. The authentic Win95 micro-controls (16×14 title buttons, 16px swatches)
+ *      are far below a comfortable ~30px tap target.
+ *
+ * We split the concerns: GEOMETRY is keyed to width breakpoints, ERGONOMICS to
+ * pointer type (so a touch tablet gets finger-sized controls without being
+ * forced full-bleed). This block is concatenated LAST so it wins the cascade;
+ * `!important` is used only where it must beat an inline style from the JS
+ * above — everything else rides normal specificity.
+ *
+ * Known gap (left for the JS optimization pass): drag/resize listen to
+ * mouse events only, so the panel can't be repositioned by touch. Full-width
+ * pinning below keeps it usable meanwhile.
+ */
+export function styleSheetMobile(): string {
+  return `
+/* --- Geometry: clamp to viewport on small screens (respects a width that
+   already fits — pure cap, no forced shrink, no zoom change) -------------- */
+@media (max-width:640px){
+  #walldev-tool{
+    max-width:calc(100vw - 16px) !important;
+    top:max(8px,env(safe-area-inset-top,0px)) !important;
+    right:max(8px,env(safe-area-inset-right,0px)) !important;
+    left:auto !important;
+  }
+}
+
+/* --- Phones: full-bleed with predictable geometry ----------------------- */
+@media (max-width:480px){
+  #walldev-tool{
+    /* Pin zoom to 1: at phone widths the 1.2–1.6x UI-scale pushes the panel
+       off-screen, and width can't be clamped against an inline zoom in CSS.
+       Neutralising it lets the widths below map 1:1 to device pixels. */
+    zoom:1 !important;
+    width:calc(100vw - 12px) !important;
+    max-width:calc(100vw - 12px) !important;
+    top:max(6px,env(safe-area-inset-top,0px)) !important;
+    right:max(6px,env(safe-area-inset-right,0px)) !important;
+    font-size:12px;
+  }
+  /* dvh follows the URL bar (vh fallback first for older engines) so the
+     scroll area never disappears behind it. */
+  #walldev-tool .wp-content{
+    padding:7px;
+    max-height:calc(100vh - 128px) !important;
+    max-height:calc(100dvh - 128px) !important;
+  }
+  #walldev-tool .wp-group{padding:7px;margin-bottom:8px}
+  /* Tabs become one swipeable strip — three wrapped rows ate the vertical
+     space the list needs. */
+  #walldev-tool .wp-tabs{
+    flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;
+  }
+  #walldev-tool .wp-tabs::-webkit-scrollbar{display:none}
+  #walldev-tool .wp-tab{flex:0 0 auto;white-space:nowrap}
+  /* The mouse-only resize grip can't beat the !important width and is a
+     one-finger nightmare; full-width already maximises space. */
+  #walldev-tool .wp-resize-handle{display:none}
+  /* Dense rows reflow instead of crushing into unreadable slivers. */
+  #walldev-tool .wp-row{flex-wrap:wrap}
+  #walldev-tool .wp-row>*{flex:1 1 80px;min-width:80px}
+  /* Keep the floating emoji picker inside the screen. */
+  .wp-emoji-picker{width:min(280px,calc(100vw - 16px))}
+  /* Toasts dodge the notch / home indicator. */
+  #walldev-toasts{
+    bottom:max(16px,env(safe-area-inset-bottom,0px));
+    right:max(8px,env(safe-area-inset-right,0px));
+  }
+}
+
+/* --- Ergonomics: comfortable tap targets on any touch device ------------ */
+@media (hover:none) and (pointer:coarse){
+  /* 16px stops iOS focus-zoom; the panel is full-width here so it still fits. */
+  #walldev-tool .wp-input,
+  #walldev-tool select.wp-input,
+  #walldev-tool textarea.wp-input,
+  #walldev-tool input[type="text"],
+  #walldev-tool input[type="number"],
+  #walldev-tool input[type="search"]{font-size:16px}
+  /* Win95 micro-controls → finger-sized, look preserved. */
+  #walldev-tool .wp-btn{min-height:32px}
+  #walldev-tool .wp-tbtn{width:24px;height:22px;line-height:20px}
+  #walldev-tool .wp-tab{padding:6px 9px;min-height:30px;box-sizing:border-box}
+  #walldev-tool .wp-sw button{width:22px;height:22px}
+  #walldev-tool .wp-social-edit,
+  #walldev-tool .wp-social-del,
+  #walldev-tool .wp-social-grip{min-width:30px;min-height:30px}
+}
+`;
+}
+
 export function injectStyle(): void {
   if ($("walldev-style")) return;
   const s = document.createElement("style");
   s.id = "walldev-style";
-  s.textContent = styleSheet() + styleSheet2() + styleSheet3();
+  s.textContent =
+    styleSheet() + styleSheet2() + styleSheet3() + styleSheetMobile();
   document.head.appendChild(s);
 }
