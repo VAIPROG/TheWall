@@ -196,6 +196,12 @@ pub async fn update(
     };
 
     // ── 8. UPDATE ────────────────────────────────────────────────────────────
+    let raw_password = body.access_password.as_deref().map(str::trim);
+    let clear_password = raw_password == Some("");
+    let pass_hash = raw_password
+        .filter(|p| !p.is_empty())
+        .map(crate::auth::hash_token);
+
     let updated: Option<TemplateV3> = sqlx::query_as::<_, TemplateV3>(&format!(
         r#"UPDATE templates
               SET document  = $2,
@@ -205,7 +211,12 @@ pub async fn update(
                   y         = $5,
                   scale     = $6,
                   scope     = $7,
-                  clan_id   = $8
+                  clan_id   = $8,
+                  access_password_hash = CASE
+                      WHEN $9 = TRUE THEN NULL
+                      WHEN $10 IS NOT NULL THEN $10
+                      ELSE access_password_hash
+                  END
             WHERE id = $1
         RETURNING {COLS}"#
     ))
@@ -217,6 +228,8 @@ pub async fn update(
     .bind(new_scale)
     .bind(&new_scope)
     .bind(new_clan_id)
+    .bind(clear_password)
+    .bind(pass_hash)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

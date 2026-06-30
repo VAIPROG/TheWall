@@ -17,42 +17,64 @@ use uuid::Uuid;
 
 use crate::{
     AppState,
-    auth::AuthUser,
 };
 
 // ---------------------------------------------------------------------------
 // Shared visibility helper
 // ---------------------------------------------------------------------------
 
-/// Load a template row restricted to the caller's visibility, returning
-/// `(owner_id, scope, clan_id, author, document, version)` or a 404 error.
+/// Load a template row restricted to the caller's access context.
+/// Returns `(owner_id, scope, clan_id, author, document, version)` or a 404 error.
 pub async fn load_visible(
     state: &AppState,
-    user_id: Uuid,
+    access: &super::access::AccessContext,
     template_id: Uuid,
 ) -> Result<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>, i32), (StatusCode, String)>
 {
+    let user_id = access.user_id;
+
     let row: Option<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>, i32)> =
         sqlx::query_as(
             r#"SELECT user_id, scope, clan_id, author, document, version
                  FROM templates
-                WHERE id = $2
+                WHERE id = $1
                   AND (
-                      user_id = $1
-                      OR (scope = 'public' AND status = 'approved')
+                      (scope = 'public' AND status = 'approved')
+                      OR user_id = $2
                       OR (scope = 'clan' AND clan_id IN (
                             SELECT clan_id FROM clan_memberships
-                             WHERE user_id = $1 AND active = TRUE
+                             WHERE user_id = $2 AND active = TRUE
                           ))
+                      OR ($3 = TRUE)
                   )"#,
         )
-        .bind(user_id)
         .bind(template_id)
+        .bind(user_id)
+        .bind(access.password.is_some())
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    row.ok_or((StatusCode::NOT_FOUND, "not found".into()))
+    if let Some(row) = row {
+        return Ok(row);
+    }
+
+    // If not found by normal visibility, try the per-template password.
+    if let Some(password) = access.password.as_deref() {
+        if super::access::verify_template_password(&state.pool, template_id, password).await {
+            let row: Option<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>, i32)> =
+                sqlx::query_as(
+                    "SELECT user_id, scope, clan_id, author, document, version FROM templates WHERE id = $1",
+                )
+                .bind(template_id)
+                .fetch_optional(&state.pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            return row.ok_or((StatusCode::NOT_FOUND, "not found".into()));
+        }
+    }
+
+    Err((StatusCode::NOT_FOUND, "not found".into()))
 }
 
 // ---------------------------------------------------------------------------
@@ -62,13 +84,13 @@ pub async fn load_visible(
 /// Return the stored `document` JSONB as-is (the-wall-dev/2 format).
 /// Returns 409 CONFLICT if the document column is NULL (un-backfilled legacy row).
 pub async fn wall_dev(
-    auth: AuthUser,
+    access: super::access::TemplateAccess,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     headers: HeaderMap,
 ) -> Result<Response, (StatusCode, String)> {
     let (_owner_id, _scope, _clan_id, _author, document, version) =
-        load_visible(&state, auth.user_id, id).await?;
+        load_visible(&state, &access.context, id).await?;
 
     let doc = document.ok_or_else(|| {
         (
@@ -129,12 +151,12 @@ pub async fn wall_dev(
 ///   { faction: "the-wall-dev export", contact: <author or "anonymous">,
 ///     templates: [...], whitelist: [] }
 pub async fn charity(
-    auth: AuthUser,
+    access: super::access::TemplateAccess,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let (_owner_id, _scope, _clan_id, author, document, _version) =
-        load_visible(&state, auth.user_id, id).await?;
+        load_visible(&state, &access.context, id).await?;
 
     let doc = document.ok_or_else(|| {
         (

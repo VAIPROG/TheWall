@@ -1,5 +1,6 @@
 //! V3 template CRUD — canonical the-wall-dev/2 document format.
 
+mod access;
 mod backfill;
 mod create;
 mod delete;

@@ -184,12 +184,19 @@ pub async fn create(
     // `share` is NOT NULL in the schema (legacy column); v3 stores truth in
     // `document`. We write an empty string as a sentinel so the constraint
     // is satisfied without inventing fake legacy data.
+    let pass_hash = body
+        .access_password
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(crate::auth::hash_token);
+
     let row = sqlx::query_as::<_, TemplateV3>(
         r#"INSERT INTO templates
                (id, user_id, name, x, y, scale, scope, status, share,
-                author, clan_id, document, version, created_at)
+                author, clan_id, access_password_hash, document, version, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '',
-                   $9, $10, $11, 1, NOW())
+                   $9, $10, $11, $12, 1, NOW())
            RETURNING id, user_id, name, x, y, scale, scope, status,
                      document, version, verified_by, verified_at,
                      rejection_reason, clan_id, author, created_at"#,
@@ -204,6 +211,7 @@ pub async fn create(
     .bind(status)
     .bind(&username)
     .bind(clan_id)
+    .bind(pass_hash)
     .bind(doc)
     .fetch_one(&state.pool)
     .await

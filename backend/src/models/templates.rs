@@ -74,6 +74,7 @@ pub struct TemplateCreateV3 {
     pub scope: String,
     pub clan_id: Option<Uuid>,
     pub source: TemplateSource,
+    pub access_password: Option<String>,
 }
 
 /// Response body for POST /api/v3/templates/new — wraps the created row
@@ -188,4 +189,5 @@ pub struct TemplatePatchV3 {
     pub doc: Option<DocPatch>,
     pub layer_ops: Option<Vec<LayerOp>>,
     pub expected_version: Option<i32>,
+    pub access_password: Option<String>,
 }

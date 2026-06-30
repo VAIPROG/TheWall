@@ -623,6 +623,13 @@ TemplateCreate:
         document:
           type: object
           description: Raw document payload matching the declared format. Validated server-side against the corresponding schema.
+    accessPassword:
+      type: string
+      nullable: true
+      description: |
+        Optional per-template share password. When set, anyone with the
+        template id and this password can read the template regardless of
+        its scope (clan or private). Pass an empty string to clear the password.
 
 TemplatePatch:
   type: object
@@ -672,6 +679,13 @@ TemplatePatch:
             - `full`: expose complete WallDevAuthor object.
             - `anon`: store as the string 'anon'.
             - `hidden`: store as null.
+    accessPassword:
+      type: string
+      nullable: true
+      description: |
+        Optional per-template share password. When set, anyone with the
+        template id and this password can read the template regardless of
+        its scope (clan or private). Pass an empty string to clear the password.
     layerOps:
       type: array
       description: Ordered list of layer operations applied sequentially to document.templates[].

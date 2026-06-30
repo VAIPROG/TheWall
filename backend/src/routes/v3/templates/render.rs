@@ -20,7 +20,9 @@ use serde_json::Value;
 use std::io::Cursor;
 use uuid::Uuid;
 
-use crate::{AppState, auth::AuthUser};
+use crate::AppState;
+
+use super::access::TemplateAccess;
 
 use super::export::load_visible;
 
@@ -161,7 +163,7 @@ fn webp_response(bytes: Vec<u8>) -> Response {
 /// output dimensions are multiplied by that factor (Charity has no native
 /// scale, so the resize must happen server-side). Defaults to layer 0.
 pub async fn get_png(
-    auth: AuthUser,
+    access: TemplateAccess,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Query(q): Query<PngQuery>,
@@ -169,7 +171,7 @@ pub async fn get_png(
     let idx = q.layer.unwrap_or(0);
 
     let (_owner_id, _scope, _clan_id, _author, document, _version) =
-        match load_visible(&state, auth.user_id, id).await {
+        match load_visible(&state, &access.context, id).await {
             Ok(r) => r,
             Err(_) => return StatusCode::NOT_FOUND.into_response(),
         };
@@ -215,7 +217,7 @@ pub async fn get_png(
 /// and size 128. The preview is rendered at the layer's scale so the thumbnail
 /// reflects the actual on-canvas appearance.
 pub async fn get_preview(
-    auth: AuthUser,
+    access: TemplateAccess,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Query(q): Query<PreviewQuery>,
@@ -227,7 +229,7 @@ pub async fn get_preview(
     let idx = q.layer.unwrap_or(0);
 
     let (_owner_id, _scope, _clan_id, _author, document, _version) =
-        match load_visible(&state, auth.user_id, id).await {
+        match load_visible(&state, &access.context, id).await {
             Ok(r) => r,
             Err(_) => return StatusCode::NOT_FOUND.into_response(),
         };

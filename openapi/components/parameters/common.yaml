@@ -129,3 +129,25 @@ UserRefPath:
     is treated as an id, otherwise as a username (usernames are globally unique).
   schema:
     type: string
+
+SessionQuery:
+  name: session
+  in: query
+  description: |
+    Session token that grants the same access as a Bearer JWT. Useful for
+    sharing a read-only link to a clan or private template without exposing
+    the user's long-term credentials. The token is looked up in the active
+    sessions table.
+  schema:
+    type: string
+
+PasswordQuery:
+  name: password
+  in: query
+  description: |
+    Per-template share password. If the template owner set an access password,
+    anyone with the id + password can fetch the template, regardless of its
+    scope (clan or private). Public approved templates never require a password.
+  schema:
+    type: string
+    minLength: 1

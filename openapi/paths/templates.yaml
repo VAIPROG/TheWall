@@ -8,10 +8,13 @@ Templates:
     summary: List / search templates
     operationId: listTemplates
     description: |
-      Paginated, filterable template discovery. Filter by scope,
-      status, author, clan, position range, text search.
+      Paginated, filterable template discovery. Public approved templates are
+      listed without authentication. Clan and private templates are only
+      included when the caller is authenticated (Bearer, API key, or session).
+      Filter by scope, status, author, clan, position range, text search.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/SessionQuery"
       - $ref: "../components/parameters/common.yaml#/PageParam"
       - $ref: "../components/parameters/common.yaml#/PerPageParam"
       - name: scope
@@ -60,8 +63,6 @@ Templates:
               type: array
               items:
                 $ref: "../components/schemas/templates.yaml#/TemplateSummaryV3"
-      "401":
-        $ref: "../components/responses/common.yaml#/Unauthorized"
 
 TemplatesNew:
   post:
@@ -182,9 +183,16 @@ TemplateById:
     tags: [Templates]
     summary: Get template details
     operationId: getTemplate
+    description: |
+      Returns the full template details including the the-wall-dev/2 document.
+      Public approved templates are readable without authentication. Clan and
+      private templates require one of: Bearer JWT, API key, `?session` token,
+      or the per-template `?password`.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - $ref: "../components/parameters/common.yaml#/SessionQuery"
+      - $ref: "../components/parameters/common.yaml#/PasswordQuery"
       - name: If-None-Match
         in: header
         description: |
@@ -218,8 +226,6 @@ TemplateById:
             description: Current ETag (same value that was submitted in If-None-Match).
             schema:
               type: string
-      "401":
-        $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
   patch:
@@ -310,10 +316,14 @@ TemplatePreview:
       the-wall-dev/2 document. The layer is scaled server-side before the
       thumbnail is generated, so the preview reflects the actual on-canvas
       appearance (Charity and other consumers have no native `scale` field).
-      Defaults to layer 0 and size 128.
+      Defaults to layer 0 and size 128. Public approved templates are
+      readable without authentication; clan/private templates require auth,
+      session, or password.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - $ref: "../components/parameters/common.yaml#/SessionQuery"
+      - $ref: "../components/parameters/common.yaml#/PasswordQuery"
       - name: size
         in: query
         description: Thumbnail side length.
@@ -341,8 +351,6 @@ TemplatePreview:
               format: binary
       "400":
         $ref: "../components/responses/common.yaml#/BadRequest"
-      "401":
-        $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
 
@@ -355,10 +363,14 @@ TemplatePng:
       Renders a single layer from the stored the-wall-dev/2 document as a
       PNG image. The layer's `scale` is applied server-side because Charity
       and similar tools cannot scale images themselves. Use `?layer={idx}` to
-      select a layer other than the first one.
+      select a layer other than the first one. Public approved templates are
+      readable without authentication; clan/private templates require auth,
+      session, or password.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - $ref: "../components/parameters/common.yaml#/SessionQuery"
+      - $ref: "../components/parameters/common.yaml#/PasswordQuery"
       - name: layer
         in: query
         description: Zero-based layer index in document.templates[].
@@ -377,8 +389,6 @@ TemplatePng:
             schema:
               type: string
               format: binary
-      "401":
-        $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
 
@@ -398,10 +408,14 @@ TemplateCharity:
       Each Charity entry's `sources` array is prepended with a backend
       `/api/v3/templates/{id}/png?layer={idx}` URL because Charity cannot
       consume `data:` URLs and has no native `scale` field; the PNG endpoint
-      bakes the layer's scale into the rendered image.
+      bakes the layer's scale into the rendered image. Public approved
+      templates are readable without authentication; clan/private templates
+      require auth, session, or password.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - $ref: "../components/parameters/common.yaml#/SessionQuery"
+      - $ref: "../components/parameters/common.yaml#/PasswordQuery"
     security:
       - BearerAuth: []
       - ApiKeyAuth: []
@@ -412,8 +426,6 @@ TemplateCharity:
           application/json:
             schema:
               $ref: "../components/schemas/templates.yaml#/CharityConfig"
-      "401":
-        $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
 
@@ -426,10 +438,13 @@ TemplateWallDev:
       Returns the stored the-wall-dev/2 document directly. This is the
       canonical stored form — no conversion is applied. Includes full
       metadata, animation, access control, contacts, and multi-source
-      image fallback lists.
+      image fallback lists. Public approved templates are readable without
+      authentication; clan/private templates require auth, session, or password.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - $ref: "../components/parameters/common.yaml#/SessionQuery"
+      - $ref: "../components/parameters/common.yaml#/PasswordQuery"
       - name: If-None-Match
         in: header
         description: |
@@ -463,8 +478,6 @@ TemplateWallDev:
             description: Current ETag (same value that was submitted in If-None-Match).
             schema:
               type: string
-      "401":
-        $ref: "../components/responses/common.yaml#/Unauthorized"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
 
