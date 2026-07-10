@@ -9,9 +9,7 @@ AuthSiteRequest:
       description: |
         Platform registry id — the same identifier used by the site-injector
         adapter. Extensible; do not enumerate closed.
-      examples:
-        - filianislost
-        - wplace
+      example: filianislost
     token:
       type: string
       description: Authentication token/cookie from the target site.

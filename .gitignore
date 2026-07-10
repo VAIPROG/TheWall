@@ -37,3 +37,6 @@ landing/assets/*.mp4
 
 # Stray Rust backups
 *.rs.bak
+
+# Generated standalone API docs (reproduce with: bun run docs)
+landing/api-docs/redoc-static.html

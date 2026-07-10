@@ -9,7 +9,7 @@ WallDevDocument:
   properties:
     format:
       type: string
-      const: "the-wall-dev/2"
+      enum: ["the-wall-dev/2"]
       description: "Format identifier. Must be 'the-wall-dev/2'."
     createdAt:
       type: string
@@ -29,10 +29,8 @@ WallDevDocument:
       oneOf:
         - $ref: "#/WallDevAuthor"
         - type: string
-          const: "anon"
+          enum: ["anon"]
           description: Explicitly anonymous author.
-        - type: "null"
-          description: No author information.
     notes:
       type: array
       items:
@@ -245,7 +243,8 @@ WallDevLayer:
       description: Depth position. Reserved for future 3D support.
     scale:
       type: number
-      exclusiveMinimum: 0
+      minimum: 0
+      exclusiveMinimum: true
       description: Scale multiplier. 1.0 = native.
     width:
       type: integer
@@ -359,7 +358,8 @@ WallDevFrameOverride:
       description: Height of the replacement image in pixels.
     scale:
       type: number
-      exclusiveMinimum: 0
+      minimum: 0
+      exclusiveMinimum: true
       description: "Scale multiplier for the replacement image relative to the frame slot. 1.0 = render at frameWidth × frameHeight."
 
 TemplateSummaryV3:
@@ -697,7 +697,7 @@ TemplatePatch:
             properties:
               op:
                 type: string
-                const: add
+                enum: [add]
               layer:
                 $ref: "#/WallDevLayer"
               atIndex:
@@ -710,7 +710,7 @@ TemplatePatch:
             properties:
               op:
                 type: string
-                const: remove
+                enum: [remove]
               index:
                 type: integer
                 minimum: 0
@@ -720,7 +720,7 @@ TemplatePatch:
             properties:
               op:
                 type: string
-                const: move
+                enum: [move]
               from:
                 type: integer
                 minimum: 0
@@ -733,7 +733,7 @@ TemplatePatch:
             properties:
               op:
                 type: string
-                const: update
+                enum: [update]
               index:
                 type: integer
                 minimum: 0
