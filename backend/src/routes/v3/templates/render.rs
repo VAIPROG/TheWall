@@ -61,6 +61,10 @@ async fn load_source_bytes(source: &str) -> Result<Vec<u8>, String> {
     }
 
     if source.starts_with("http://") || source.starts_with("https://") {
+        // SSRF guard: `source` comes from a user-supplied template document, so
+        // resolve the host and refuse to fetch anything that resolves to a
+        // non-public (loopback/private/link-local/unspecified) address.
+        guard_public_url(source).await?;
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
@@ -77,6 +81,53 @@ async fn load_source_bytes(source: &str) -> Result<Vec<u8>, String> {
     }
 
     Err(format!("unsupported image source scheme: {source}"))
+}
+
+/// Reject URLs whose host resolves to a non-public IP, to prevent server-side
+/// request forgery via user-controlled template image sources.
+async fn guard_public_url(source: &str) -> Result<(), String> {
+    let url = reqwest::Url::parse(source).map_err(|e| format!("bad url: {e}"))?;
+    let host = url.host_str().ok_or_else(|| "url has no host".to_string())?;
+    let port = url.port_or_known_default().unwrap_or(443);
+    let addrs = tokio::net::lookup_host((host, port))
+        .await
+        .map_err(|e| format!("resolve host: {e}"))?;
+    let mut resolved = false;
+    for addr in addrs {
+        resolved = true;
+        if is_forbidden_ip(&addr.ip()) {
+            return Err("image source resolves to a non-public address".to_string());
+        }
+    }
+    if !resolved {
+        return Err("image source host did not resolve".to_string());
+    }
+    Ok(())
+}
+
+fn is_forbidden_ip(ip: &std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_private()
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || v4.octets()[0] == 0
+                // Carrier-grade NAT 100.64.0.0/10
+                || (v4.octets()[0] == 100 && (v4.octets()[1] & 0xc0) == 0x40)
+        }
+        std::net::IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                // link-local fe80::/10
+                || (v6.segments()[0] & 0xffc0) == 0xfe80
+                // unique local fc00::/7
+                || (v6.segments()[0] & 0xfe00) == 0xfc00
+        }
+    }
 }
 
 /// Extract the requested layer from the document, returning a reference to the

@@ -85,9 +85,8 @@ pub async fn insert_message(
                       deleted_at, deleted_by, is_system, version, created_at
         )
         SELECT {MESSAGE_COLUMNS}
-          FROM messages m
-          LEFT JOIN users u ON u.id = m.author_id
-         WHERE m.id = (SELECT id FROM inserted)"#
+          FROM inserted m
+          LEFT JOIN users u ON u.id = m.author_id"#
     ))
     .bind(chat_id)
     .bind(author_id)
@@ -107,14 +106,17 @@ pub async fn chat_unread_and_last_message(
     chat_id: Uuid,
     viewer_id: Uuid,
 ) -> Result<(i64, Option<DateTime<Utc>>), (axum::http::StatusCode, String)> {
-    let last_read: Option<Uuid> = sqlx::query_scalar(
+    // The `chat_reads` row may exist with a NULL last_read_message_id, so decode
+    // the column as `Option` (not bare `Uuid`) and flatten the no-row case.
+    let last_read: Option<Uuid> = sqlx::query_scalar::<_, Option<Uuid>>(
         "SELECT last_read_message_id FROM chat_reads WHERE chat_id = $1 AND account_id = $2",
     )
     .bind(chat_id)
     .bind(viewer_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .flatten();
 
     let unread: Option<i64> = sqlx::query_scalar(
         r#"SELECT COUNT(*) FROM messages
@@ -131,11 +133,15 @@ pub async fn chat_unread_and_last_message(
     .await
     .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let last_at: Option<DateTime<Utc>> = sqlx::query_scalar(
+    // `MAX(...)` always returns exactly one row whose value is NULL when the
+    // chat has no messages (e.g. a freshly seeded global chat). Decode column 0
+    // as `Option` and use `fetch_one`, otherwise sqlx tries to decode the NULL
+    // into a bare `DateTime` and fails with "unexpected null".
+    let last_at: Option<DateTime<Utc>> = sqlx::query_scalar::<_, Option<DateTime<Utc>>>(
         "SELECT MAX(created_at) FROM messages WHERE chat_id = $1 AND deleted_at IS NULL",
     )
     .bind(chat_id)
-    .fetch_optional(pool)
+    .fetch_one(pool)
     .await
     .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

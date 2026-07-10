@@ -48,12 +48,10 @@ pub async fn get(
                         SELECT clan_id FROM clan_memberships
                          WHERE user_id = $2 AND active = TRUE
                       ))
-                  OR ($3 = TRUE)
               )"#
     ))
     .bind(id)
     .bind(user_id)
-    .bind(has_password)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

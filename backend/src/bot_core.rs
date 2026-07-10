@@ -75,7 +75,8 @@ pub async fn user_count_data(pool: &PgPool) -> UserCountData {
         users: scalar(pool, "SELECT COUNT(*) FROM users").await,
         active_today: scalar(
             pool,
-            "SELECT COUNT(*) FROM users WHERE last_seen_at > NOW() - INTERVAL '1 day'",
+            "SELECT COUNT(DISTINCT user_id) FROM sessions \
+             WHERE last_activity > NOW() - INTERVAL '1 day'",
         )
         .await,
         sessions: scalar(pool, "SELECT COUNT(*) FROM sessions WHERE expires_at > NOW()").await,

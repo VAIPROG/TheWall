@@ -1,5 +1,11 @@
 -- 038: V3 telemetry tables for client events, logs, and server-side metrics.
 
+-- A legacy V2 aggregate table named telemetry_events (day/event_type/count/...)
+-- has an incompatible schema and shadows the V3 per-event table below, so a bare
+-- CREATE TABLE IF NOT EXISTS would silently keep the wrong shape. Drop it first
+-- (it only ever held rolled-up counters, safe to discard).
+DROP TABLE IF EXISTS telemetry_events;
+
 CREATE TABLE IF NOT EXISTS telemetry_events (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID REFERENCES users(id) ON DELETE SET NULL,

@@ -651,14 +651,10 @@ async fn main() {
         )
         // --- V3 chats: unified chat model (global, clan, DM) ------------------
         .route("/api/v3/chats", get(routes::v3::chats::list_chats))
-        // Literal-segment routes (/global, /dm) come before param-segment /{id}
-        // in the source; axum 0.8's radix trie gives literals priority anyway,
-        // but explicit ordering avoids any ambiguity.
-        .route(
-            "/api/v3/chats/global",
-            get(routes::v3::chats::get_chat_detail),
-        )
-        // Literal sub-paths under /global come before the param-segment /{id}.
+        // `/api/v3/chats/{id}` handles both a chat UUID and the literal keyword
+        // `global` (resolved in get_chat_detail via resolve_chat_selector), so no
+        // separate `/global` route is needed. Literal sub-paths like
+        // `/global/modmail` still need their own routes (different handler).
         .route(
             "/api/v3/chats/global/modmail",
             get(routes::v3::chats::get_modmail).post(routes::v3::chats::send_modmail),
@@ -677,8 +673,7 @@ async fn main() {
         )
         .route(
             "/api/v3/chats/{cid}/messages/{mid}",
-            get(routes::v3::chats::list_messages)
-                .patch(routes::v3::chats::edit_message)
+            axum::routing::patch(routes::v3::chats::edit_message)
                 .delete(routes::v3::chats::delete_message),
         )
         .route(

@@ -82,8 +82,7 @@ pub async fn attach_reactions_one(
 pub async fn add_reaction(
     auth: AuthUser,
     State(state): State<AppState>,
-    Path((chat_id, message_id)): Path<(Uuid, Uuid)>,
-    Json(body): Json<ReactionBody>,
+    Path((chat_id, message_id, emoji)): Path<(Uuid, Uuid, String)>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
     let chat = load_chat(&state.pool, chat_id)
         .await?
@@ -105,7 +104,7 @@ pub async fn add_reaction(
         return Err((StatusCode::NOT_FOUND, "message not found".to_string()));
     }
 
-    let emoji = body.emoji.trim();
+    let emoji = emoji.trim();
     if emoji.is_empty() || emoji.chars().count() > 16 {
         return Err((StatusCode::BAD_REQUEST, "invalid emoji".to_string()));
     }

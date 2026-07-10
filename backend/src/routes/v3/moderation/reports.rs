@@ -73,7 +73,7 @@ async fn resolve_restriction_target(
         "user" => Uuid::parse_str(target_id).ok(),
         "message" => {
             sqlx::query_scalar::<_, Option<Uuid>>(
-                "SELECT author_id FROM messages WHERE id = $1",
+                "SELECT author_id FROM messages WHERE id = $1::uuid",
             )
             .bind(target_id)
             .fetch_optional(pool)
@@ -83,7 +83,7 @@ async fn resolve_restriction_target(
         }
         "template" => {
             sqlx::query_scalar::<_, Option<Uuid>>(
-                "SELECT user_id FROM templates WHERE id = $1",
+                "SELECT user_id FROM templates WHERE id = $1::uuid",
             )
             .bind(target_id)
             .fetch_optional(pool)

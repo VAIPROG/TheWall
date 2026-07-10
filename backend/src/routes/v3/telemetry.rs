@@ -187,6 +187,7 @@ pub async fn query_logs(
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
     let mut filters = vec!["1=1".to_string()];
     if let Some(level) = q.level {
+        let level = level.replace('\'', "''");
         filters.push(format!("level = '{level}'"));
     }
     if let Some(from) = q.from {
@@ -199,6 +200,7 @@ pub async fn query_logs(
         filters.push(format!("session_id = '{}'", session_id));
     }
     if let Some(source) = q.source {
+        let source = source.replace('\'', "''");
         filters.push(format!("source = '{source}'"));
     }
     if let Some(cursor) = q.cursor {

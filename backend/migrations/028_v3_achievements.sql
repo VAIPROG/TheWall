@@ -23,11 +23,10 @@ CREATE INDEX IF NOT EXISTS idx_achievements_rarity    ON achievements(rarity);
 -- 2. Track grants with source and metadata
 -- ---------------------------------------------------------------------------
 
-ALTER TABLE user_achievements
-    ADD COLUMN IF NOT EXISTS id          UUID PRIMARY KEY DEFAULT gen_random_uuid(); -- OOPS: can't add PK after table. Fix below.
-
--- The previous line is invalid (can't add PRIMARY KEY via ADD COLUMN IF NOT EXISTS).
--- Instead create a separate grants table and keep user_achievements for V2 compat.
+-- NOTE: an invalid `ALTER TABLE user_achievements ADD COLUMN id ... PRIMARY KEY`
+-- statement was removed here — you cannot add a PRIMARY KEY via ADD COLUMN, and
+-- user_achievements already has one. Grants are tracked in the separate
+-- achievement_grants table below; user_achievements is kept for V2 compat.
 
 CREATE TABLE IF NOT EXISTS achievement_grants (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

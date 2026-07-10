@@ -79,7 +79,7 @@ pub async fn list_snapshots(
         .await
     } else {
         sqlx::query_as::<_, SnapshotRow>(
-            r#"SELECT (e.payload->'sizes'->k->>'id')::uuid AS id,
+            r#"SELECT e.id AS id,
                       k AS size,
                       (e.payload->'sizes'->k->>'bytes')::bigint AS bytes,
                       (e.payload->'sizes'->k->>'width')::int AS width,

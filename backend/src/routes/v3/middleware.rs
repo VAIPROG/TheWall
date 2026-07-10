@@ -25,29 +25,29 @@ use serde_json::json;
 use crate::{AppState, auth::AuthUser};
 
 /// Routes a globally-banned user is still allowed to call.
-/// Patterns are `MatchedPath` strings (e.g. `/api/v3/templates/:id`).
+/// Patterns are `MatchedPath` strings (e.g. `/api/v3/templates/{id}`).
 const BAN_ALLOW_LIST: &[&str] = &[
     "/api/v3/templates",
-    "/api/v3/templates/:id",
-    "/api/v3/templates/:id/preview",
-    "/api/v3/templates/:id/png",
-    "/api/v3/templates/:id/wall-dev",
-    "/api/v3/templates/:id/charity",
+    "/api/v3/templates/{id}",
+    "/api/v3/templates/{id}/preview",
+    "/api/v3/templates/{id}/png",
+    "/api/v3/templates/{id}/wall-dev",
+    "/api/v3/templates/{id}/charity",
     "/api/v3/templates/pinned",
     "/api/v3/clans",
-    "/api/v3/clans/:id",
-    "/api/v3/clans/:id/templates",
+    "/api/v3/clans/{id}",
+    "/api/v3/clans/{id}/templates",
     "/api/v3/chats/global",
     "/api/v3/telemetry/health",
     "/api/v3/telemetry/metrics",
     // Auth/session management (needed to keep a token alive and call appeal).
     "/api/v3/auth/site",
-    "/api/v3/auth/oauth/:provider/start",
-    "/api/v3/auth/oauth/:provider/callback",
+    "/api/v3/auth/oauth/{provider}/start",
+    "/api/v3/auth/oauth/{provider}/callback",
     "/api/v3/auth/refresh",
     "/api/v3/auth/session",
     "/api/v3/auth/logout",
-    "/api/v3/auth/session/:sessionId/logout",
+    "/api/v3/auth/session/{sessionId}/logout",
     "/api/v3/auth/session/all/logout",
     "/api/v3/auth/recover",
     // The appeal endpoint and self-service restriction view.
@@ -144,12 +144,21 @@ pub async fn auth_and_ban_middleware(
     // 1. Verify JWT if present and store AuthUser in extensions.
     if let Some(token) = extract_bearer(&request) {
         if let Ok(claims) = crate::auth::verify_token(token, &state.config.jwt_secret) {
-            // Reject tokens whose session has been revoked or expired.
+            // Reject tokens whose session has been revoked (logout) or expired.
+            // This is the ONLY place session validity is enforced — handlers use
+            // the `AuthUser` extractor, which re-decodes the JWT and does not
+            // consult the session table. Falling through here (the previous
+            // behaviour) let a logged-out but unexpired access token keep
+            // authenticating for the full token lifetime.
             let session_valid = validate_token_session(&state, &claims).await?;
-            if session_valid {
-                if let Ok(user_id) = uuid::Uuid::parse_str(&claims.sub) {
-                    request.extensions_mut().insert(AuthUser { user_id });
-                }
+            if !session_valid {
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    "session expired or revoked".to_string(),
+                ));
+            }
+            if let Ok(user_id) = uuid::Uuid::parse_str(&claims.sub) {
+                request.extensions_mut().insert(AuthUser { user_id });
             }
         }
     }
@@ -188,15 +197,15 @@ mod tests {
     #[test]
     fn public_templates_exempt() {
         assert!(is_ban_exempt("/api/v3/templates"));
-        assert!(is_ban_exempt("/api/v3/templates/:id"));
-        assert!(is_ban_exempt("/api/v3/templates/:id/wall-dev"));
+        assert!(is_ban_exempt("/api/v3/templates/{id}"));
+        assert!(is_ban_exempt("/api/v3/templates/{id}/wall-dev"));
     }
 
     #[test]
     fn public_clans_exempt() {
         assert!(is_ban_exempt("/api/v3/clans"));
-        assert!(is_ban_exempt("/api/v3/clans/:id"));
-        assert!(is_ban_exempt("/api/v3/clans/:id/templates"));
+        assert!(is_ban_exempt("/api/v3/clans/{id}"));
+        assert!(is_ban_exempt("/api/v3/clans/{id}/templates"));
     }
 
     #[test]
@@ -210,9 +219,9 @@ mod tests {
 
     #[test]
     fn write_routes_not_exempt() {
-        assert!(!is_ban_exempt("/api/v3/chats/:id/messages"));
+        assert!(!is_ban_exempt("/api/v3/chats/{id}/messages"));
         assert!(!is_ban_exempt("/api/v3/templates/new"));
-        assert!(!is_ban_exempt("/api/v3/clans/:id/invites"));
+        assert!(!is_ban_exempt("/api/v3/clans/{id}/invites"));
         assert!(!is_ban_exempt("/api/v3/moderation/reports"));
     }
 

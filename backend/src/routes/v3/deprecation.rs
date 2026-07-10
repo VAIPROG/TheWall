@@ -125,37 +125,56 @@ pub async fn v1_v2_deprecation_middleware(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    if content_type.as_deref() == Some("application/json")
-        || content_type.as_deref().map(|s| s.starts_with("application/json;")).unwrap_or(false)
-    {
-        if let Ok(bytes) = buffer_body(std::mem::take(&mut body), MAX_JSON_BUFFER_BYTES).await {
-            let mut value: serde_json::Value = match serde_json::from_slice(&bytes) {
-                Ok(v) => v,
-                Err(_) => {
-                    // Not valid JSON despite the header — return original body.
-                    let mut rebuilt = Response::from_parts(parts, Body::from(bytes));
-                    *rebuilt.status_mut() = status;
-                    return Ok(rebuilt);
+    let is_json = content_type.as_deref() == Some("application/json")
+        || content_type.as_deref().map(|s| s.starts_with("application/json;")).unwrap_or(false);
+
+    if is_json {
+        // NOTE: `to_bytes` consumes the body, so we must ALWAYS rebuild the
+        // response from the buffered bytes. The previous version took the body
+        // with `std::mem::take` and, when it exceeded MAX_JSON_BUFFER_BYTES,
+        // fell through to `Response::from_parts(parts, body)` with an already
+        // emptied `body` — returning a 200 with an empty payload. That silently
+        // blanked large legacy responses (e.g. the full template list), which
+        // looked like "all templates disappeared".
+        match axum::body::to_bytes(std::mem::take(&mut body), 32 * 1024 * 1024).await {
+            Ok(bytes) => {
+                // Inject the deprecation notice only into small JSON *objects*.
+                // Arrays (the template/signal lists) and large bodies pass
+                // through untouched.
+                if bytes.len() <= MAX_JSON_BUFFER_BYTES {
+                    if let Ok(mut value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                        if let Some(obj) = value.as_object_mut() {
+                            obj.insert(
+                                "_deprecation".to_string(),
+                                json!({
+                                    "message": "This API version is deprecated. Please migrate to /api/v3.",
+                                    "sunsetDate": "2026-08-01",
+                                    "documentationUrl": "/docs/api/v3",
+                                }),
+                            );
+                            let new_body = serde_json::to_string(&value)
+                                .unwrap_or_else(|_| String::from_utf8_lossy(&bytes).to_string());
+                            return Ok(Response::builder()
+                                .status(status)
+                                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                                .body(Body::from(new_body))
+                                .unwrap());
+                        }
+                    }
                 }
-            };
-
-            if let Some(obj) = value.as_object_mut() {
-                obj.insert(
-                    "_deprecation".to_string(),
-                    json!({
-                        "message": "This API version is deprecated. Please migrate to /api/v3.",
-                        "sunsetDate": "2026-08-01",
-                        "documentationUrl": "/docs/api/v3",
-                    }),
-                );
+                // Large body, JSON array, or non-object: return the bytes verbatim.
+                let mut rebuilt = Response::from_parts(parts, Body::from(bytes));
+                *rebuilt.status_mut() = status;
+                return Ok(rebuilt);
             }
-
-            let new_body = serde_json::to_string(&value).unwrap_or_else(|_| String::from_utf8_lossy(&bytes).to_string());
-            return Ok(Response::builder()
-                .status(status)
-                .header(axum::http::header::CONTENT_TYPE, "application/json")
-                .body(Body::from(new_body))
-                .unwrap());
+            Err(_) => {
+                // Body exceeded 32 MB — cannot buffer. Return an explicit error
+                // rather than a misleading empty 200.
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "legacy response too large to proxy".to_string(),
+                ));
+            }
         }
     }
 

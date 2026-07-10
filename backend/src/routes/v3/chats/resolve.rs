@@ -23,6 +23,24 @@ pub async fn global_chat_id(pool: &sqlx::PgPool) -> Result<Uuid, (StatusCode, St
         })
 }
 
+/// Resolve a chat path selector to a concrete chat id.
+///
+/// The `{id}` segment on the chat/message routes accepts either the literal
+/// keyword `global` (the singleton global chat) or a chat UUID. Clan and DM
+/// chats have their own dedicated routes, so those keywords are not handled
+/// here. Without this, a request to `/api/v3/chats/global/messages` tried to
+/// parse `global` as a UUID and failed with a 400.
+pub async fn resolve_chat_selector(
+    pool: &sqlx::PgPool,
+    selector: &str,
+) -> Result<Uuid, (StatusCode, String)> {
+    if selector.eq_ignore_ascii_case("global") {
+        return global_chat_id(pool).await;
+    }
+    Uuid::parse_str(selector)
+        .map_err(|_| (StatusCode::BAD_REQUEST, format!("invalid chat id: {selector}")))
+}
+
 /// Get-or-create the clan chat for `clan_id`.
 pub async fn clan_chat_id(pool: &sqlx::PgPool, clan_id: Uuid) -> Result<Uuid, (StatusCode, String)> {
     // Try insert; if the unique index fires, the DO NOTHING path skips it.

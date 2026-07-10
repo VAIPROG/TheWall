@@ -45,12 +45,10 @@ pub async fn load_visible(
                             SELECT clan_id FROM clan_memberships
                              WHERE user_id = $2 AND active = TRUE
                           ))
-                      OR ($3 = TRUE)
                   )"#,
         )
         .bind(template_id)
         .bind(user_id)
-        .bind(access.password.is_some())
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

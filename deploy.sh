@@ -451,7 +451,7 @@ server {
         if ($request_method = 'OPTIONS') {
             add_header 'Access-Control-Allow-Origin' '*' always;
             add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
-            add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type' always;
+            add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type, X-ClientVersion-TheWallDev-API' always;
             add_header 'Access-Control-Max-Age' 86400;
             return 204;
         }
@@ -463,7 +463,7 @@ server {
         client_max_body_size 16M;
         add_header 'Access-Control-Allow-Origin' '*' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
-        add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type' always;
+        add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type, X-ClientVersion-TheWallDev-API' always;
     }
 
     # Static extensions + API docs

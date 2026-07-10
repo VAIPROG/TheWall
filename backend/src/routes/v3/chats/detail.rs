@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::reactions::attach_reactions;
-use super::resolve::{can_access_chat, load_chat};
+use super::resolve::{can_access_chat, load_chat, resolve_chat_selector};
 
 // ---------------------------------------------------------------------------
 // GET /api/v3/chats/{chat_id}
@@ -27,8 +27,9 @@ use super::resolve::{can_access_chat, load_chat};
 pub async fn get_chat_detail(
     auth: AuthUser,
     State(state): State<AppState>,
-    Path(chat_id): Path<Uuid>,
+    Path(chat_sel): Path<String>,
 ) -> Result<Json<ChatDetailView>, (StatusCode, String)> {
+    let chat_id = resolve_chat_selector(&state.pool, &chat_sel).await?;
     let chat = load_chat(&state.pool, chat_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "chat not found".to_string()))?;
@@ -110,7 +111,7 @@ pub async fn build_detail(
 
     // Pinned message ids.
     let pinned_message_ids: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT message_id FROM chat_pins WHERE chat_id = $1 ORDER BY pinned_at DESC",
+        "SELECT message_id FROM pinned_messages WHERE chat_id = $1 ORDER BY pinned_at DESC",
     )
     .bind(chat.id)
     .fetch_all(pool)
@@ -159,8 +160,9 @@ async fn build_participants_and_viewer(
 
             let ids = vec![a, b];
             let rows = sqlx::query_as::<_, (Uuid, String, Option<String>, Option<String>)>(
-                "SELECT id, username, display_name, avatar_url \
-                 FROM users WHERE id = ANY($1)",
+                "SELECT u.id, u.username, u.display_name, a.image \
+                 FROM users u LEFT JOIN avatars a ON a.user_id = u.id \
+                 WHERE u.id = ANY($1)",
             )
             .bind(&ids)
             .fetch_all(pool)
@@ -169,7 +171,7 @@ async fn build_participants_and_viewer(
 
             let mut participants = Vec::new();
             for (uid, username, display_name, avatar_url) in rows {
-                let last_read: Option<Uuid> = sqlx::query_scalar(
+                let last_read: Option<Uuid> = sqlx::query_scalar::<_, Option<Uuid>>(
                     "SELECT last_read_message_id FROM chat_reads \
                      WHERE chat_id = $1 AND account_id = $2",
                 )
@@ -177,7 +179,8 @@ async fn build_participants_and_viewer(
                 .bind(uid)
                 .fetch_optional(pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .flatten();
 
                 participants.push(ParticipantView {
                     user_id: uid,
@@ -192,7 +195,7 @@ async fn build_participants_and_viewer(
                 });
             }
 
-            let viewer_last_read: Option<Uuid> = sqlx::query_scalar(
+            let viewer_last_read: Option<Uuid> = sqlx::query_scalar::<_, Option<Uuid>>(
                 "SELECT last_read_message_id FROM chat_reads \
                  WHERE chat_id = $1 AND account_id = $2",
             )
@@ -200,7 +203,8 @@ async fn build_participants_and_viewer(
             .bind(viewer_id)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .flatten();
 
             let viewer = ChatViewerContext {
                 role: None,
@@ -216,7 +220,8 @@ async fn build_participants_and_viewer(
 
             let opener_id = chat.opener_id.unwrap_or(viewer_id);
             if let Some(opener_row) = sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
-                "SELECT username, display_name, avatar_url FROM users WHERE id = $1",
+                "SELECT u.username, u.display_name, a.image FROM users u \
+                 LEFT JOIN avatars a ON a.user_id = u.id WHERE u.id = $1",
             )
             .bind(opener_id)
             .fetch_optional(pool)
@@ -239,8 +244,9 @@ async fn build_participants_and_viewer(
 
             // Add global moderators+ as participants.
             let mod_rows: Vec<(Uuid, String, Option<String>, Option<String>)> = sqlx::query_as(
-                "SELECT id, username, display_name, avatar_url \
-                 FROM users WHERE global_role IN ('moderator','admin','owner')",
+                "SELECT u.id, u.username, u.display_name, a.image \
+                 FROM users u LEFT JOIN avatars a ON a.user_id = u.id \
+                 WHERE u.global_role IN ('moderator','admin','owner')",
             )
             .fetch_all(pool)
             .await
@@ -290,12 +296,13 @@ async fn build_participants_and_viewer(
                 chrono::DateTime<chrono::Utc>,
             )> = if let Some(clan_id) = chat.clan_id {
                 sqlx::query_as(
-                    "SELECT u.id, u.username, u.display_name, u.avatar_url, \
+                    "SELECT u.id, u.username, u.display_name, av.image, \
                             m.clan_role, r.rank, rs.last_read_message_id, m.joined_at \
                      FROM clan_memberships m \
                      JOIN users u ON u.id = m.user_id \
+                     LEFT JOIN avatars av ON av.user_id = u.id \
                      LEFT JOIN clan_roles r ON r.clan_id = m.clan_id AND r.role = m.clan_role \
-                     LEFT JOIN chat_reads rs ON rs.chat_id = $1 AND rs.user_id = u.id \
+                     LEFT JOIN chat_reads rs ON rs.chat_id = $1 AND rs.account_id = u.id \
                      WHERE m.clan_id = $2 AND m.active = TRUE \
                      ORDER BY r.rank DESC NULLS LAST, m.joined_at",
                 )
@@ -352,7 +359,7 @@ async fn build_participants_and_viewer(
                 (true, is_muted, None)
             };
 
-            let viewer_last_read: Option<Uuid> = sqlx::query_scalar(
+            let viewer_last_read: Option<Uuid> = sqlx::query_scalar::<_, Option<Uuid>>(
                 "SELECT last_read_message_id FROM chat_reads \
                  WHERE chat_id = $1 AND account_id = $2",
             )
@@ -360,7 +367,8 @@ async fn build_participants_and_viewer(
             .bind(viewer_id)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .flatten();
 
             let viewer = ChatViewerContext {
                 role,

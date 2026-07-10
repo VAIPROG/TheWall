@@ -155,7 +155,7 @@ pub struct MemberListQuery {
 // ---------------------------------------------------------------------------
 
 pub async fn list_members(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Path(clan_id): Path<Uuid>,
     Query(q): Query<MemberListQuery>,
@@ -163,6 +163,17 @@ pub async fn list_members(
     let clan = load_clan(&state.pool, clan_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "clan not found".to_string()))?;
+
+    // Roster is public only for discoverable clans; otherwise require an active
+    // membership (effective_clan_role also grants global moderators+).
+    if !clan.discoverable
+        && effective_clan_role(&state.pool, auth.user_id, clan_id)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .is_none()
+    {
+        return Err((StatusCode::FORBIDDEN, "clan roster is private".to_string()));
+    }
 
     let page = q.page.unwrap_or(1).max(1);
     let per_page = q.per_page.unwrap_or(50).clamp(1, 100);
@@ -218,13 +229,22 @@ pub async fn list_members(
 // ---------------------------------------------------------------------------
 
 pub async fn get_member(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Path((clan_id, user_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<ClanMemberView>, (StatusCode, String)> {
     let clan = load_clan(&state.pool, clan_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "clan not found".to_string()))?;
+
+    if !clan.discoverable
+        && effective_clan_role(&state.pool, auth.user_id, clan_id)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .is_none()
+    {
+        return Err((StatusCode::FORBIDDEN, "clan roster is private".to_string()));
+    }
 
     let row = fetch_member_row(&state.pool, clan_id, user_id)
         .await?

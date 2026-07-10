@@ -1,4 +1,6 @@
--- 028: V3 chats — pins, mentions, per-opener modmail threads, send idempotency.
+-- 041: V3 chats — pins, mentions, per-opener modmail threads, send idempotency.
+-- (Was mis-numbered 028 — collided with 028_v3_achievements and never applied;
+--  renumbered to a unique trailing version so sqlx runs it. Idempotent.)
 -- Forward-only, idempotent. Builds on 027.
 
 -- ---- Pins -----------------------------------------------------------------

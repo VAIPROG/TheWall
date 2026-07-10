@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::reactions::{attach_reactions, attach_reactions_one};
-use super::resolve::{can_access_chat, load_chat};
+use super::resolve::{can_access_chat, load_chat, resolve_chat_selector};
 
 // ---------------------------------------------------------------------------
 // GET /api/v3/chats/{chat_id}/messages
@@ -28,9 +28,10 @@ use super::resolve::{can_access_chat, load_chat};
 pub async fn list_messages(
     auth: AuthUser,
     State(state): State<AppState>,
-    Path(chat_id): Path<Uuid>,
+    Path(chat_sel): Path<String>,
     Query(q): Query<MessageListQuery>,
 ) -> Result<Json<Vec<MessageView>>, (StatusCode, String)> {
+    let chat_id = resolve_chat_selector(&state.pool, &chat_sel).await?;
     let chat = load_chat(&state.pool, chat_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "chat not found".to_string()))?;
@@ -105,9 +106,10 @@ pub async fn list_messages(
 pub async fn send_message(
     auth: AuthUser,
     State(state): State<AppState>,
-    Path(chat_id): Path<Uuid>,
+    Path(chat_sel): Path<String>,
     Json(body): Json<SendMessageReq>,
 ) -> Result<(StatusCode, Json<MessageView>), (StatusCode, String)> {
+    let chat_id = resolve_chat_selector(&state.pool, &chat_sel).await?;
     let chat = load_chat(&state.pool, chat_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "chat not found".to_string()))?;

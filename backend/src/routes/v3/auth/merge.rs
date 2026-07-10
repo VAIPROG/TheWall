@@ -155,8 +155,8 @@ pub async fn merge(
     // ---- audit_log.actor_id (nullable / ON DELETE SET NULL) ----
     exec!("UPDATE audit_log SET actor_id = $1 WHERE actor_id = $2");
 
-    // ---- signal_notes.author_id (nullable / ON DELETE SET NULL) ----
-    exec!("UPDATE signal_notes SET author_id = $1 WHERE author_id = $2");
+    // ---- feed_event_notes.author_id (replaced the dropped signal_notes table) ----
+    exec!("UPDATE feed_event_notes SET author_id = $1 WHERE author_id = $2");
 
     // ---- timelapse_renders.requested_by (nullable / ON DELETE SET NULL) ----
     exec!("UPDATE timelapse_renders SET requested_by = $1 WHERE requested_by = $2");

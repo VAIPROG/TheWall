@@ -59,10 +59,11 @@ fn row_to_view(r: AppRow) -> ClanJoinApplicationView {
 }
 
 const APP_SELECT: &str = r#"SELECT a.id, a.clan_id, a.applicant_id,
-          u.username, u.display_name, u.avatar_url,
+          u.username, u.display_name, av.image,
           a.message, a.status, a.created_at, a.reviewed_by, a.reviewed_at
    FROM clan_join_applications a
-   JOIN users u ON u.id = a.applicant_id"#;
+   JOIN users u ON u.id = a.applicant_id
+   LEFT JOIN avatars av ON av.user_id = a.applicant_id"#;
 
 // ---------------------------------------------------------------------------
 // GET /api/v3/clans/{id}/applications

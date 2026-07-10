@@ -1,4 +1,7 @@
--- 029: unified V3 feed.
+-- 042: unified V3 feed.
+-- (Was mis-numbered 029 — collided with 029_message_reports and never applied,
+--  so `feed_events` was missing on prod; renumbered to a unique trailing
+--  version. Idempotent: IF NOT EXISTS + ON CONFLICT DO NOTHING throughout.)
 --
 -- Replaces the split `wall_snapshots` + `signals_cache` tables with a single
 -- `feed_events` stream. Every entry has a uniform shape:
@@ -64,13 +67,13 @@ SELECT
             )
         )
     ) AS payload,
-    jsonb_agg(
+    COALESCE(jsonb_agg(
         jsonb_build_object(
             'type', 'image',
             'url', COALESCE(discord_url, telegram_url),
             'label', size
         ) ORDER BY size
-    ) FILTER (WHERE discord_url IS NOT NULL OR telegram_url IS NOT NULL) AS media,
+    ) FILTER (WHERE discord_url IS NOT NULL OR telegram_url IS NOT NULL), '[]'::jsonb) AS media,
     MAX(created_at) AS occurred_at,
     MIN(created_at) AS created_at
 FROM wall_snapshots
