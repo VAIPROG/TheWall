@@ -9,7 +9,7 @@ import { reloadEmotes } from "../emoji";
 import { confirmDlg, errorDlg, infoDlg, promptDlg } from "../dialog";
 import { toast } from "../notify";
 import { WallEvents } from "../events";
-import { Backend } from "../backend";
+import { getActiveClient, api } from "../backend/index";
 import { manualCheck, skipVersion, cmpVersion } from "../update-check";
 import { VERSION } from "../constants";
 import { playPaintRefillSound } from "../paint-sound";
@@ -294,7 +294,8 @@ export function wireSettings(_win: HTMLElement): void {
 
   // Account deletion
   $("btn-delete-account")?.addEventListener("click", async () => {
-    if (!Backend.on) {
+    const client = getActiveClient();
+    if (!client?.on) {
       await errorDlg("Connect to backend first");
       return;
     }
@@ -305,7 +306,7 @@ export function wireSettings(_win: HTMLElement): void {
     if (!ok) return;
     const reason = await promptDlg("Reason (optional):", "", "Reason");
     try {
-      await Backend.req("POST", "/me/delete", { confirm: true, reason });
+      await api(client).users.deleteMe(reason ?? undefined);
       cfg.backendToken = "";
       cfg.refreshToken = "";
       saveCfg();

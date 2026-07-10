@@ -15,10 +15,10 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::UserProfilePublic,
-    routes::v3::utils::audit,
+    routes::v3::utils::{audit, users::resolve_user_ref},
 };
 
-use super::profile::{avatar_url_for, load_user, resolve_user_ref};
+use super::profile::{avatar_url_for, load_user};
 
 pub async fn get_block_list(
     auth: AuthUser,
@@ -58,7 +58,7 @@ pub async fn block_user(
     State(state): State<AppState>,
     Path(user_ref): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     if target_id == auth.user_id {
         return Err((StatusCode::BAD_REQUEST, "cannot block yourself".to_string()));
@@ -98,7 +98,7 @@ pub async fn unblock_user(
     State(state): State<AppState>,
     Path(user_ref): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let result = sqlx::query(
         "DELETE FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2",

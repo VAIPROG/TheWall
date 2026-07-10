@@ -21,6 +21,12 @@ use crate::AppState;
 pub struct Claims {
     /// Subject — user UUID as a string.
     pub sub: String,
+    /// JWT id — session UUID this access token belongs to.
+    pub jti: String,
+    /// Token hash — SHA-256 of the raw access token. Allows server-side
+    /// revocation checks without storing the full token in the JWT.
+    #[serde(rename = "th")]
+    pub token_hash: String,
     /// Expiry (Unix timestamp seconds).
     pub exp: usize,
     /// Issued-at (Unix timestamp seconds).
@@ -52,27 +58,53 @@ impl IntoResponse for AuthError {
     }
 }
 
-/// Create a signed JWT for `user_id` that expires after `duration_hours`.
+/// Create a signed JWT for `user_id` bound to `session_id`.
+///
+/// The `token_hash` claim is the SHA-256 of the final token itself, so the
+/// server can verify that the token has not been revoked by looking up the
+/// session row.  The token expires after `duration_hours`.
 pub fn create_token(
     user_id: &Uuid,
+    session_id: &Uuid,
     secret: &str,
     duration_hours: i64,
-) -> Result<String, AuthError> {
+) -> Result<(String, String), AuthError> {
     let now = Utc::now().timestamp() as usize;
     let exp = (Utc::now() + chrono::Duration::hours(duration_hours)).timestamp() as usize;
 
+    // First pass: mint a token with a placeholder hash so we can compute the
+    // hash of the actual encoded form.
+    let placeholder = Claims {
+        sub: user_id.to_string(),
+        jti: session_id.to_string(),
+        token_hash: String::new(),
+        exp,
+        iat: now,
+    };
+    let placeholder_token = encode(
+        &Header::default(),
+        &placeholder,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .map_err(AuthError::TokenCreation)?;
+
+    let token_hash = hash_token(&placeholder_token);
+
     let claims = Claims {
         sub: user_id.to_string(),
-        iat: now,
+        jti: session_id.to_string(),
+        token_hash: token_hash.clone(),
         exp,
+        iat: now,
     };
-
-    encode(
+    let token = encode(
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
     )
-    .map_err(AuthError::TokenCreation)
+    .map_err(AuthError::TokenCreation)?;
+
+    Ok((token, token_hash))
 }
 
 /// Verify a JWT and return its claims.
@@ -220,21 +252,47 @@ pub async fn issue_session_pair(
     pool: &sqlx::PgPool,
     jwt_secret: &str,
     user_id: Uuid,
-) -> Result<(String, String), String> {
-    let token = create_token(&user_id, jwt_secret, 24).map_err(|e| format!("{e:?}"))?;
+) -> Result<(String, String, Uuid), String> {
+    let session_id = Uuid::new_v4();
+    let (token, token_hash) = create_token(&user_id, &session_id, jwt_secret, 24)
+        .map_err(|e| format!("{e:?}"))?;
     let refresh_token = generate_refresh_token();
     let refresh_expires = Utc::now() + chrono::Duration::days(7);
+
     sqlx::query(
         r#"INSERT INTO sessions (id, user_id, token_hash, refresh_hash, expires_at, created_at)
            VALUES ($1, $2, $3, $4, $5, now())"#,
     )
-    .bind(Uuid::new_v4())
+    .bind(session_id)
     .bind(user_id)
-    .bind(hash_token(&token))
+    .bind(&token_hash)
     .bind(hash_token(&refresh_token))
     .bind(refresh_expires)
     .execute(pool)
     .await
     .map_err(|e| e.to_string())?;
-    Ok((token, refresh_token))
+
+    Ok((token, refresh_token, session_id))
+}
+
+/// Verify that an access token's session is still valid (not revoked/expired).
+///
+/// Looks up `sessions` by `session_id` and `token_hash`.  This is the
+/// server-side revocation check used by middleware.
+pub async fn validate_session(
+    pool: &sqlx::PgPool,
+    session_id: Uuid,
+    token_hash: &str,
+) -> Result<bool, sqlx::Error> {
+    let valid: Option<bool> = sqlx::query_scalar(
+        r#"SELECT TRUE FROM sessions
+            WHERE id = $1
+              AND token_hash = $2
+              AND expires_at > NOW()"#,
+    )
+    .bind(session_id)
+    .bind(token_hash)
+    .fetch_optional(pool)
+    .await?;
+    Ok(valid.is_some())
 }

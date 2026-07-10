@@ -276,7 +276,7 @@ pub async fn callback(
     };
 
     // 5. Issue session pair.
-    let (access, refresh) = issue_session_pair(&state.pool, &state.config.jwt_secret, account_id)
+    let (access, refresh, _session_id) = issue_session_pair(&state.pool, &state.config.jwt_secret, account_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 

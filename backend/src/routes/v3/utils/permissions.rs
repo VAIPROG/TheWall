@@ -38,7 +38,6 @@ pub enum GlobalRole {
     Owner,
 }
 
-#[allow(dead_code)] // some predicates are API surface used by later guards
 impl GlobalRole {
     pub fn from_str(s: &str) -> GlobalRole {
         match s {
@@ -83,7 +82,6 @@ pub enum ClanRole {
     Owner,
 }
 
-#[allow(dead_code)]
 impl ClanRole {
     pub fn from_str(s: &str) -> ClanRole {
         match s {
@@ -186,7 +184,6 @@ pub async fn effective_clan_role(
 // Guards
 // ---------------------------------------------------------------------------
 
-#[allow(dead_code)]
 pub async fn require_moderator(
     auth: &AuthUser,
     pool: &PgPool,
@@ -200,7 +197,6 @@ pub async fn require_moderator(
     Ok(())
 }
 
-#[allow(dead_code)]
 pub async fn require_admin(auth: &AuthUser, pool: &PgPool) -> Result<(), (StatusCode, String)> {
     let g = global_role_of(pool, auth.user_id)
         .await
@@ -212,7 +208,6 @@ pub async fn require_admin(auth: &AuthUser, pool: &PgPool) -> Result<(), (Status
 }
 
 /// Actor must be a clan moderator or higher (folding in global authority).
-#[allow(dead_code)]
 pub async fn require_clan_mod(
     auth: &AuthUser,
     pool: &PgPool,
@@ -229,7 +224,6 @@ pub async fn require_clan_mod(
 }
 
 /// Actor must be a clan admin or higher (folding in global authority).
-#[allow(dead_code)]
 pub async fn require_clan_admin(
     auth: &AuthUser,
     pool: &PgPool,
@@ -261,10 +255,10 @@ pub async fn publish_auto_approved(
             .bind(user_id)
             .fetch_optional(pool)
             .await?;
-    let Some((username, role)) = row else {
+    let Some((_, role)) = row else {
         return Ok(false);
     };
-    if GlobalRole::from_str(&role).is_admin() || username.trim().eq_ignore_ascii_case("vai") {
+    if GlobalRole::from_str(&role).is_admin() {
         return Ok(true);
     }
     if scope == "clan" {

@@ -419,6 +419,9 @@ paths:
   /templates/{templateId}/png:
     $ref: "./paths/templates.yaml#/TemplatePng"
 
+  /templates/{templateId}/animated:
+    $ref: "./paths/templates.yaml#/TemplateAnimated"
+
   /templates/{templateId}/charity:
     $ref: "./paths/templates.yaml#/TemplateCharity"
 

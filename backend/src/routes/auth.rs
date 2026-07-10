@@ -131,26 +131,16 @@ pub async fn site(
 
     let external_id = site_user.id.to_string();
 
-    // 2. Upsert user in DB. Legacy v1 keeps the `role` column in sync (admin
-    // for vai, member otherwise); v2 reads `global_role` instead which is
-    // backfilled in the migration.
-    let legacy_role = if site_user.username.to_lowercase() == "vai" {
-        "admin"
-    } else {
-        "member"
-    };
+    // 2. Upsert user in DB. Legacy role is always 'member' here; promotion to
+    // owner/admin is done via WALL_OWNER_SEED at first boot or manually later.
     let user = sqlx::query_as::<_, crate::models::User>(
         r#"
         INSERT INTO users (id, source, external_id, username, discord_id, discord_username, role, global_role, created_at, updated_at)
-        VALUES ($1, 'filianislost', $2, $3, $4, $5, $6,
-                CASE WHEN LOWER($3) = 'vai' THEN 'owner' ELSE 'user' END,
-                now(), now())
+        VALUES ($1, 'filianislost', $2, $3, $4, $5, 'member', 'member', now(), now())
         ON CONFLICT (source, external_id) DO UPDATE
             SET username         = EXCLUDED.username,
                 discord_id       = EXCLUDED.discord_id,
                 discord_username = COALESCE(EXCLUDED.discord_username, users.discord_username),
-                role             = CASE WHEN EXCLUDED.username = 'vai' THEN 'admin' ELSE users.role END,
-                global_role      = CASE WHEN LOWER(EXCLUDED.username) = 'vai' THEN 'owner' ELSE users.global_role END,
                 updated_at       = now()
         RETURNING *
         "#,
@@ -158,19 +148,18 @@ pub async fn site(
     .bind(Uuid::new_v4())
     .bind(&external_id)
     .bind(&site_user.username)
-    .bind(&site_user.discord_id)
-    .bind(&site_user.discord_username)
-    .bind(legacy_role)
+    .bind(site_user.discord_id)
+    .bind(site_user.discord_username)
     .fetch_one(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // 3. Issue token pair
-    let token = create_token(&user.id, &state.config.jwt_secret, 24)
+    let session_id = Uuid::new_v4();
+    let (token, token_hash) = create_token(&user.id, &session_id, &state.config.jwt_secret, 24)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let refresh_token = generate_refresh_token();
     let refresh_hash = hash_token(&refresh_token);
-    let token_hash = hash_token(&token);
 
     let now = Utc::now();
     let refresh_expires = now + chrono::Duration::days(7);
@@ -182,7 +171,7 @@ pub async fn site(
         VALUES ($1, $2, $3, $4, $5, now())
         "#,
     )
-    .bind(Uuid::new_v4())
+    .bind(session_id)
     .bind(user.id)
     .bind(&token_hash)
     .bind(&refresh_hash)
@@ -265,11 +254,11 @@ pub async fn refresh(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Issue new token pair
-    let token = create_token(&user.id, &state.config.jwt_secret, 24)
+    let new_session_id = Uuid::new_v4();
+    let (token, token_hash) = create_token(&user.id, &new_session_id, &state.config.jwt_secret, 24)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let new_refresh = generate_refresh_token();
     let new_refresh_hash = hash_token(&new_refresh);
-    let token_hash = hash_token(&token);
     let refresh_expires = now + chrono::Duration::days(7);
 
     sqlx::query(
@@ -278,7 +267,7 @@ pub async fn refresh(
         VALUES ($1, $2, $3, $4, $5, now())
         "#,
     )
-    .bind(Uuid::new_v4())
+    .bind(new_session_id)
     .bind(user.id)
     .bind(&token_hash)
     .bind(&new_refresh_hash)

@@ -15,22 +15,11 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{EditMessageReq, MessageJoinRow, MessageListQuery, MessageView, SendMessageReq},
-    routes::v3::utils::{permissions, sanctions},
+    routes::v3::utils::{chat_messages, permissions, sanctions},
 };
 
 use super::reactions::{attach_reactions, attach_reactions_one};
 use super::resolve::{can_access_chat, load_chat};
-
-// ---------------------------------------------------------------------------
-// SQL column list shared by all message queries
-// ---------------------------------------------------------------------------
-
-const MSG_COLS: &str = r#"
-    m.id, m.chat_id, m.author_id, m.content, m.reply_to_id,
-    m.edited_at, m.edit_count, m.deleted_at, m.deleted_by,
-    m.is_system, m.version, m.created_at,
-    u.username AS author_username
-"#;
 
 // ---------------------------------------------------------------------------
 // GET /api/v3/chats/{chat_id}/messages
@@ -51,11 +40,12 @@ pub async fn list_messages(
     }
 
     let limit = q.limit.unwrap_or(50).min(100);
+    let cols = chat_messages::MESSAGE_COLUMNS;
 
     let rows: Vec<MessageJoinRow> = if let Some(before_id) = q.before {
         // Messages older than the cursor message.
         sqlx::query_as::<_, MessageJoinRow>(&format!(
-            "SELECT {MSG_COLS} \
+            "SELECT {cols} \
              FROM messages m \
              LEFT JOIN users u ON u.id = m.author_id \
              WHERE m.chat_id = $1 \
@@ -72,7 +62,7 @@ pub async fn list_messages(
     } else if let Some(after_id) = q.after {
         // Messages newer than the cursor message.
         sqlx::query_as::<_, MessageJoinRow>(&format!(
-            "SELECT {MSG_COLS} \
+            "SELECT {cols} \
              FROM messages m \
              LEFT JOIN users u ON u.id = m.author_id \
              WHERE m.chat_id = $1 \
@@ -89,7 +79,7 @@ pub async fn list_messages(
     } else {
         // Default: newest first.
         sqlx::query_as::<_, MessageJoinRow>(&format!(
-            "SELECT {MSG_COLS} \
+            "SELECT {cols} \
              FROM messages m \
              LEFT JOIN users u ON u.id = m.author_id \
              WHERE m.chat_id = $1 \
@@ -134,52 +124,24 @@ pub async fn send_message(
     )
     .await?;
 
-    let content = body.content.trim().to_string();
-    if content.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "content cannot be empty".to_string()));
-    }
-    if content.len() > 4000 {
-        return Err((StatusCode::PAYLOAD_TOO_LARGE, "content exceeds 4000 chars".to_string()));
-    }
+    let content = chat_messages::validate_message_content(
+        &body.content,
+        state.config.limits.message_chars,
+    )?;
 
-    // Validate reply_to belongs to the same chat.
     if let Some(reply_id) = body.reply_to_id {
-        let exists: Option<bool> = sqlx::query_scalar(
-            "SELECT TRUE FROM messages WHERE id = $1 AND chat_id = $2",
-        )
-        .bind(reply_id)
-        .bind(chat_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        if exists.is_none() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "reply_to_id does not exist in this chat".to_string(),
-            ));
-        }
+        chat_messages::ensure_reply_in_chat(&state.pool, reply_id, chat_id).await?;
     }
 
-    let row = sqlx::query_as::<_, MessageJoinRow>(&format!(
-        "WITH inserted AS ( \
-             INSERT INTO messages (id, chat_id, author_id, content, reply_to_id) \
-             VALUES (gen_random_uuid(), $1, $2, $3, $4) \
-             RETURNING id, chat_id, author_id, content, reply_to_id, \
-                       edited_at, edit_count, deleted_at, deleted_by, \
-                       is_system, version, created_at \
-         ) \
-         SELECT {MSG_COLS} \
-         FROM messages m \
-         LEFT JOIN users u ON u.id = m.author_id \
-         WHERE m.id = (SELECT id FROM inserted)"
-    ))
-    .bind(chat_id)
-    .bind(auth.user_id)
-    .bind(&content)
-    .bind(body.reply_to_id)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let row = chat_messages::insert_message(
+        &state.pool,
+        chat_id,
+        Some(auth.user_id),
+        &content,
+        body.reply_to_id,
+        false,
+    )
+    .await?;
 
     let mut view = row.into_view();
     attach_reactions_one(&state.pool, auth.user_id, &mut view).await?;
@@ -230,13 +192,11 @@ pub async fn edit_message(
         }
     }
 
-    let content = body.content.trim().to_string();
-    if content.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "content cannot be empty".to_string()));
-    }
-    if content.len() > 4000 {
-        return Err((StatusCode::PAYLOAD_TOO_LARGE, "content exceeds 4000 chars".to_string()));
-    }
+    let content = chat_messages::validate_message_content(
+        &body.content,
+        state.config.limits.message_chars,
+    )?;
+    let cols = chat_messages::MESSAGE_COLUMNS;
 
     let updated = sqlx::query_as::<_, MessageJoinRow>(&format!(
         "WITH upd AS ( \
@@ -248,7 +208,7 @@ pub async fn edit_message(
                        edited_at, edit_count, deleted_at, deleted_by, \
                        is_system, version, created_at \
          ) \
-         SELECT {MSG_COLS} \
+         SELECT {cols} \
          FROM messages m \
          LEFT JOIN users u ON u.id = m.author_id \
          WHERE m.id = (SELECT id FROM upd)"

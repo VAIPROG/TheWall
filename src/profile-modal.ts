@@ -5,7 +5,19 @@
  *
  * Win95-themed and follows the same dark/light auto-detection as dialog.ts.
  */
-import { Backend } from "./backend";
+import { getActiveClient, api } from "./backend/index";
+
+// Public-profile reads still use the V2 user surface (rich shape the modal
+// renders). They resolve against the API root, not the V3 base.
+// TODO(phase3): move to /api/v3/users/{ref} once the modal adopts the V3 shape.
+function pmReq<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  const client = getActiveClient();
+  if (!client) return Promise.reject(new Error("backend offline"));
+  return client.req<T>({ method, path, body, root: true });
+}
+function pmRoot(): string {
+  return getActiveClient()?.rootUrl ?? "";
+}
 import { esc, errMsg } from "./helpers";
 import { replaceEmotes } from "./emoji";
 import { promptDlg, errorDlg, infoDlg } from "./dialog";
@@ -171,7 +183,7 @@ function ensureModal(): HTMLElement {
 async function resolveUsernameToId(name: string): Promise<string | null> {
   if (idCache.has(name)) return idCache.get(name)!;
   try {
-    const roster = await Backend.req("GET", "/clan/members") as any[];
+    const roster = await pmReq("GET", "/clan/members") as any[];
     for (const m of roster || []) if (m.username && m.id) idCache.set(m.username, m.id);
   } catch {}
   return idCache.get(name) ?? null;
@@ -199,12 +211,12 @@ export async function openProfile(usernameOrId: string): Promise<void> {
 
   let prof: any, ach: any[] = [];
   try {
-    prof = await Backend.req("GET", `/v2/users/${id}`);
+    prof = await pmReq("GET", `/v2/users/${id}`);
   } catch (e: any) {
     body.innerHTML = `<div style="color:#b33;padding:8px">Failed to load profile: ${esc(errMsg(e))}</div>`;
     return;
   }
-  try { ach = (await Backend.req("GET", `/v2/users/${id}/achievements`)) as any[]; } catch {}
+  try { ach = (await pmReq("GET", `/v2/users/${id}/achievements`)) as any[]; } catch {}
 
   const displayName = prof.username || "unknown";
   const vai = displayName.trim().toLowerCase() === "vai";
@@ -219,7 +231,7 @@ export async function openProfile(usernameOrId: string): Promise<void> {
   }).join("");
   const pins = (prof.pinned_templates || []).map((p: any) =>
     `<div class="wd-pm-pin" data-tpl="${esc(p.id)}" title="${esc(p.name || "")}"
-       style="background-image:url('${Backend.base}/v2/templates/${encodeURIComponent(p.id)}/preview?size=64')"></div>`
+       style="background-image:url('${pmRoot()}/v2/templates/${encodeURIComponent(p.id)}/preview?size=64')"></div>`
   ).join("");
   const achCount = ach?.length ?? 0;
 
@@ -257,7 +269,7 @@ export async function openProfile(usernameOrId: string): Promise<void> {
 
   body.innerHTML = `
     <div style="display:flex;gap:10px;align-items:flex-start">
-      <img class="wd-pm-avatar" src="${Backend.base}/avatar?userId=${encodeURIComponent(id)}" onerror="this.style.display='none'">
+      <img class="wd-pm-avatar" src="${pmRoot()}/avatar?userId=${encodeURIComponent(id)}" onerror="this.style.display='none'">
       <div style="flex:1;min-width:0">
         <div style="font-weight:bold;font-size:14px">${esc(displayName)}</div>
         <div class="wd-pm-meta">${roleLine}</div>
@@ -274,7 +286,9 @@ export async function openProfile(usernameOrId: string): Promise<void> {
     const text = await promptDlg(`Message to @${displayName}:`, "", t("profileSendDM"));
     if (text == null || !String(text).trim()) return;
     try {
-      await Backend.req("POST", "/v2/mailbox/dm", { to: id, body: String(text).trim() });
+      const client = getActiveClient();
+      if (!client) throw new Error("backend offline");
+      await api(client).chats.sendDm(id, { content: String(text).trim() });
       await infoDlg("Sent!", "DM");
     } catch (e: any) { await errorDlg("Failed: " + errMsg(e)); }
   };

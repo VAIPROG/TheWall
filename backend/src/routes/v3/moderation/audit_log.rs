@@ -16,22 +16,8 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{AuditLogEntry, AuditLogPage, AuditLogRow},
-    routes::v3::utils::permissions::global_role_of,
+    routes::v3::utils::permissions,
 };
-
-async fn require_moderator(
-    pool: &sqlx::PgPool,
-    user_id: Uuid,
-) -> Result<(), (StatusCode, String)> {
-    let role = global_role_of(pool, user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    if role.is_moderator() {
-        Ok(())
-    } else {
-        Err((StatusCode::FORBIDDEN, "moderator required".to_string()))
-    }
-}
 
 #[derive(Debug, Deserialize)]
 pub struct AuditLogQuery {
@@ -44,7 +30,7 @@ pub async fn get_audit_log(
     State(state): State<AppState>,
     Query(q): Query<AuditLogQuery>,
 ) -> Result<Json<AuditLogPage>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
 
     let page = q.page.unwrap_or(1).max(1);
     let per_page = q.per_page.unwrap_or(50).clamp(1, 100);

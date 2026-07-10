@@ -14,8 +14,9 @@ import { log } from "./log";
 import { toast } from "./notify";
 import { t } from "./i18n";
 import { cfg, saveCfg } from "./config";
-import { Backend } from "./backend";
 import { errorDlg } from "./dialog";
+import { getActiveClient, api } from "./backend/index";
+import type { LinkStatus } from "./backend/mailbox";
 
 const LANDING_BASE = "https://the-wall.vai-rice.space";
 
@@ -31,27 +32,23 @@ interface ProviderRow {
   detail: string;
 }
 
-function providerRows(s: any): ProviderRow[] {
+function providerRows(s: LinkStatus): ProviderRow[] {
   return [
     {
       key: "telegram",
       label: "✈️ Telegram",
-      linked: !!(s.telegram_user_id || s.telegram_username),
-      detail: s.telegram_username
-        ? `@${s.telegram_username}`
-        : s.telegram_user_id
-          ? `id ${s.telegram_user_id}`
-          : "",
+      linked: !!(s.telegram?.username),
+      detail: s.telegram?.username
+        ? `@${s.telegram.username}`
+        : "",
     },
     {
       key: "discord",
       label: "🎮 Discord",
-      linked: !!(s.discord_id || s.discord_username),
-      detail: s.discord_username
-        ? `${s.discord_username}${s.discord_linked_via_oauth ? " ✓OAuth" : ""}`
-        : s.discord_id
-          ? `id ${s.discord_id}`
-          : "",
+      linked: !!(s.discord?.username),
+      detail: s.discord?.username
+        ? `${s.discord.username}`
+        : "",
     },
   ];
 }
@@ -59,13 +56,14 @@ function providerRows(s: any): ProviderRow[] {
 async function renderLinkRows(): Promise<void> {
   const el = $("links-rows");
   if (!el) return;
-  if (!Backend.on) {
+  const client = getActiveClient();
+  if (!client?.on) {
     el.innerHTML = noteBox(t("offline"));
     return;
   }
-  let s: any;
+  let s: LinkStatus;
   try {
-    s = await Backend.req("GET", "/v2/me/links");
+    s = await api(client).mailbox.links();
   } catch (e) {
     el.innerHTML = noteBox("load failed: " + errMsg(e), "err");
     return;
@@ -107,8 +105,10 @@ async function renderLinkRows(): Promise<void> {
 }
 
 async function unlink(provider: "telegram" | "discord"): Promise<void> {
+  const client = getActiveClient();
+  if (!client?.on) return;
   try {
-    await Backend.req("DELETE", `/v2/me/links/${provider}`);
+    await api(client).mailbox.unlink(provider);
     toast(t("linksLegend"), `${provider} unlinked`);
   } catch (e: any) {
     await errorDlg(`unlink failed: ${errMsg(e)}`);
@@ -124,9 +124,10 @@ export function wireLinks(): void {
   $("cfg-paint-reminder-remote")?.addEventListener("change", (e: Event) => {
     cfg.paintReminderRemote = (e.target as HTMLInputElement).checked;
     saveCfg();
-    if (!cfg.paintReminderRemote && Backend.on) {
+    const client = getActiveClient();
+    if (!cfg.paintReminderRemote && client?.on) {
       // Cancel any pending reminder so the toggle means what it says.
-      Backend.req("DELETE", "/v2/me/paint-reminder").catch(() => {});
+      api(client).mailbox.deletePaintReminder().catch(() => {});
     }
     toast(t("linksLegend"), cfg.paintReminderRemote ? "refill DMs on" : "refill DMs off");
   });

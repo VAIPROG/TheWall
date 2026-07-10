@@ -1,7 +1,5 @@
-//! ChatDetail endpoints:
-//!   GET /api/v3/chats/global          — global chat detail shortcut
-//!   GET /api/v3/chats/{id}            — chat detail by id
-//!   GET /api/v3/chats/{cid}/messages/{mid} — single message fetch
+//! Chat detail handler:
+//!   GET /api/v3/chats/{id} — full chat context + participants + recent messages
 
 use axum::{
     Json,
@@ -14,283 +12,19 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{
-        ChatDetailView, ChatViewerContext, LastMessagePreview, MessageJoinRow, MessageView,
-        ParticipantView, ChatV3,
+        ChatDetailView, ChatV3, LastMessagePreview, MessageJoinRow, MessageView, ParticipantView,
     },
-    routes::v3::utils::permissions,
+    routes::v3::utils::{chat_messages, permissions},
 };
 
-use super::reactions::{attach_reactions, attach_reactions_one};
-use super::resolve::{can_access_chat, global_chat_id, load_chat};
+use super::reactions::attach_reactions;
+use super::resolve::{can_access_chat, load_chat};
 
 // ---------------------------------------------------------------------------
-// SQL column list (mirrors messages.rs to avoid cross-module coupling)
+// GET /api/v3/chats/{chat_id}
 // ---------------------------------------------------------------------------
 
-const MSG_COLS: &str = r#"
-    m.id, m.chat_id, m.author_id, m.content, m.reply_to_id,
-    m.edited_at, m.edit_count, m.deleted_at, m.deleted_by,
-    m.is_system, m.version, m.created_at,
-    u.username AS author_username
-"#;
-
-// ---------------------------------------------------------------------------
-// Internal — build ChatDetailView from a loaded ChatV3
-// ---------------------------------------------------------------------------
-
-pub(super) async fn build_detail(
-    pool: &sqlx::PgPool,
-    viewer_id: Uuid,
-    chat: ChatV3,
-) -> Result<ChatDetailView, (StatusCode, String)> {
-    let chat_id = chat.id;
-
-    // ── unread_count & last_message_at (reuse enrich logic inline) ──────────
-    let (unread_count, last_message_at): (i64, Option<chrono::DateTime<chrono::Utc>>) =
-        sqlx::query_as(
-            "SELECT
-                COALESCE((
-                    SELECT COUNT(*)
-                    FROM messages m
-                    WHERE m.chat_id = $1
-                      AND m.deleted_at IS NULL
-                      AND m.author_id != $2
-                      AND (
-                            NOT EXISTS (
-                                SELECT 1 FROM chat_reads cr
-                                WHERE cr.chat_id = $1 AND cr.account_id = $2
-                            )
-                          OR
-                            m.created_at > COALESCE(
-                                (SELECT rm.created_at
-                                 FROM chat_reads cr
-                                 JOIN messages rm ON rm.id = cr.last_read_message_id
-                                 WHERE cr.chat_id = $1 AND cr.account_id = $2),
-                                'epoch'::timestamptz
-                            )
-                      )
-                ), 0),
-                (
-                    SELECT MAX(m.created_at)
-                    FROM messages m
-                    WHERE m.chat_id = $1
-                      AND m.deleted_at IS NULL
-                )",
-        )
-        .bind(chat_id)
-        .bind(viewer_id)
-        .fetch_one(pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    // ── viewer context ───────────────────────────────────────────────────────
-    let can_post = can_access_chat(pool, viewer_id, &chat).await?;
-
-    let viewer_role: Option<String> = match chat.chat_type.as_str() {
-        "global" => {
-            let g = permissions::global_role_of(pool, viewer_id)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            Some(g.as_str().to_string())
-        }
-        "clan" | "modmail" => {
-            if let Some(clan_id) = chat.clan_id {
-                permissions::clan_role_of(pool, viewer_id, clan_id)
-                    .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-                    .map(|r| r.as_str().to_string())
-            } else {
-                None
-            }
-        }
-        _ => None, // dm
-    };
-
-    let last_read_message_id: Option<Uuid> = sqlx::query_scalar(
-        "SELECT last_read_message_id FROM chat_reads WHERE chat_id = $1 AND account_id = $2",
-    )
-    .bind(chat_id)
-    .bind(viewer_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    .flatten();
-
-    let viewer = ChatViewerContext {
-        role: viewer_role,
-        can_post,
-        is_muted: false,
-        last_read_message_id,
-    };
-
-    // ── participant_count & participants ─────────────────────────────────────
-    let (participant_count, participants) = match chat.chat_type.as_str() {
-        "global" => {
-            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
-                .fetch_one(pool)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            (count, Vec::new())
-        }
-        "dm" => {
-            let dm_key = chat.dm_key.clone().unwrap_or_default();
-            let parts: Vec<&str> = dm_key.splitn(2, ':').collect();
-            let mut participants = Vec::new();
-            for part in &parts {
-                if let Ok(uid) = part.parse::<Uuid>() {
-                    let row: Option<(Uuid, String)> =
-                        sqlx::query_as("SELECT id, username FROM users WHERE id = $1")
-                            .bind(uid)
-                            .fetch_optional(pool)
-                            .await
-                            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-                    if let Some((user_id, username)) = row {
-                        participants.push(ParticipantView {
-                            user_id,
-                            username: username.clone(),
-                            display_name: username,
-                            avatar_url: None,
-                            role: None,
-                            role_rank: None,
-                            last_read_message_id: None,
-                            joined_at: None,
-                            is_muted: false,
-                        });
-                    }
-                }
-            }
-            (2i64, participants)
-        }
-        "clan" | "modmail" => {
-            let clan_id = match chat.clan_id {
-                Some(c) => c,
-                None => return Err((StatusCode::INTERNAL_SERVER_ERROR, "clan_id missing".into())),
-            };
-            #[derive(sqlx::FromRow)]
-            struct MemberRow {
-                user_id: Uuid,
-                username: String,
-                clan_role: String,
-                joined_at: chrono::DateTime<chrono::Utc>,
-            }
-            let members: Vec<MemberRow> = sqlx::query_as(
-                "SELECT m.user_id, u.username, m.clan_role, m.joined_at \
-                 FROM clan_memberships m \
-                 JOIN users u ON u.id = m.user_id \
-                 WHERE m.clan_id = $1 AND m.active = TRUE \
-                 ORDER BY m.joined_at ASC",
-            )
-            .bind(clan_id)
-            .fetch_all(pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-            let count = members.len() as i64;
-            let plist = members
-                .into_iter()
-                .map(|m| {
-                    let role_rank = match m.clan_role.as_str() {
-                        "admin" => 3,
-                        "moderator" => 2,
-                        _ => 1,
-                    };
-                    ParticipantView {
-                        user_id: m.user_id,
-                        username: m.username.clone(),
-                        display_name: m.username,
-                        avatar_url: None,
-                        role: Some(m.clan_role),
-                        role_rank: Some(role_rank),
-                        last_read_message_id: None,
-                        joined_at: Some(m.joined_at),
-                        is_muted: false,
-                    }
-                })
-                .collect();
-            (count, plist)
-        }
-        _ => (0i64, Vec::new()),
-    };
-
-    // ── recent messages (latest 50, newest-first) ────────────────────────────
-    let rows: Vec<MessageJoinRow> = sqlx::query_as(&format!(
-        "SELECT {MSG_COLS} \
-         FROM messages m \
-         LEFT JOIN users u ON u.id = m.author_id \
-         WHERE m.chat_id = $1 \
-         ORDER BY m.created_at DESC \
-         LIMIT 50"
-    ))
-    .bind(chat_id)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let mut recent_messages: Vec<MessageView> = rows.into_iter().map(|r| r.into_view()).collect();
-    attach_reactions(pool, viewer_id, &mut recent_messages).await?;
-
-    // ── last_message preview (newest non-deleted message) ────────────────────
-    #[derive(sqlx::FromRow)]
-    struct LastMsgRow {
-        id: Uuid,
-        author_username: Option<String>,
-        content: String,
-        created_at: chrono::DateTime<chrono::Utc>,
-    }
-    let last_message: Option<LastMessagePreview> = sqlx::query_as(
-        "SELECT m.id, u.username AS author_username, m.content, m.created_at \
-         FROM messages m \
-         LEFT JOIN users u ON u.id = m.author_id \
-         WHERE m.chat_id = $1 AND m.deleted_at IS NULL \
-         ORDER BY m.created_at DESC \
-         LIMIT 1",
-    )
-    .bind(chat_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    .map(|r: LastMsgRow| {
-        let preview: String = r.content.chars().take(120).collect();
-        LastMessagePreview {
-            id: r.id,
-            author_username: r.author_username,
-            content_preview: preview,
-            created_at: r.created_at,
-        }
-    });
-
-    let pinned_message_ids: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT message_id FROM pinned_messages WHERE chat_id = $1 ORDER BY pinned_at ASC"
-    )
-    .bind(chat.id)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    Ok(ChatDetailView {
-        id: chat.id,
-        chat_type: chat.chat_type,
-        clan_id: chat.clan_id,
-        dm_key: chat.dm_key,
-        topic: chat.topic,
-        slowmode_seconds: chat.slowmode_seconds,
-        created_at: chat.created_at,
-        participant_count,
-        unread_count,
-        last_message_at,
-        last_message,
-        viewer,
-        participants,
-        recent_messages,
-        pinned_message_ids,
-    })
-}
-
-// ---------------------------------------------------------------------------
-// GET /api/v3/chats/{id}
-// ---------------------------------------------------------------------------
-
-pub async fn get_chat(
+pub async fn get_chat_detail(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(chat_id): Path<Uuid>,
@@ -308,53 +42,334 @@ pub async fn get_chat(
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/v3/chats/global
+// Shared detail builder
 // ---------------------------------------------------------------------------
 
-pub async fn get_global_chat(
-    auth: AuthUser,
-    State(state): State<AppState>,
-) -> Result<Json<ChatDetailView>, (StatusCode, String)> {
-    let chat_id = global_chat_id(&state.pool).await?;
-    let chat = load_chat(&state.pool, chat_id)
-        .await?
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "global chat row missing".to_string()))?;
+pub async fn build_detail(
+    pool: &sqlx::PgPool,
+    viewer_id: Uuid,
+    chat: ChatV3,
+) -> Result<ChatDetailView, (StatusCode, String)> {
+    let cols = chat_messages::MESSAGE_COLUMNS;
 
-    let detail = build_detail(&state.pool, auth.user_id, chat).await?;
-    Ok(Json(detail))
-}
+    // Unread count + last message timestamp for this chat.
+    let (unread_count, last_message_at) =
+        chat_messages::chat_unread_and_last_message(pool, chat.id, viewer_id).await?;
 
-// ---------------------------------------------------------------------------
-// GET /api/v3/chats/{cid}/messages/{mid}
-// ---------------------------------------------------------------------------
+    // Latest message preview.
+    let last_message: Option<LastMessagePreview> = if let Some(_ts) = last_message_at {
+        sqlx::query_as(&format!(
+            "SELECT {cols} \
+             FROM messages m \
+             LEFT JOIN users u ON u.id = m.author_id \
+             WHERE m.chat_id = $1 AND m.deleted_at IS NULL \
+             ORDER BY m.created_at DESC \
+             LIMIT 1"
+        ))
+        .bind(chat.id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map(|row: MessageJoinRow| {
+            let preview_text: String = row.content.chars().take(120).collect();
+            LastMessagePreview {
+                id: row.id,
+                author_username: row.author_username,
+                content_preview: preview_text,
+                created_at: row.created_at,
+            }
+        })
+    } else {
+        None
+    };
 
-pub async fn get_message(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Path((chat_id, message_id)): Path<(Uuid, Uuid)>,
-) -> Result<Json<MessageView>, (StatusCode, String)> {
-    let chat = load_chat(&state.pool, chat_id)
-        .await?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, "chat not found".to_string()))?;
+    // Recent messages (newest 50).
+    let mut recent_messages: Vec<MessageView> = sqlx::query_as::<_, MessageJoinRow>(
+        &format!(
+            "SELECT {cols} \
+             FROM messages m \
+             LEFT JOIN users u ON u.id = m.author_id \
+             WHERE m.chat_id = $1 \
+             ORDER BY m.created_at DESC \
+             LIMIT $2"
+        ),
+    )
+    .bind(chat.id)
+    .bind(50i64)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .into_iter()
+    .map(|r| r.into_view())
+    .collect();
+    recent_messages.reverse();
+    attach_reactions(pool, viewer_id, &mut recent_messages).await?;
 
-    if !can_access_chat(&state.pool, auth.user_id, &chat).await? {
-        return Err((StatusCode::FORBIDDEN, "access denied".to_string()));
-    }
+    // Participants + viewer context.
+    let (participants, viewer) = build_participants_and_viewer(pool, viewer_id, &chat).await?;
 
-    let row: Option<MessageJoinRow> = sqlx::query_as(&format!(
-        "SELECT {MSG_COLS} \
-         FROM messages m \
-         LEFT JOIN users u ON u.id = m.author_id \
-         WHERE m.id = $1 AND m.chat_id = $2"
-    ))
-    .bind(message_id)
-    .bind(chat_id)
-    .fetch_optional(&state.pool)
+    // Pinned message ids.
+    let pinned_message_ids: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT message_id FROM chat_pins WHERE chat_id = $1 ORDER BY pinned_at DESC",
+    )
+    .bind(chat.id)
+    .fetch_all(pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let row = row.ok_or_else(|| (StatusCode::NOT_FOUND, "message not found".to_string()))?;
-    let mut view = row.into_view();
-    attach_reactions_one(&state.pool, auth.user_id, &mut view).await?;
-    Ok(Json(view))
+    let participant_count = participants.len() as i64;
+
+    Ok(ChatDetailView {
+        id: chat.id,
+        chat_type: chat.chat_type.clone(),
+        clan_id: chat.clan_id,
+        dm_key: chat.dm_key.clone(),
+        topic: chat.topic.clone(),
+        slowmode_seconds: chat.slowmode_seconds,
+        created_at: chat.created_at,
+        participant_count,
+        unread_count,
+        last_message_at,
+        last_message,
+        viewer,
+        participants,
+        recent_messages,
+        pinned_message_ids,
+    })
+}
+
+async fn build_participants_and_viewer(
+    pool: &sqlx::PgPool,
+    viewer_id: Uuid,
+    chat: &ChatV3,
+) -> Result<(Vec<ParticipantView>, crate::models::ChatViewerContext), (StatusCode, String)> {
+    use crate::models::ChatViewerContext;
+
+    match chat.chat_type.as_str() {
+        "dm" => {
+            let (a, b) = match chat.dm_key.as_deref().and_then(super::resolve::parse_dm_key) {
+                Some(pair) => pair,
+                None => return Ok((Vec::new(), ChatViewerContext {
+                    role: None,
+                    can_post: false,
+                    is_muted: false,
+                    last_read_message_id: None,
+                })),
+            };
+
+            let ids = vec![a, b];
+            let rows = sqlx::query_as::<_, (Uuid, String, Option<String>, Option<String>)>(
+                "SELECT id, username, display_name, avatar_url \
+                 FROM users WHERE id = ANY($1)",
+            )
+            .bind(&ids)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            let mut participants = Vec::new();
+            for (uid, username, display_name, avatar_url) in rows {
+                let last_read: Option<Uuid> = sqlx::query_scalar(
+                    "SELECT last_read_message_id FROM chat_reads \
+                     WHERE chat_id = $1 AND account_id = $2",
+                )
+                .bind(chat.id)
+                .bind(uid)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+                participants.push(ParticipantView {
+                    user_id: uid,
+                    username,
+                    display_name: display_name.unwrap_or_default(),
+                    avatar_url,
+                    role: None,
+                    role_rank: None,
+                    last_read_message_id: last_read,
+                    joined_at: None,
+                    is_muted: false,
+                });
+            }
+
+            let viewer_last_read: Option<Uuid> = sqlx::query_scalar(
+                "SELECT last_read_message_id FROM chat_reads \
+                 WHERE chat_id = $1 AND account_id = $2",
+            )
+            .bind(chat.id)
+            .bind(viewer_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            let viewer = ChatViewerContext {
+                role: None,
+                can_post: true,
+                is_muted: false,
+                last_read_message_id: viewer_last_read,
+            };
+            Ok((participants, viewer))
+        }
+        "modmail" => {
+            // Modmail participants are the opener and global moderators+.
+            let mut participants = Vec::new();
+
+            let opener_id = chat.opener_id.unwrap_or(viewer_id);
+            if let Some(opener_row) = sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
+                "SELECT username, display_name, avatar_url FROM users WHERE id = $1",
+            )
+            .bind(opener_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            {
+                let (username, display_name, avatar_url) = opener_row;
+                participants.push(ParticipantView {
+                    user_id: opener_id,
+                    username,
+                    display_name: display_name.unwrap_or_default(),
+                    avatar_url,
+                    role: Some("opener".to_string()),
+                    role_rank: Some(0),
+                    last_read_message_id: None,
+                    joined_at: None,
+                    is_muted: false,
+                });
+            }
+
+            // Add global moderators+ as participants.
+            let mod_rows: Vec<(Uuid, String, Option<String>, Option<String>)> = sqlx::query_as(
+                "SELECT id, username, display_name, avatar_url \
+                 FROM users WHERE global_role IN ('moderator','admin','owner')",
+            )
+            .fetch_all(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            for (uid, username, display_name, avatar_url) in mod_rows {
+                if uid == opener_id {
+                    continue;
+                }
+                participants.push(ParticipantView {
+                    user_id: uid,
+                    username,
+                    display_name: display_name.unwrap_or_default(),
+                    avatar_url,
+                    role: Some("moderator".to_string()),
+                    role_rank: Some(1),
+                    last_read_message_id: None,
+                    joined_at: None,
+                    is_muted: false,
+                });
+            }
+
+            let is_mod = permissions::global_role_of(pool, viewer_id)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .is_moderator();
+
+            let viewer = ChatViewerContext {
+                role: if is_mod { Some("moderator".to_string()) } else { Some("opener".to_string()) },
+                can_post: true,
+                is_muted: false,
+                last_read_message_id: None,
+            };
+
+            Ok((participants, viewer))
+        }
+        _ => {
+            // Global / clan chat: pull from clan_memberships when clan-scoped.
+            let rows: Vec<(
+                Uuid,
+                String,
+                Option<String>,
+                Option<String>,
+                String,
+                i32,
+                Option<Uuid>,
+                chrono::DateTime<chrono::Utc>,
+            )> = if let Some(clan_id) = chat.clan_id {
+                sqlx::query_as(
+                    "SELECT u.id, u.username, u.display_name, u.avatar_url, \
+                            m.clan_role, r.rank, rs.last_read_message_id, m.joined_at \
+                     FROM clan_memberships m \
+                     JOIN users u ON u.id = m.user_id \
+                     LEFT JOIN clan_roles r ON r.clan_id = m.clan_id AND r.role = m.clan_role \
+                     LEFT JOIN chat_reads rs ON rs.chat_id = $1 AND rs.user_id = u.id \
+                     WHERE m.clan_id = $2 AND m.active = TRUE \
+                     ORDER BY r.rank DESC NULLS LAST, m.joined_at",
+                )
+                .bind(chat.id)
+                .bind(clan_id)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            } else {
+                // Global chat: no participant list.
+                Vec::new()
+            };
+
+            let participants: Vec<ParticipantView> = rows
+                .into_iter()
+                .map(|(uid, username, display_name, avatar_url, role, rank, last_read, joined_at)| {
+                    ParticipantView {
+                        user_id: uid,
+                        username,
+                        display_name: display_name.unwrap_or_default(),
+                        avatar_url,
+                        role: Some(role),
+                        role_rank: Some(rank),
+                        last_read_message_id: last_read,
+                        joined_at: Some(joined_at),
+                        is_muted: false,
+                    }
+                })
+                .collect();
+
+            let (can_post, is_muted, role) = if let Some(clan_id) = chat.clan_id {
+                let effective = permissions::effective_clan_role(pool, viewer_id, clan_id)
+                    .await
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                let can_post = effective.is_some();
+                let is_muted = crate::routes::v3::utils::sanctions::has_sanction(
+                    pool,
+                    viewer_id,
+                    &crate::routes::v3::utils::sanctions::Sanction::Mute,
+                    Some(clan_id),
+                )
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                (can_post, is_muted, effective.map(|r| r.as_str().to_string()))
+            } else {
+                let is_muted = crate::routes::v3::utils::sanctions::has_sanction(
+                    pool,
+                    viewer_id,
+                    &crate::routes::v3::utils::sanctions::Sanction::Mute,
+                    None,
+                )
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                (true, is_muted, None)
+            };
+
+            let viewer_last_read: Option<Uuid> = sqlx::query_scalar(
+                "SELECT last_read_message_id FROM chat_reads \
+                 WHERE chat_id = $1 AND account_id = $2",
+            )
+            .bind(chat.id)
+            .bind(viewer_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            let viewer = ChatViewerContext {
+                role,
+                can_post,
+                is_muted,
+                last_read_message_id: viewer_last_read,
+            };
+
+            Ok((participants, viewer))
+        }
+    }
 }

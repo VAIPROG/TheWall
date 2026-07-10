@@ -1,6 +1,6 @@
 //! Config-contract tests — run offline, no server or database needed.
 //!
-//! The backend keeps a `KNOWN_ENV_KEYS` whitelist in `src/main.rs` that the
+//! The backend keeps a `KNOWN_ENV_KEYS` whitelist in `src/config.rs` that the
 //! boot-time typo detector checks env files against. These tests pin the
 //! contract from the other side: every key documented in `example.env` must
 //! be in the whitelist, so docs and detector can't silently drift apart.
@@ -15,13 +15,13 @@ fn manifest_dir() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
 }
 
-/// Extract the quoted strings of the `KNOWN_ENV_KEYS` array from main.rs.
+/// Extract the quoted strings of the `KNOWN_ENV_KEYS` array from config.rs.
 fn known_env_keys() -> Vec<String> {
-    let src = fs::read_to_string(manifest_dir().join("src/main.rs"))
-        .expect("read backend/src/main.rs");
+    let src = fs::read_to_string(manifest_dir().join("src/config.rs"))
+        .expect("read backend/src/config.rs");
     let start = src
         .find("const KNOWN_ENV_KEYS")
-        .expect("KNOWN_ENV_KEYS not found in main.rs");
+        .expect("KNOWN_ENV_KEYS not found in config.rs");
     let tail = &src[start..];
     let end = tail.find("];").expect("KNOWN_ENV_KEYS array not terminated");
     let body = &tail[..end];

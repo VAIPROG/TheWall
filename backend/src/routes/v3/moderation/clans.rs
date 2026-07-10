@@ -19,7 +19,7 @@ use crate::{
     models::{ClanTakedownRequest, ClanUnlockRequest, ClanView},
     routes::v3::{
         clans::{build_clan_view, load_clan},
-        utils::{audit, permissions::global_role_of},
+        utils::{audit, permissions},
     },
 };
 
@@ -39,20 +39,6 @@ fn field_sql_update(field: &str) -> Option<(&'static str, &'static str)> {
 }
 
 /// Moderator+ gate.
-async fn require_moderator(
-    pool: &sqlx::PgPool,
-    user_id: Uuid,
-) -> Result<(), (StatusCode, String)> {
-    let role = global_role_of(pool, user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    if role.is_moderator() {
-        Ok(())
-    } else {
-        Err((StatusCode::FORBIDDEN, "moderator required".to_string()))
-    }
-}
-
 // ---------------------------------------------------------------------------
 // POST /api/v3/moderation/clans/{clanId}/takedown
 // ---------------------------------------------------------------------------
@@ -63,7 +49,7 @@ pub async fn takedown_clan(
     Path(clan_id): Path<Uuid>,
     Json(body): Json<ClanTakedownRequest>,
 ) -> Result<Json<ClanView>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
 
     let clan = load_clan(&state.pool, clan_id)
         .await?
@@ -168,7 +154,7 @@ pub async fn unlock_clan(
     Path(clan_id): Path<Uuid>,
     Json(body): Json<ClanUnlockRequest>,
 ) -> Result<Json<ClanView>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
 
     let clan = load_clan(&state.pool, clan_id)
         .await?

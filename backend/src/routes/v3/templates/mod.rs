@@ -17,7 +17,7 @@ pub use backfill::backfill;
 pub use create::create;
 pub use delete::delete;
 pub use export::{charity, wall_dev};
-pub use render::{get_png, get_preview};
+pub use render::{get_animated, get_png, get_preview};
 pub use pin::{list_pinned, pin, unpin};
 pub use read::{get, list};
 pub use report::report_template;

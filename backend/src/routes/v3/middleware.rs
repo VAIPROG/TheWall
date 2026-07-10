@@ -4,9 +4,12 @@
 //!   1. Verifies the `Authorization: Bearer <jwt>` header if present and stores
 //!      the resulting `AuthUser` in request extensions so handlers (and the
 //!      `AuthUser` extractor) can reuse it without re-decoding the JWT.
-//!   2. If the caller is authenticated, checks whether the user is globally
+//!   2. Validates the access token against the `sessions` table (with an
+//!      in-memory TTL cache) so logout and revocation take effect immediately.
+//!   3. If the caller is authenticated, checks whether the user is globally
 //!      banned. Banned users may still reach a short allow-list of routes
-//!      (public read endpoints, auth/session management, and `/me/appeal`).
+//!      (public read endpoints, auth/session management, `/me/appeal`, and
+//!      `/me/restrictions`).
 //!
 //! Public routes that do not use `AuthUser` naturally pass through when no
 //! `Authorization` header is sent.
@@ -15,8 +18,9 @@ use axum::{
     extract::{MatchedPath, Request, State},
     http::StatusCode,
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
+use serde_json::json;
 
 use crate::{AppState, auth::AuthUser};
 
@@ -46,8 +50,9 @@ const BAN_ALLOW_LIST: &[&str] = &[
     "/api/v3/auth/session/:sessionId/logout",
     "/api/v3/auth/session/all/logout",
     "/api/v3/auth/recover",
-    // The appeal endpoint itself.
+    // The appeal endpoint and self-service restriction view.
     "/api/v3/users/me/appeal",
+    "/api/v3/users/me/restrictions",
 ];
 
 /// Returns true if the matched path is reachable by a globally banned user.
@@ -61,7 +66,75 @@ fn extract_bearer(request: &Request) -> Option<&str> {
     header.strip_prefix("Bearer ")
 }
 
-/// Main V3 middleware. Verifies auth and enforces the global ban policy.
+/// Build a structured 403 response for a banned or restricted user.
+async fn restriction_error_response(
+    pool: &sqlx::PgPool,
+    user_id: uuid::Uuid,
+) -> Result<Response, (StatusCode, String)> {
+    let row: Option<(String, Option<chrono::DateTime<chrono::Utc>>)> = sqlx::query_as(
+        r#"SELECT reason, expires_at
+             FROM restrictions
+            WHERE user_id = $1
+              AND scope = 'global'
+              AND s_ban = TRUE
+              AND removed_at IS NULL
+              AND (expires_at IS NULL OR expires_at > NOW())
+            ORDER BY applied_at DESC
+            LIMIT 1"#,
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let (reason, expires_at) = row.unwrap_or_else(|| ("account restricted".to_string(), None));
+
+    let body = json!({
+        "error": "account_restricted",
+        "message": "Your account is restricted. Please use /api/v3/users/me/restrictions to view details, /api/v3/users/me/appeal to submit an appeal, or contact platform administration.",
+        "reason": reason,
+        "expiresAt": expires_at,
+        "appealUrl": "/api/v3/users/me/appeal",
+        "restrictionsUrl": "/api/v3/users/me/restrictions",
+    });
+
+    Ok((StatusCode::FORBIDDEN, axum::Json(body)).into_response())
+}
+
+/// Verify that the access token's session is still active, using the cache
+/// with a database fallback.
+async fn validate_token_session(
+    state: &AppState,
+    claims: &crate::auth::Claims,
+) -> Result<bool, (StatusCode, String)> {
+    let session_id = match uuid::Uuid::parse_str(&claims.jti) {
+        Ok(id) => id,
+        Err(_) => return Ok(false),
+    };
+
+    // Cache lookup.
+    if let Some(cached) = state.session_cache.get(session_id, &claims.token_hash).await {
+        return Ok(cached);
+    }
+
+    // Database fallback.
+    let valid = crate::auth::validate_session(&state.pool,
+        session_id,
+        &claims.token_hash,
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    state
+        .session_cache
+        .set(session_id, claims.token_hash.clone(), valid)
+        .await;
+
+    Ok(valid)
+}
+
+/// Main V3 middleware. Verifies auth, validates the session, and enforces the
+/// global ban policy.
 pub async fn auth_and_ban_middleware(
     State(state): State<AppState>,
     matched_path: Option<MatchedPath>,
@@ -71,8 +144,12 @@ pub async fn auth_and_ban_middleware(
     // 1. Verify JWT if present and store AuthUser in extensions.
     if let Some(token) = extract_bearer(&request) {
         if let Ok(claims) = crate::auth::verify_token(token, &state.config.jwt_secret) {
-            if let Ok(user_id) = uuid::Uuid::parse_str(&claims.sub) {
-                request.extensions_mut().insert(AuthUser { user_id });
+            // Reject tokens whose session has been revoked or expired.
+            let session_valid = validate_token_session(&state, &claims).await?;
+            if session_valid {
+                if let Ok(user_id) = uuid::Uuid::parse_str(&claims.sub) {
+                    request.extensions_mut().insert(AuthUser { user_id });
+                }
             }
         }
     }
@@ -91,7 +168,7 @@ pub async fn auth_and_ban_middleware(
         if banned {
             if let Some(path) = matched_path.as_ref().map(|m| m.as_str()) {
                 if !is_ban_exempt(path) {
-                    return Err((StatusCode::FORBIDDEN, "you are banned".to_string()));
+                    return restriction_error_response(&state.pool, user.user_id).await;
                 }
             }
         }
@@ -128,6 +205,7 @@ mod tests {
         assert!(is_ban_exempt("/api/v3/auth/refresh"));
         assert!(is_ban_exempt("/api/v3/auth/session"));
         assert!(is_ban_exempt("/api/v3/users/me/appeal"));
+        assert!(is_ban_exempt("/api/v3/users/me/restrictions"));
     }
 
     #[test]

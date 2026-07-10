@@ -6,9 +6,11 @@ mod discord_commands;
 mod discord_gateway;
 mod formats;
 mod models;
+mod owner_seed;
 mod region_guard;
 mod reminder_worker;
 mod routes;
+mod session_cache;
 mod signals;
 mod sites;
 mod snapshot_worker;
@@ -32,6 +34,7 @@ pub struct AppState {
     pub pool: sqlx::PgPool,
     pub config: AppConfig,
     pub started_at: std::time::SystemTime,
+    pub session_cache: std::sync::Arc<crate::session_cache::SessionCache>,
 }
 
 // Re-export config types so the rest of the crate can keep using
@@ -47,17 +50,17 @@ fn warn_unset_config(config: &AppConfig) {
         ("TELEGRAM_BOT_TOKEN", config.oauth.telegram_bot_token.is_some(),
          "Telegram bot disabled (snapshots, DMs, admin commands)"),
         ("TELEGRAM_CLIENT_ID", config.oauth.telegram_client_id.is_some(),
-         "Telegram OAuth linking/sign-in disabled"),
+         "Telegram OAuth linking/sign-in disabled (due missing Client ID)"),
         ("TELEGRAM_CLIENT_SECRET", config.oauth.telegram_client_secret.is_some(),
-         "Telegram OAuth linking/sign-in disabled"),
+         "Telegram OAuth linking/sign-in disabled (due missing Client Secret)"),
         ("DISCORD_CLIENT_ID", config.oauth.discord_client_id.is_some(),
-         "Discord OAuth linking/sign-in disabled"),
+         "Discord OAuth linking/sign-in disabled (due missing Client ID)"),
         ("DISCORD_CLIENT_SECRET", config.oauth.discord_client_secret.is_some(),
-         "Discord OAuth linking/sign-in disabled"),
+         "Discord OAuth linking/sign-in disabled (due missing Client Secret)"),
         ("GITHUB_CLIENT_ID", config.oauth.github_client_id.is_some(),
-         "GitHub OAuth linking/sign-in disabled"),
+         "GitHub OAuth linking/sign-in disabled (due missing Client ID)"),
         ("GITHUB_CLIENT_SECRET", config.oauth.github_client_secret.is_some(),
-         "GitHub OAuth linking/sign-in disabled"),
+         "GitHub OAuth linking/sign-in disabled (due missing Client Secret)"),
         ("DISCORD_BOT_TOKEN", config.oauth.discord_bot_token.is_some(),
          "Discord bot disabled (gateway presence, DMs, slash registration)"),
         ("DISCORD_APPLICATION_ID", config.oauth.discord_application_id.is_some(),
@@ -112,6 +115,9 @@ async fn main() {
         .await
         .expect("Failed to run database migrations");
 
+    // Seed the first owner from env if the DB is empty and WALL_OWNER_SEED is set.
+    owner_seed::seed_owner_if_needed(&pool, &config).await;
+
     // Loud config audit: name every optional feature that's off and why.
     warn_unset_config(&config);
 
@@ -132,6 +138,7 @@ async fn main() {
         pool,
         config,
         started_at: std::time::SystemTime::now(),
+        session_cache: std::sync::Arc::new(crate::session_cache::SessionCache::new()),
     };
 
     // Discord gateway: keeps the bot's presence Online and serves slash
@@ -140,7 +147,7 @@ async fn main() {
 
     // CORS is handled by nginx — don't add a CorsLayer here or headers will duplicate.
 
-    let app = Router::new()
+    let legacy_api = Router::new()
         // * ════════════════════════ V1 (frozen API) ════════════════════════
         // * No behavioural changes here — the extension's legacy paths and any
         // * third-party consumers depend on these exact shapes. New features
@@ -205,6 +212,9 @@ async fn main() {
         .route("/api/chat/relay", post(routes::chat::relay))
         .route("/api/i18n/{lang}", get(routes::i18n::get_lang))
         .route("/api/meta", get(routes::meta::get_meta))
+        .route("/api/v3/meta", get(routes::meta::get_meta))
+        .route("/api/v3/health", get(routes::meta::health_check))
+        .route("/api/v3/who-is-the-dev", get(routes::who::who_is_the_dev))
         // --- admin (global admin/owner only) ---------------------------------
         .route("/api/admin/users", get(routes::admin::list_users))
         .route("/api/admin/users/{id}/role", put(routes::admin::set_role))
@@ -554,6 +564,9 @@ async fn main() {
             "/api/v2/admin/config/{key}",
             put(routes::v2::admin_config::update_config),
         )
+    ;
+
+    let v3_api = Router::new()
         /* ════════════════════════════ V3 API ══════════════════════════════
          * Split identity model: users = Account, site_identities + provider_links
          * hold per-platform connections. */
@@ -629,6 +642,10 @@ async fn main() {
             get(routes::v3::templates::get_preview),
         )
         .route(
+            "/api/v3/templates/{id}/animated",
+            get(routes::v3::templates::get_animated),
+        )
+        .route(
             "/api/v3/admin/templates/backfill-documents",
             post(routes::v3::templates::backfill),
         )
@@ -639,7 +656,7 @@ async fn main() {
         // but explicit ordering avoids any ambiguity.
         .route(
             "/api/v3/chats/global",
-            get(routes::v3::chats::get_global_chat),
+            get(routes::v3::chats::get_chat_detail),
         )
         // Literal sub-paths under /global come before the param-segment /{id}.
         .route(
@@ -652,7 +669,7 @@ async fn main() {
         )
         .route(
             "/api/v3/chats/{id}",
-            get(routes::v3::chats::get_chat),
+            get(routes::v3::chats::get_chat_detail),
         )
         .route(
             "/api/v3/chats/{id}/messages",
@@ -660,7 +677,7 @@ async fn main() {
         )
         .route(
             "/api/v3/chats/{cid}/messages/{mid}",
-            get(routes::v3::chats::get_message)
+            get(routes::v3::chats::list_messages)
                 .patch(routes::v3::chats::edit_message)
                 .delete(routes::v3::chats::delete_message),
         )
@@ -855,6 +872,46 @@ async fn main() {
             "/api/v3/users/{user_ref}/restrictions",
             get(routes::v3::moderation::user_restrictions),
         )
+        // --- V3 feed: unified snapshots, signals, announcements ----------
+        .route("/api/v3/feed", get(routes::v3::feed::list))
+        .route("/api/v3/feed/{id}", get(routes::v3::feed::get_one))
+        .route("/api/v3/feed/{id}/notes", get(routes::v3::feed::list_notes))
+        .route("/api/v3/admin/feed", post(routes::v3::feed::create))
+        .route("/api/v3/admin/feed/{id}/notes", post(routes::v3::feed::upsert_note))
+        .route("/api/v3/admin/feed/{id}/notes/{lang}", delete(routes::v3::feed::delete_note))
+        // --- V3 achievements --------------------------------------------------
+        .route(
+            "/api/v3/users/me/achievements",
+            get(routes::v3::achievements::list_my_achievements),
+        )
+        .route(
+            "/api/v3/users/me/achievements/recheck",
+            post(routes::v3::achievements::recheck_my_achievements),
+        )
+        .route(
+            "/api/v3/users/me/achievements/event",
+            post(routes::v3::achievements::record_event),
+        )
+        .route(
+            "/api/v3/users/{user_ref}/achievements",
+            get(routes::v3::achievements::list_user_achievements),
+        )
+        .route(
+            "/api/v3/admin/achievements/catalog",
+            get(routes::v3::achievements::admin_catalog),
+        )
+        .route(
+            "/api/v3/admin/achievements/grants",
+            get(routes::v3::achievements::admin_grants),
+        )
+        .route(
+            "/api/v3/admin/achievements/{id}/grant",
+            post(routes::v3::achievements::admin_grant),
+        )
+        .route(
+            "/api/v3/admin/achievements/{id}/revoke/{user_id}",
+            delete(routes::v3::achievements::admin_revoke),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             routes::v3::middleware::auth_and_ban_middleware,
@@ -863,6 +920,17 @@ async fn main() {
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .with_state(state.clone());
+
+    let legacy_api = legacy_api
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            routes::v3::deprecation::v1_v2_deprecation_middleware,
+        ))
+        .with_state(state.clone());
+
+    let app = Router::new()
+        .merge(legacy_api)
+        .merge(v3_api);
 
     let addr = format!("0.0.0.0:{}", state.config.port);
     let listener = tokio::net::TcpListener::bind(&addr)

@@ -63,9 +63,6 @@ pub async fn create(
         }
     };
 
-    // VAI is always the global owner regardless of DB state — the extension
-    // author gets god mode for the purpose of template approvals.
-    let is_vai = username.trim().eq_ignore_ascii_case("vai");
     let is_global_admin = matches!(global_role.as_str(), "owner" | "admin")
         || matches!(legacy_role.as_str(), "owner" | "admin");
 
@@ -104,11 +101,11 @@ pub async fn create(
     };
 
     // Approval matrix:
-    //   VAI or global admin/owner → approved (any scope)
-    //   scope='clan' & clan mod    → approved
-    //   otherwise                  → pending (public goes to review queue;
-    //                                clan-scope just sits in pending too)
-    let status: &str = if is_vai || is_global_admin {
+    //   global admin/owner → approved (any scope)
+    //   scope='clan' & clan mod → approved
+    //   otherwise → pending (public goes to review queue;
+    //              clan-scope just sits in pending too)
+    let status: &str = if is_global_admin {
         "approved"
     } else if body.scope == "clan" && is_clan_mod {
         "approved"

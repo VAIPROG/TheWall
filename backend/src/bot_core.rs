@@ -61,10 +61,12 @@ pub async fn status_data(pool: &PgPool) -> StatusData {
             "SELECT COUNT(*) FROM protected_regions WHERE enabled AND NOT last_ok",
         )
         .await,
-        last_snapshot: sqlx::query_scalar("SELECT MAX(created_at) FROM wall_snapshots")
-            .fetch_one(pool)
-            .await
-            .unwrap_or(None),
+        last_snapshot: sqlx::query_scalar(
+            "SELECT MAX(occurred_at) FROM feed_events WHERE event_type = 'snapshot'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(None),
     }
 }
 
@@ -81,23 +83,44 @@ pub async fn user_count_data(pool: &PgPool) -> UserCountData {
 }
 
 pub async fn latest_snapshot(pool: &PgPool) -> Vec<SnapshotLink> {
-    let rows: Vec<(String, Option<String>, Option<String>, chrono::DateTime<chrono::Utc>)> =
-        sqlx::query_as(
-            r#"SELECT size, discord_url, telegram_url, created_at
-                 FROM wall_snapshots
-                WHERE batch_id = (SELECT batch_id FROM wall_snapshots ORDER BY created_at DESC LIMIT 1)
-                ORDER BY size"#,
-        )
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-    rows.into_iter()
-        .map(|(size, discord, telegram, at)| SnapshotLink {
-            size,
-            url: telegram.or(discord),
-            at,
-        })
-        .collect()
+    let row: Option<(serde_json::Value, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
+        r#"SELECT payload, occurred_at
+             FROM feed_events
+            WHERE event_type = 'snapshot'
+            ORDER BY occurred_at DESC
+            LIMIT 1"#,
+    )
+    .fetch_optional(pool)
+    .await
+    .unwrap_or_default();
+
+    let Some((payload, at)) = row else {
+        return Vec::new();
+    };
+
+    let sizes = payload.get("sizes").and_then(|v| v.as_object()).cloned().unwrap_or_default();
+    let order = ["small", "medium", "large"];
+    let mut out = Vec::new();
+    for size in order {
+        if let Some(obj) = sizes.get(size).and_then(|v| v.as_object()) {
+            let url = obj
+                .get("telegramUrl")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .or_else(|| {
+                    obj.get("discordUrl")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                })
+                .map(String::from);
+            out.push(SnapshotLink {
+                size: size.to_string(),
+                url,
+                at,
+            });
+        }
+    }
+    out
 }
 
 pub async fn recent_events(pool: &PgPool, n: i64) -> Vec<EventRow> {

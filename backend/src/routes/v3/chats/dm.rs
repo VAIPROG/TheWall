@@ -11,20 +11,13 @@ use axum::{
 use crate::{
     AppState,
     auth::AuthUser,
-    models::{ChatDetailView, MessageJoinRow, MessageView, SendMessageReq},
-    routes::v3::utils::sanctions,
+    models::{ChatDetailView, MessageView, SendMessageReq},
+    routes::v3::utils::{chat_messages, sanctions, users::resolve_user_ref},
 };
 
 use super::detail::build_detail;
 use super::reactions::attach_reactions_one;
-use super::resolve::{dm_chat_id, load_chat, resolve_user_ref};
-
-const MSG_COLS: &str = r#"
-    m.id, m.chat_id, m.author_id, m.content, m.reply_to_id,
-    m.edited_at, m.edit_count, m.deleted_at, m.deleted_by,
-    m.is_system, m.version, m.created_at,
-    u.username AS author_username
-"#;
+use super::resolve::{dm_chat_id, load_chat};
 
 // ---------------------------------------------------------------------------
 // GET /api/v3/dm/{user_ref}
@@ -35,9 +28,7 @@ pub async fn get_dm_thread(
     State(state): State<AppState>,
     Path(user_ref): Path<String>,
 ) -> Result<Json<ChatDetailView>, (StatusCode, String)> {
-    let peer = resolve_user_ref(&state.pool, &user_ref)
-        .await?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
+    let peer = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     if peer == auth.user_id {
         return Err((StatusCode::BAD_REQUEST, "cannot DM yourself".to_string()));
@@ -62,9 +53,7 @@ pub async fn send_dm(
     Path(user_ref): Path<String>,
     Json(body): Json<SendMessageReq>,
 ) -> Result<(StatusCode, Json<MessageView>), (StatusCode, String)> {
-    let peer = resolve_user_ref(&state.pool, &user_ref)
-        .await?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
+    let peer = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     if peer == auth.user_id {
         return Err((StatusCode::BAD_REQUEST, "cannot DM yourself".to_string()));
@@ -80,52 +69,24 @@ pub async fn send_dm(
     )
     .await?;
 
-    let content = body.content.trim().to_string();
-    if content.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "content cannot be empty".to_string()));
-    }
-    if content.len() > 4000 {
-        return Err((StatusCode::PAYLOAD_TOO_LARGE, "content exceeds 4000 chars".to_string()));
-    }
+    let content = chat_messages::validate_message_content(
+        &body.content,
+        state.config.limits.message_chars,
+    )?;
 
-    // Validate reply_to belongs to the same chat.
     if let Some(reply_id) = body.reply_to_id {
-        let exists: Option<bool> = sqlx::query_scalar(
-            "SELECT TRUE FROM messages WHERE id = $1 AND chat_id = $2",
-        )
-        .bind(reply_id)
-        .bind(chat_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        if exists.is_none() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "reply_to_id does not exist in this chat".to_string(),
-            ));
-        }
+        chat_messages::ensure_reply_in_chat(&state.pool, reply_id, chat_id).await?;
     }
 
-    let row = sqlx::query_as::<_, MessageJoinRow>(&format!(
-        "WITH inserted AS ( \
-             INSERT INTO messages (id, chat_id, author_id, content, reply_to_id) \
-             VALUES (gen_random_uuid(), $1, $2, $3, $4) \
-             RETURNING id, chat_id, author_id, content, reply_to_id, \
-                       edited_at, edit_count, deleted_at, deleted_by, \
-                       is_system, version, created_at \
-         ) \
-         SELECT {MSG_COLS} \
-         FROM messages m \
-         LEFT JOIN users u ON u.id = m.author_id \
-         WHERE m.id = (SELECT id FROM inserted)"
-    ))
-    .bind(chat_id)
-    .bind(auth.user_id)
-    .bind(&content)
-    .bind(body.reply_to_id)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let row = chat_messages::insert_message(
+        &state.pool,
+        chat_id,
+        Some(auth.user_id),
+        &content,
+        body.reply_to_id,
+        false,
+    )
+    .await?;
 
     let mut view = row.into_view();
     attach_reactions_one(&state.pool, auth.user_id, &mut view).await?;

@@ -1,4 +1,9 @@
 //! Read-side endpoints for the mirrored signals + persisted snapshot URLs.
+//!
+//! NOTE: this module is legacy V2. The underlying `wall_snapshots` table has
+//! been replaced by the unified `feed_events` table. These endpoints project
+//! rows with `event_type = 'snapshot'` back into the original V2 shape so
+//! existing clients keep working.
 
 use axum::{
     Json,
@@ -18,8 +23,8 @@ pub struct SnapshotQuery {
     pub size: Option<String>,
     /// Number of distinct *snapshots* the caller wants. Defaults to 20.
     /// Internally, when no `size` filter is provided we multiply the SQL
-    /// LIMIT by SIZES_PER_BATCH so each requested snapshot still arrives
-    /// with all three sizes attached — see the bug-fix note below.
+    /// LIMIT so each requested snapshot still arrives with all three sizes
+    /// attached — see the bug-fix note below.
     pub limit: Option<i64>,
 }
 
@@ -38,10 +43,6 @@ pub struct SnapshotRow {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// Each snapshot batch inserts one row per size (small / medium / large), so
-/// "N batches" corresponds to roughly `N * SIZES_PER_BATCH` rows. Used to
-/// fix the limit-mismatch bug where `?limit=30` previously returned 10
-/// snapshot batches (30 rows ÷ 3 sizes).
 const SIZES_PER_BATCH: i64 = 3;
 
 pub async fn list_snapshots(
@@ -49,29 +50,55 @@ pub async fn list_snapshots(
     Query(q): Query<SnapshotQuery>,
 ) -> Result<Json<Vec<SnapshotRow>>, (StatusCode, String)> {
     let requested = q.limit.unwrap_or(20).clamp(1, 100);
-    // Bug fix: when no size filter is set, the caller is asking for N
-    // *snapshots* (each carrying S/M/L), not N rows. Multiply the SQL LIMIT
-    // by SIZES_PER_BATCH so the caller actually gets ~N batches' worth of
-    // rows. When a size filter IS set, one row = one snapshot, so the
-    // original limit applies directly.
     let sql_limit = if q.size.is_some() {
         requested
     } else {
         requested.saturating_mul(SIZES_PER_BATCH).min(500)
     };
-    let rows = sqlx::query_as::<_, SnapshotRow>(
-        r#"SELECT id, size, bytes, width, height,
-                  discord_url, telegram_url,
-                  batch_id, created_at
-             FROM wall_snapshots
-            WHERE ($1::text IS NULL OR size = $1)
-            ORDER BY created_at DESC
-            LIMIT $2"#,
-    )
-    .bind(q.size.as_deref())
-    .bind(sql_limit)
-    .fetch_all(&state.pool)
-    .await
+
+    let rows = if let Some(size) = q.size.as_deref() {
+        sqlx::query_as::<_, SnapshotRow>(
+            r#"SELECT e.id,
+                      $1::text AS size,
+                      (e.payload->'sizes'->$1->>'bytes')::bigint AS bytes,
+                      (e.payload->'sizes'->$1->>'width')::int AS width,
+                      (e.payload->'sizes'->$1->>'height')::int AS height,
+                      e.payload->'sizes'->$1->>'discordUrl' AS discord_url,
+                      e.payload->'sizes'->$1->>'telegramUrl' AS telegram_url,
+                      (e.payload->>'batchId')::uuid AS batch_id,
+                      e.occurred_at AS created_at
+                 FROM feed_events e
+                WHERE e.event_type = 'snapshot'
+                  AND e.payload->'sizes' ? $1
+                ORDER BY e.occurred_at DESC
+                LIMIT $2"#,
+        )
+        .bind(size)
+        .bind(sql_limit)
+        .fetch_all(&state.pool)
+        .await
+    } else {
+        sqlx::query_as::<_, SnapshotRow>(
+            r#"SELECT (e.payload->'sizes'->k->>'id')::uuid AS id,
+                      k AS size,
+                      (e.payload->'sizes'->k->>'bytes')::bigint AS bytes,
+                      (e.payload->'sizes'->k->>'width')::int AS width,
+                      (e.payload->'sizes'->k->>'height')::int AS height,
+                      e.payload->'sizes'->k->>'discordUrl' AS discord_url,
+                      e.payload->'sizes'->k->>'telegramUrl' AS telegram_url,
+                      (e.payload->>'batchId')::uuid AS batch_id,
+                      e.occurred_at AS created_at
+                 FROM feed_events e,
+                      jsonb_object_keys(e.payload->'sizes') k
+                WHERE e.event_type = 'snapshot'
+                ORDER BY e.occurred_at DESC, k
+                LIMIT $1"#,
+        )
+        .bind(sql_limit)
+        .fetch_all(&state.pool)
+        .await
+    }
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     Ok(Json(rows))
 }

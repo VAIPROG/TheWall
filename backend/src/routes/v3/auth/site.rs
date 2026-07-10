@@ -99,23 +99,13 @@ pub async fn site(
             }
             None => {
                 // CREATE: upsert the Account (users) for this site identity, then
-                // attach the site_identity. The vai easter egg keeps the author
-                // a global owner; comparison is case-insensitive.
-                let legacy_role = if site_username.eq_ignore_ascii_case("vai") {
-                    "admin"
-                } else {
-                    "member"
-                };
+                // attach the site_identity.
                 let new_user = sqlx::query_as::<_, User>(
                     r#"
                     INSERT INTO users (id, source, external_id, username, role, global_role, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, $5,
-                            CASE WHEN LOWER($4) = 'vai' THEN 'owner' ELSE 'member' END,
-                            now(), now())
+                    VALUES ($1, $2, $3, $4, 'member', 'member', now(), now())
                     ON CONFLICT (source, external_id) DO UPDATE
                         SET username    = EXCLUDED.username,
-                            role        = CASE WHEN LOWER(EXCLUDED.username) = 'vai' THEN 'admin' ELSE users.role END,
-                            global_role = CASE WHEN LOWER(EXCLUDED.username) = 'vai' THEN 'owner' ELSE users.global_role END,
                             updated_at  = now()
                     RETURNING *
                     "#,
@@ -124,7 +114,6 @@ pub async fn site(
                 .bind(src)
                 .bind(&external_id)
                 .bind(&site_username)
-                .bind(legacy_role)
                 .fetch_one(&state.pool)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -151,7 +140,7 @@ pub async fn site(
     // NOTE: best-effort clan sync (verified.clan) is deferred to a later slice.
 
     // 6. Issue the session pair.
-    let (access, refresh) = issue_session_pair(&state.pool, &state.config.jwt_secret, account_id)
+    let (access, refresh, _session_id) = issue_session_pair(&state.pool, &state.config.jwt_secret, account_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

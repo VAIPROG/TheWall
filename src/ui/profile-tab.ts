@@ -5,7 +5,18 @@ import { toast } from "../notify";
 import { confirmDlg, errorDlg } from "../dialog";
 import { log } from "../log";
 import { cfg } from "../config";
-import { Backend, getMe } from "../backend";
+import { getActiveClient, api, getMe } from "../backend/index";
+
+// Profile edit + pin management still use the V2 root surface (rich profile
+// shape). TODO(phase3): move to /api/v3/users/me + /api/v3/templates.
+function ptReq<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  const client = getActiveClient();
+  if (!client) return Promise.reject(new Error("backend offline"));
+  return client.req<T>({ method, path, body, root: true });
+}
+function ptRoot(): string {
+  return getActiveClient()?.rootUrl ?? "";
+}
 import { markAllRead, syncProfile, resetAvatar } from "../data";
 import { importShare } from "../share";
 import { openCursorShop } from "../open-cursor-shop";
@@ -291,7 +302,7 @@ export function wireProfile(_win: HTMLElement): void {
     const bio = ($("profile-bio") as HTMLTextAreaElement)?.value || "";
     const social_links = (window as any).__wallSocialLinks || [];
     try {
-      await Backend.req("PUT", "/v2/me/profile", { bio, social_links });
+      await ptReq("PUT", "/v2/me/profile", { bio, social_links });
       toast("Profile", "saved");
       syncProfile();
     } catch (e: any) {
@@ -315,7 +326,7 @@ export function wireProfile(_win: HTMLElement): void {
         pinBox.innerHTML = pins
           .map(
             (tp: any) =>
-              `<div style="text-align:center"><img src="${Backend.base}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" style="width:48px;height:48px;border:1px solid #888;cursor:pointer;image-rendering:pixelated" data-load-tpl="${(tp.share || "").replace(/"/g, "&quot;")}" data-unpin="${tp.id}" title="${(tp.name || "").replace(/[<>"]/g, "")}"><br><span class="sub" style="font-size:10px">${(tp.name || "").slice(0, 12)}</span></div>`,
+              `<div style="text-align:center"><img src="${ptRoot()}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" style="width:48px;height:48px;border:1px solid #888;cursor:pointer;image-rendering:pixelated" data-load-tpl="${(tp.share || "").replace(/"/g, "&quot;")}" data-unpin="${tp.id}" title="${(tp.name || "").replace(/[<>"]/g, "")}"><br><span class="sub" style="font-size:10px">${(tp.name || "").slice(0, 12)}</span></div>`,
           )
           .join("");
         pinBox.querySelectorAll("[data-load-tpl]").forEach((b) => {
@@ -325,7 +336,7 @@ export function wireProfile(_win: HTMLElement): void {
               if (id) {
                 confirmDlg("Unpin this template?", "Confirm").then((ok) => {
                   if (ok)
-                    Backend.req("DELETE", `/v2/templates/${id}/pin`)
+                    ptReq("DELETE", `/v2/templates/${id}/pin`)
                       .then(() => syncProfile())
                       .catch(() => {});
                 });
@@ -343,7 +354,8 @@ export function wireProfile(_win: HTMLElement): void {
   $("avatar-upload")!.addEventListener("change", (e: Event) => {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (!f) return;
-    if (!Backend.on) {
+    const client = getActiveClient();
+    if (!client?.on) {
       errorDlg("Connect to VAI-PROG backend first (Settings)");
       (e.target as HTMLInputElement).value = "";
       return;
@@ -351,7 +363,7 @@ export function wireProfile(_win: HTMLElement): void {
     const rd = new FileReader();
     rd.onload = async (ev) => {
       try {
-        await Backend.setAvatar((ev.target as FileReader).result as string);
+        await api(client).users.setAvatar((ev.target as FileReader).result as string);
         toast(t("customAvatar"), "uploaded");
         syncProfile();
       } catch (err: any) {

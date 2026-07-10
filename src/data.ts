@@ -6,7 +6,7 @@ import { t, setRemoteDict } from "./i18n";
 import { log } from "./log";
 import { notify, toast } from "./notify";
 import { siteApi } from "./site-api";
-import { Backend, getMe, setMe, BackendUser } from "./backend";
+import { getMe, setMe, getActiveClient, api } from "./backend/index";
 import { overlayData } from "./overlay";
 import { replaceEmotes } from "./emoji";
 import { renderMentions } from "./mentions";
@@ -17,6 +17,93 @@ import { ANNOUNCEMENT_POLL_MS, CACHE_TTL_TEMPLATES_MS } from "./constants";
 import { applyCursorMode } from "./cursors";
 import { importShare } from "./share";
 import { updateAdminVisibility } from "./ui/admin-ui";
+
+export interface SiteProfile {
+  username: string;
+  id: string | number;
+  discord_id?: string;
+  discord_username?: string;
+  role?: string;
+  clan_role?: string;
+  cursor_id?: string;
+  preferred_lang?: string;
+  has_custom_avatar?: boolean;
+  unread_notifications?: Array<{ id?: string; title: string; body?: string }>;
+  country_code?: string;
+  clan?: {
+    id?: string;
+    name?: string;
+    display_name?: string;
+    discord_id?: string;
+    icon?: string;
+    stat_pixels_changed?: number;
+    stat_member_count?: number;
+    stat_paint_visible?: number;
+    approx_discord_members?: number;
+  };
+}
+
+export interface DiscordGuild {
+  id: string;
+  name: string;
+  icon?: string;
+  owner?: boolean;
+  approximate_member_count?: number;
+}
+
+export interface ClanMember {
+  id: string;
+  username: string;
+  discord_id?: string;
+  role?: string;
+  clan_role?: string;
+  cursor_id?: string;
+  has_custom_avatar?: boolean;
+}
+
+export interface ClanChatMessage {
+  id?: string;
+  author: string;
+  authorName?: string;
+  text: string;
+  body?: string;
+  created_at?: string;
+}
+
+export interface MailboxItem {
+  id?: string;
+  uid?: string;
+  title?: string;
+  author?: string;
+  authorName?: string;
+  text?: string;
+  body?: string;
+  created_at?: string;
+  read?: boolean;
+  kind?: string;
+}
+
+export function asClanChatMessages(items: unknown[]): ClanChatMessage[] {
+  return items.map((m) => m as ClanChatMessage);
+}
+
+export function asMailboxItems(items: unknown[]): MailboxItem[] {
+  return items.map((m) => m as MailboxItem);
+}
+
+export interface LegacyTemplate {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  scale?: number;
+  author?: string;
+  status?: "pending" | "approved";
+  share: string;
+  user_id?: string | number;
+}
+
+export type AnimScope = "public" | "clan" | "private";
 
 function roleBadge(role: string | undefined): string {
   const r = String(role || "member").toLowerCase();
@@ -30,7 +117,7 @@ function roleBadge(role: string | undefined): string {
   return `<span class="wp-badge member">${esc(role || "member")}</span>`;
 }
 
-function displayRole(prof: any): string {
+function displayRole(prof: SiteProfile | null): string {
   if (prof && prof.username && String(prof.username).toLowerCase() === "vai")
     return "Just a Dev";
   const me = getMe();
@@ -38,7 +125,7 @@ function displayRole(prof: any): string {
   return (prof && prof.role) || "member";
 }
 
-export function canModerate(prof?: any): boolean {
+export function canModerate(prof?: SiteProfile | null): boolean {
   if (prof && String(prof.username || "").toLowerCase() === "vai") return true;
   const me = getMe();
   const r = String(
@@ -56,7 +143,7 @@ function timeAgo(iso: string): string {
 }
 
 export async function syncProfile(): Promise<void> {
-  const prof = await siteApi("me");
+  const prof = (await siteApi("me")) as SiteProfile | null;
   const card = $("profile-card");
   const status = $("wp-status");
   const bar = $("wp-drag");
@@ -70,8 +157,9 @@ export async function syncProfile(): Promise<void> {
   const role = displayRole(prof);
   if (card) {
     const discordTag = prof.discord_username ? `@${esc(prof.discord_username)}` : (prof.discord_id ? `discord #${esc(prof.discord_id)}` : "");
+    const client = getActiveClient();
     card.innerHTML = `<div class="wp-card">
-      ${avImg(avatarSrcs(prof.id, prof.discord_id, Backend.base, !!(getMe() && getMe()!.has_custom_avatar)))}
+      ${avImg(avatarSrcs(prof.id, prof.discord_id, client?.url ?? "", !!(getMe() && getMe()!.has_custom_avatar)))}
       <div style="flex:1">
         <div class="nm">${esc(prof.username)} <span class="sub">#${prof.id}</span>${roleBadge(role)}</div>
         <div class="sub">wall: <b>${esc(prof.username)}</b>${discordTag ? ` · discord: <b>${discordTag}</b>` : ""}</div>
@@ -84,7 +172,7 @@ export async function syncProfile(): Promise<void> {
   const clanCard = $("clan-card");
   if (clanCard) {
     if (prof.clan) {
-      const icon = guildIcon(prof.clan.discord_id, prof.clan.icon);
+      const icon = guildIcon(prof.clan.discord_id || "", prof.clan.icon);
       clanCard.innerHTML = `<div class="wp-card">
         ${icon ? `<img src="${icon}">` : '<div class="ph"></div>'}
         <div><div class="nm">${esc(prof.clan.display_name || prof.clan.name)}</div>
@@ -107,17 +195,18 @@ export async function syncProfile(): Promise<void> {
     (window as any).__wallClanId = prof.clan.id;
   }
 
+  const client = getActiveClient();
   // Fetch the v2-rich profile (bio, social_links, pinned_templates, etc.)
   // and dispatch so the Profile pane wire-up can refresh.
-  if (Backend.on) {
-    Backend.req("GET", "/v2/auth/me").then((v2) => {
+  if (client?.on) {
+    client.get("/v2/auth/me").then((v2) => {
       document.dispatchEvent(new CustomEvent("wd:profile-loaded", { detail: v2 }));
     }).catch(() => {});
   }
 }
 
 export async function loadGuilds(): Promise<void> {
-  const guilds = await siteApi("discordGuilds");
+  const guilds = (await siteApi("discordGuilds")) as DiscordGuild[] | null;
   const box = $("social-guilds");
   if (!box) return;
   if (!Array.isArray(guilds)) {
@@ -125,8 +214,8 @@ export async function loadGuilds(): Promise<void> {
     return;
   }
   box.innerHTML = guilds
-    .sort((a: any, b: any) => (b.approximate_member_count || 0) - (a.approximate_member_count || 0))
-    .map((g: any) => {
+    .sort((a, b) => (b.approximate_member_count || 0) - (a.approximate_member_count || 0))
+    .map((g) => {
       const ic2 = guildIcon(g.id, g.icon);
       return `<div class="wp-li">${ic2 ? `<img src="${ic2}">` : '<div class="ph"></div>'}
         <div><b>${esc(g.name)}</b><br><span class="sub">${(g.approximate_member_count || 0).toLocaleString()} ${t("members").toLowerCase()}${g.owner ? " · crown" : ""}</span></div></div>`;
@@ -137,13 +226,17 @@ export async function loadGuilds(): Promise<void> {
 
 export async function loadRoster(): Promise<void> {
   const box = $("clan-roster");
-  if (!box || !Backend.on) return;
+  const client = getActiveClient();
+  if (!box || !client?.on) return;
   try {
-    const ms = await Backend.clanMembers();
+    const ms = await api(client).mailbox.clanMembers();
     box.innerHTML =
       (ms || [])
-        .map((m: any) => `<div class="wp-li">${avImg(avatarSrcs(m.id, m.discord_id, Backend.base, !!m.has_custom_avatar), "")}
-          <div><b>${esc(m.username)}</b> ${roleBadge(m.clan_role || m.role)}<br><span class="sub">cursor ${esc(m.cursor_id || "?")}</span></div></div>`)
+        .map((m) => {
+          const member = m as ClanMember;
+          return `<div class="wp-li">${avImg(avatarSrcs(member.id, member.discord_id, client.url, !!member.has_custom_avatar), "")}
+          <div><b>${esc(member.username)}</b> ${roleBadge(member.clan_role || member.role)}<br><span class="sub">cursor ${esc(member.cursor_id || "?")}</span></div></div>`;
+        })
         .join("") ||
       `<div style="padding:6px;color:var(--sub)">— empty —</div>`;
     wireAvatars(box);
@@ -152,7 +245,36 @@ export async function loadRoster(): Promise<void> {
   }
 }
 
-let knownNotifs: any[] = [];
+function renderNotifications(list: Array<Partial<MailboxItem> & { title: string }>): void {
+  knownNotifs = list || [];
+  const box = $("notif-list");
+  if (!box) {
+    // Still update the seen set so we don't re-notify if the panel is closed.
+    knownNotifs.forEach((n) => notifiedIds.add(String(n.id ?? n.title)));
+    persistSeen();
+    return;
+  }
+  if (!knownNotifs.length) {
+    box.innerHTML = `<div style="padding:6px;color:var(--sub)">— no unread —</div>`;
+    return;
+  }
+  box.innerHTML = knownNotifs
+    .map((n) => `<div class="wp-li"><div style="flex:none">${ic("bell", 18)}</div>
+      <div><b>${esc(n.title)}</b><br><span class="sub">${esc(n.body || "")}</span></div></div>`)
+    .join("");
+  // Notify only items we haven't seen this session (or previous sessions).
+  let newCount = 0;
+  knownNotifs.forEach((n) => {
+    const key = String(n.id ?? n.title);
+    if (notifiedIds.has(key)) return;
+    notifiedIds.add(key);
+    notify(n.title, n.body || "");
+    newCount++;
+  });
+  if (newCount) persistSeen();
+}
+
+let knownNotifs: Array<Partial<MailboxItem> & { title: string }> = [];
 
 const notifiedIds = new Set<string>();
 const SEEN_KEY = "walldev_notif_seen";
@@ -167,39 +289,11 @@ function persistSeen(): void {
   localStorage.setItem(SEEN_KEY, JSON.stringify(arr));
 }
 
-function renderNotifications(list: any[]): void {
-  knownNotifs = list || [];
-  const box = $("notif-list");
-  if (!box) {
-    // Still update the seen set so we don't re-notify if the panel is closed.
-    knownNotifs.forEach((n: any) => notifiedIds.add(String(n.id ?? n.title)));
-    persistSeen();
-    return;
-  }
-  if (!knownNotifs.length) {
-    box.innerHTML = `<div style="padding:6px;color:var(--sub)">— no unread —</div>`;
-    return;
-  }
-  box.innerHTML = knownNotifs
-    .map((n: any) => `<div class="wp-li"><div style="flex:none">${ic("bell", 18)}</div>
-      <div><b>${esc(n.title)}</b><br><span class="sub">${esc(n.body || "")}</span></div></div>`)
-    .join("");
-  // Notify only items we haven't seen this session (or previous sessions).
-  let newCount = 0;
-  knownNotifs.forEach((n: any) => {
-    const key = String(n.id ?? n.title);
-    if (notifiedIds.has(key)) return;
-    notifiedIds.add(key);
-    notify(n.title, n.body || "");
-    newCount++;
-  });
-  if (newCount) persistSeen();
-}
-
 export async function refreshNotifications(): Promise<void> {
-  if (Backend.on) {
+  const client = getActiveClient();
+  if (client?.on) {
     try {
-      const ext = await Backend.notifications();
+      const ext = await api(client).notifications.list();
       if (Array.isArray(ext) && ext.length)
         renderNotifications([...(knownNotifs || []), ...ext]);
     } catch {}
@@ -207,19 +301,22 @@ export async function refreshNotifications(): Promise<void> {
 }
 
 export function markAllRead(): void {
-  const ids = knownNotifs.map((n: any) => n.id);
+  const ids = knownNotifs.map((n) => n.id).filter((id): id is string => !!id);
   renderNotifications([]);
-  if (Backend.on) Backend.ackNotifications(ids).catch(() => {});
+  const client = getActiveClient();
+  if (client?.on) api(client).notifications.ack(ids).catch(() => {});
   toast(t("notifs"), "cleared");
 }
 
 export async function backendConnect(): Promise<void> {
   cfg.backendUrl = (($("cfg-backend-url") as HTMLInputElement)?.value || "").trim() || cfg.backendUrl;
   saveCfg();
+  const client = getActiveClient();
+  if (!client) return;
   if (cfg.backendToken) {
     cfg.backendToken = "";
     cfg.refreshToken = "";
-    setMe(null);
+    setMe(undefined);
     saveCfg();
     const btn = $("btn-backend-connect");
     if (btn) btn.textContent = t("connect");
@@ -228,8 +325,9 @@ export async function backendConnect(): Promise<void> {
   }
   if (!cfg.backendUrl) { await errorDlg("Set backend URL first"); return; }
   try {
-    await Backend.login();
-    try { setMe(await Backend.me()); } catch {}
+    const a = api(client);
+    await a.auth.loginWithSiteToken("filianislost", "");
+    try { setMe(await a.auth.me()); } catch {}
     const btn = $("btn-backend-connect");
     if (btn) btn.textContent = t("disconnect");
     toast(t("backend"), "connected");
@@ -253,11 +351,12 @@ export async function backendConnect(): Promise<void> {
 }
 
 export async function loadRemoteI18n(): Promise<void> {
-  if (!Backend.on) return;
+  const client = getActiveClient();
+  if (!client?.on) return;
   try {
-    const d = await Backend.i18n(localStorage.getItem("wall_overlay_lang") || "en");
-    if (d && typeof d === "object") {
-      setRemoteDict(d);
+    const d = await api(client).mailbox.i18n(localStorage.getItem("wall_overlay_lang") || "en");
+    if (d && typeof d === "object" && !Array.isArray(d)) {
+      setRemoteDict(d as Record<string, string>);
       log("I18N", "OK", "remote loaded");
     }
   } catch (e: any) { log("I18N", "WARN", e.toString()); }
@@ -288,20 +387,21 @@ function saveAnnounceSeenIds(ids: Set<string>): void {
 }
 
 export async function loadAnnouncements(): Promise<void> {
-  if (!Backend.on) return;
+  const client = getActiveClient();
+  if (!client?.on) return;
   try {
-    const list = (await Backend.listMailbox("announcement")) || [];
+    const list = asMailboxItems((await api(client).mailbox.listMailbox("announcement")) || []);
     const seen = loadAnnounceSeenIds();
     const firstTime = seen.size === 0;
     let added = 0;
-    for (const a of list) {
-      const id = String(a.id ?? a.uid ?? a.created_at ?? a.title);
+    for (const item of list) {
+      const id = String(item.id ?? item.uid ?? item.created_at ?? item.title);
       if (seen.has(id)) continue;
       seen.add(id);
       added += 1;
       // On the very first run we silently absorb everything into "seen"
       // — old signals shouldn't pop notifications on a fresh install.
-      if (!firstTime) notify(a.title || "Announcement", a.body || "");
+      if (!firstTime) notify(item.title || "Announcement", item.body || "");
     }
     if (added) saveAnnounceSeenIds(seen);
   } catch (e: any) { log("ANNOUNCE", "WARN", e.toString()); }
@@ -309,21 +409,22 @@ export async function loadAnnouncements(): Promise<void> {
 
 export async function loadClanChat(): Promise<void> {
   const box = $("clan-chat");
-  if (!box || !Backend.on) return;
+  const client = getActiveClient();
+  if (!box || !client?.on) return;
   const mod = canModerate();
   try {
-    const msgs = await Backend.clanMessages();
+    const msgs = asClanChatMessages((await api(client).mailbox.clanMessages()) || []);
     box.innerHTML =
       (msgs || [])
-        .map((m: any) => {
-          const ts = m.created_at ? timeAgo(m.created_at) : "";
-          return `<div class="m"><div class="bd"><span class="au" data-user="${esc(m.author)}">${esc(m.author)}</span>${ts ? ` <span class="ts" title="${esc(m.created_at)}">${ts}</span>` : ""} ${renderMentions(replaceEmotes(mdToHtml(m.text)))}</div>${mod && m.id != null ? `<span class="del" data-del="${esc(m.id)}" title="${t("delete")}">${ic("trash", 12)}</span>` : ""}</div>`;
+        .map((msg) => {
+          const ts = msg.created_at ? timeAgo(msg.created_at) : "";
+          return `<div class="m"><div class="bd"><span class="au" data-user="${esc(msg.author)}">${esc(msg.author)}</span>${ts ? ` <span class="ts" title="${esc(msg.created_at)}">${ts}</span>` : ""} ${renderMentions(replaceEmotes(mdToHtml(msg.text)))}</div>${mod && msg.id != null ? `<span class="del" data-del="${esc(msg.id)}" title="${t("delete")}">${ic("trash", 12)}</span>` : ""}</div>`;
         })
         .join("") || `<div style="color:var(--sub)">— empty —</div>`;
     box.querySelectorAll("[data-del]").forEach((b) =>
       b.addEventListener("click", async () => {
         if (!(await confirmDlg(t("delete") + "?"))) return;
-        try { await Backend.deleteClanMessage((b as HTMLElement).dataset.del!); loadClanChat(); }
+        try { await api(client).mailbox.deleteClanMessage((b as HTMLElement).dataset.del!); loadClanChat(); }
         catch (e: any) { await errorDlg("Delete failed: " + errMsg(e)); }
       }),
     );
@@ -339,10 +440,11 @@ let lastChatSig = "";
 export function startChatPolling(): void {
   if (chatPollTimer != null) return;
   const tick = async () => {
-    if (!Backend.on) return;
+    const client = getActiveClient();
+    if (!client?.on) return;
     try {
-      const msgs = await Backend.clanMessages();
-      const sig = JSON.stringify((msgs || []).map((m: any) => m.id));
+      const msgs = asClanChatMessages((await api(client).mailbox.clanMessages()) || []);
+      const sig = JSON.stringify((msgs || []).map((m) => m.id));
       if (sig !== lastChatSig) {
         const wasAtBottom = (() => {
           const box = $("clan-chat");
@@ -351,12 +453,12 @@ export function startChatPolling(): void {
         })();
         // Detect a new incoming message
         if (lastChatSig) {
-          const prevIds = new Set(JSON.parse(lastChatSig));
-          const newMsgs = (msgs || []).filter((m: any) => !prevIds.has(m.id));
-          newMsgs.forEach((m: any) => {
+          const prevIds = new Set(JSON.parse(lastChatSig) as (string | undefined)[]);
+          const newMsgs = (msgs || []).filter((m) => !prevIds.has(m.id));
+          newMsgs.forEach((msg) => {
             const me = getMe();
-            if (!me || m.author !== me.username) {
-              toast("Clan chat", `${m.author}: ${(m.text || "").slice(0, 60)}`);
+            if (!me || msg.author !== me.username) {
+              toast("Clan chat", `${msg.author}: ${(msg.text || "").slice(0, 60)}`);
             }
           });
         }
@@ -410,10 +512,11 @@ export function clearNotifSeen(): void {
 }
 
 export async function resetAvatar(): Promise<void> {
-  if (!Backend.on) { await errorDlg("Connect to VAI-PROG backend first"); return; }
+  const client = getActiveClient();
+  if (!client?.on) { await errorDlg("Connect to VAI-PROG backend first"); return; }
   try {
     // DELETE /me/avatar — fallback to PUT with empty if no DELETE route
-    await Backend.req("DELETE", "/me/avatar");
+    await client.delete("/me/avatar");
     toast(t("customAvatar"), "reset to Discord avatar");
     syncProfile();
   } catch (e: any) {
@@ -425,20 +528,22 @@ export async function sendClanMessage(): Promise<void> {
   const ta = $("clan-chat-input") as HTMLTextAreaElement | null;
   const text = ta?.value.trim();
   if (!text) return;
-  if (!Backend.on) { await errorDlg("Connect to VAI-PROG backend first (Settings)"); return; }
+  const client = getActiveClient();
+  if (!client?.on) { await errorDlg("Connect to VAI-PROG backend first (Settings)"); return; }
   // Detect 7TV usage so we can grant the "emote_explorer" achievement.
   const usedEmote = /:[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)?:/.test(text);
   try {
-    await Backend.sendClanMessage(text);
+    await api(client).mailbox.sendClanMessage(text);
     if (ta) ta.value = "";
     loadClanChat();
     if (usedEmote) triggerEvent("emote_explorer").catch(() => {});
   } catch (e: any) { await errorDlg("Send failed: " + errMsg(e)); }
 }
 
-function templateRow(tp: any, opts: { pending?: boolean; pub?: boolean }): string {
-  const thumb = Backend.base && tp.id != null
-    ? `<img src="${Backend.base}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" class="wp-tpl-thumb" loading="lazy" onerror="this.style.opacity=0.3">`
+function templateRow(tp: LegacyTemplate, opts: { pending?: boolean; pub?: boolean }): string {
+  const client = getActiveClient();
+  const thumb = client?.base && tp.id != null
+    ? `<img src="${client.url}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" class="wp-tpl-thumb" loading="lazy" onerror="this.style.opacity=0.3">`
     : '<div class="ph"></div>';
   const isPending = opts.pending || tp.status === "pending";
   const badge = isPending
@@ -474,6 +579,9 @@ function templateRow(tp: any, opts: { pending?: boolean; pub?: boolean }): strin
 }
 
 function wireTemplateRows(box: Element): void {
+  const client = getActiveClient();
+  if (!client) return;
+  const a = api(client);
   box.querySelectorAll("button[data-tpl]").forEach((b) =>
     b.addEventListener("click", () => {
       const el = b as HTMLElement;
@@ -491,14 +599,14 @@ function wireTemplateRows(box: Element): void {
     b.addEventListener("click", async () => {
       const reason = await promptDlg(t("report") + " — reason:", "", "Report Template");
       if (reason == null || !String(reason).trim()) return;
-      try { await Backend.reportTemplate((b as HTMLElement).dataset.report!, String(reason).trim()); toast(t("report"), "sent"); }
+      try { await a.legacy.reportTemplate((b as HTMLElement).dataset.report!, String(reason).trim()); toast(t("report"), "sent"); }
       catch (e: any) { await errorDlg("Report failed: " + errMsg(e)); }
     }),
   );
   box.querySelectorAll("[data-approve]").forEach((b) =>
     b.addEventListener("click", async () => {
       try {
-        await Backend.approveTemplate((b as HTMLElement).dataset.approve!);
+        await a.legacy.approveTemplate((b as HTMLElement).dataset.approve!);
         toast(t("approve"), "done");
         loadPublicTemplates();
         loadTemplates();
@@ -511,7 +619,7 @@ function wireTemplateRows(box: Element): void {
       const ok = await confirmDlg("Delete this template?", "Confirm Delete");
       if (!ok) return;
       try {
-        await Backend.req("DELETE", `/templates/${(b as HTMLElement).dataset.delTpl}`);
+        await client.delete(`/templates/${(b as HTMLElement).dataset.delTpl}`);
         toast("Templates", "deleted");
         loadPublicTemplates();
         loadTemplates();
@@ -525,7 +633,7 @@ function wireTemplateRows(box: Element): void {
       const slot = parseInt(String(slotStr), 10);
       if (!(slot >= 1 && slot <= 3)) { await errorDlg("Slot must be 1, 2 or 3"); return; }
       try {
-        await Backend.req("POST", `/v2/templates/${(b as HTMLElement).dataset.pinTpl}/pin`, { slot });
+        await a.legacy.pinTemplateV2((b as HTMLElement).dataset.pinTpl!, slot);
         toast("Templates", `pinned to slot ${slot}`);
         syncProfile();
       } catch (e: any) { await errorDlg("Pin failed: " + errMsg(e)); }
@@ -540,10 +648,10 @@ function wireTemplateRows(box: Element): void {
  * within a refill window. The Reload button next to each list invalidates
  * the cache and refetches.
  */
-function renderTemplateList(box: HTMLElement, tpls: any[], opts?: { pub?: boolean }): void {
+function renderTemplateList(box: HTMLElement, tpls: LegacyTemplate[], opts?: { pub?: boolean }): void {
   const decorate = opts?.pub
-    ? (tp: any) => templateRow(tp, { pub: true, pending: tp.status === "pending" })
-    : (tp: any) => templateRow(tp, { pending: tp.status === "pending" });
+    ? (tp: LegacyTemplate) => templateRow(tp, { pub: true, pending: tp.status === "pending" })
+    : (tp: LegacyTemplate) => templateRow(tp, { pending: tp.status === "pending" });
   box.innerHTML =
     (tpls || []).map(decorate).join("") ||
     `<div style="color:var(--sub);padding:6px">— none —</div>`;
@@ -555,7 +663,6 @@ function renderTemplateList(box: HTMLElement, tpls: any[], opts?: { pub?: boolea
  * for animated configs) and registers itself here, so data.ts never imports
  * it back (no cycle). Loaders call the hook after rendering classic rows;
  * renderTemplateList resets innerHTML, so appended rows can't duplicate. */
-export type AnimScope = "public" | "clan" | "private";
 let animRowsAppender:
   | ((box: HTMLElement, scope: AnimScope) => Promise<void>)
   | null = null;
@@ -592,24 +699,26 @@ interface TemplateBoard {
 // the network fails. This drives all three from one place.
 async function loadTemplateBoard(b: TemplateBoard, forceRefresh: boolean): Promise<void> {
   const box = $(b.boxId);
-  if (!box || !Backend.on) return;
-  const paint = (rows: any[]) => {
+  const client = getActiveClient();
+  if (!box || !client?.on) return;
+  const a = api(client);
+  const paint = (rows: LegacyTemplate[]) => {
     renderTemplateList(box, rows, b.pub ? { pub: true } : undefined);
     appendAnimIfEnabled(box, b.scope);
   };
   if (!forceRefresh) {
-    const cached = getCached<any[]>(b.cacheKey, CACHE_TTL_TEMPLATES_MS);
+    const cached = getCached<LegacyTemplate[]>(b.cacheKey, CACHE_TTL_TEMPLATES_MS);
     if (cached) paint(cached);
   }
   try {
-    let rows: any[];
+    let rows: LegacyTemplate[] = [];
     if (b.scope === "private") {
-      rows = (await Backend.listTemplatesV2({ scope: b.scope })) || [];
+      rows = ((await a.legacy.listTemplatesV2({ scope: b.scope })) || []) as LegacyTemplate[];
     } else {
-      rows = (await Backend.listTemplatesV2({ scope: b.scope, status: "approved" })) || [];
+      rows = ((await a.legacy.listTemplatesV2({ scope: b.scope, status: "approved" })) || []) as LegacyTemplate[];
       if (b.showUnverified) {
-        const pending = await Backend.listTemplatesV2({ scope: b.scope, status: "pending" });
-        rows = rows.concat(pending || []);
+        const pending = await a.legacy.listTemplatesV2({ scope: b.scope, status: "pending" });
+        rows = rows.concat((pending || []) as LegacyTemplate[]);
       }
     }
     setCached(b.cacheKey, rows);
@@ -657,7 +766,8 @@ export function loadPublicTemplates(forceRefresh = false): Promise<void> {
 
 export async function shareCurrentTemplate(): Promise<void> {
   if (!overlayData.src) { await errorDlg("Load an overlay first"); return; }
-  if (!Backend.on) { await errorDlg("Connect to VAI-PROG backend first (Settings)"); return; }
+  const client = getActiveClient();
+  if (!client?.on) { await errorDlg("Connect to VAI-PROG backend first (Settings)"); return; }
   const scope = ($("share-scope") as HTMLSelectElement)?.value || "clan";
   const pass = (($("share-pass") as HTMLInputElement)?.value ?? "").trim();
   const nameRaw = await promptDlg("Template name:", "", "Share Template");
@@ -669,7 +779,7 @@ export async function shareCurrentTemplate(): Promise<void> {
     const b64 = btoa(unescape(encodeURIComponent(JSON.stringify({
       x: overlayData.x, y: overlayData.y, scale: cfg.overlayScale, src: origSrc,
     }))));
-    const resp = await Backend.createTemplateV2({
+    const resp = await api(client).legacy.createTemplateV2({
       name,
       x: overlayData.x,
       y: overlayData.y,
@@ -677,7 +787,7 @@ export async function shareCurrentTemplate(): Promise<void> {
       scope,
       share: `the-wall-dev://${b64}`,
       ...(pass ? { access_password: pass } : {}),
-    });
+    }) as LegacyTemplate | undefined;
     log("TEMPLATE_SHARE", "OK", `id=${resp?.id} status=${resp?.status}`);
     // Stash the last-shared template id so the Share-tab's "Save Charity
     // config" button can reference our hosted PNG without asking the user

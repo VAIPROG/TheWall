@@ -31,3 +31,9 @@ Thumbs.db
 
 # Reference copy of the host site's own source — not ours to redistribute
 source-code-wall/
+
+# Large landing video assets — served from the deploy, not git
+landing/assets/*.mp4
+
+# Stray Rust backups
+*.rs.bak

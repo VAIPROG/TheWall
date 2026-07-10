@@ -1,8 +1,7 @@
-import { $ } from "../helpers";
-import { esc } from "../helpers";
+import { $, esc } from "../helpers";
 import { t } from "../i18n";
 import { ic, achIcon as achIconHelper } from "../icons";
-import { listMine } from "../achievements";
+import { listMine, type AchievementRow } from "../achievements";
 
 // ---------------------------------------------------------------------------
 // Achievement list (Profile pane)
@@ -37,7 +36,7 @@ export async function loadAchievementList(): Promise<void> {
     return;
   }
 
-  const unlocked = all.filter((a) => a.unlocked_at);
+  const unlocked = all.filter((a) => a.unlockedAt);
   const totalPts = unlocked.reduce((s, a) => s + a.points, 0);
   if (summary) {
     summary.textContent =
@@ -50,7 +49,7 @@ export async function loadAchievementList(): Promise<void> {
   }
 
   // Group by category
-  const byCat = new Map<string, typeof all>();
+  const byCat = new Map<string, AchievementRow[]>();
   for (const a of all) {
     const arr = byCat.get(a.category) || [];
     arr.push(a);
@@ -62,22 +61,22 @@ export async function loadAchievementList(): Promise<void> {
     const catLabel = t(ACH_CATEGORY_KEYS[cat] || "achCategoryGeneral");
     html += `<div style="font-weight:bold;font-size:10px;color:var(--sub);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.5px">${esc(catLabel)}</div>`;
     for (const a of items) {
-      const got = !!a.unlocked_at;
-      const icon = renderAchIcon(a.icon);
+      const got = !!a.unlockedAt;
+      const icon = renderAchIcon(a.iconUrl);
       const opacity = got ? "1" : "0.35";
       const name = got
-        ? esc(a.name)
+        ? esc(a.title)
         : a.secret
           ? esc(t("achSecret"))
-          : esc(a.name);
+          : esc(a.title);
       const desc = got
         ? esc(a.description)
         : a.secret
           ? "???"
           : esc(a.description);
       const pts = `<span style="margin-left:auto;font-size:9px;color:var(--sub)">${a.points} ${esc(t("achPoints"))}</span>`;
-      const dateStr = a.unlocked_at
-        ? `<span style="font-size:9px;color:var(--sub);margin-left:6px">${new Date(a.unlocked_at).toLocaleDateString()}</span>`
+      const dateStr = a.unlockedAt
+        ? `<span style="font-size:9px;color:var(--sub);margin-left:6px">${new Date(a.unlockedAt).toLocaleDateString()}</span>`
         : "";
       html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;opacity:${opacity};border-bottom:1px solid rgba(128,128,128,.15)">
         <span style="flex:none;width:24px;height:24px;display:flex;align-items:center;justify-content:center">${icon}</span>

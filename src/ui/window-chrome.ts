@@ -8,7 +8,7 @@ import {
 import { $ } from "../helpers";
 import { log } from "../log";
 import { mountReopener } from "../reopen";
-import { loadMail } from "../mail";
+import { loadNotifications, loadChatList } from "../mail";
 import {
   loadTemplates,
   loadPublicTemplates,
@@ -169,6 +169,6 @@ export function wireWindowChrome(win: HTMLElement): void {
 
   // Load mail when user clicks the mail tab
   document.querySelectorAll('.wp-tab[data-p="ma"]').forEach((b) => {
-    b.addEventListener("click", () => loadMail());
+    b.addEventListener("click", () => { loadNotifications(); loadChatList(); });
   });
 }

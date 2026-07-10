@@ -4,7 +4,7 @@ import { ic } from "../icons";
 import { toast } from "../notify";
 import { confirmDlg, errorDlg, infoDlg } from "../dialog";
 import { log } from "../log";
-import { Backend } from "../backend";
+import { getActiveClient } from "../backend/index";
 import {
   loadAdminUsers,
   loadModApps,
@@ -58,7 +58,7 @@ export function wireAdmin(_win: HTMLElement): void {
             `<optgroup label="${esc(cat)}">${items
               .map(
                 (a) =>
-                  `<option value="${esc(a.id)}">${esc(a.name)} · ${a.points} pts${a.secret ? " 🔒" : ""}</option>`,
+                  `<option value="${esc(a.id)}">${esc(a.title)} · ${a.points} pts${a.secret ? " 🔒" : ""}</option>`,
               )
               .join("")}</optgroup>`,
         )
@@ -86,7 +86,7 @@ export function wireAdmin(_win: HTMLElement): void {
         ? await adminGrant(who, aid)
         : await adminGrantByName(who, aid);
       if (r) {
-        toast("Admin", `granted "${r.achievement.name}" (new=${r.was_new})`);
+        toast("Admin", `granted "${r.achievement.title}" (new=${r.wasNew})`);
       } else {
         await errorDlg("Grant failed (see console)");
       }
@@ -146,19 +146,19 @@ export function wireAdmin(_win: HTMLElement): void {
     try {
       const row = await adminCreate({
         id,
-        name,
+        title: name,
         description: desc,
-        icon,
+        iconUrl: icon,
         category,
         points,
         secret,
       });
       if (row) {
-        toast("Admin", `${t("achAdminCreated")}: ${row.name}`);
+        toast("Admin", `${t("achAdminCreated")}: ${row.title}`);
         // Refresh the grant dropdown.
         const opt = document.createElement("option");
         opt.value = row.id;
-        opt.textContent = `${row.name} · ${row.points} pts${row.secret ? " 🔒" : ""}`;
+        opt.textContent = `${row.title} · ${row.points} pts${row.secret ? " 🔒" : ""}`;
         ($("admin-ach-id") as HTMLSelectElement | null)?.appendChild(opt);
         // Reset the form.
         ($("admin-ach-new-id") as HTMLInputElement).value = "";
@@ -182,8 +182,10 @@ export function wireAdmin(_win: HTMLElement): void {
       btn.textContent = "Working…";
     }
     try {
-      const r = await Backend.req(
-        "POST",
+      const client = getActiveClient();
+      if (!client) throw new Error("backend offline");
+      // TODO(phase3): V3 has /admin/templates/backfill-documents (different op).
+      const r = await client.postRoot<any>(
         "/v2/admin/templates/backfill-previews",
         {},
       );

@@ -17,10 +17,8 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{ProviderLink, SocialAccountPublic},
-    routes::v3::utils::audit,
+    routes::v3::utils::{audit, users::resolve_user_ref},
 };
-
-use super::profile::resolve_user_ref;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -148,11 +146,11 @@ pub async fn delete_my_social(
 }
 
 pub async fn get_user_socials(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Path(user_ref): Path<String>,
 ) -> Result<Json<Vec<SocialAccountPublic>>, (StatusCode, String)> {
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let rows = sqlx::query_as::<_, SocialAccountPublic>(
         "SELECT provider, username, is_verified, linked_at

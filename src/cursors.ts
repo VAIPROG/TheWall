@@ -2,7 +2,8 @@ import { cfg, saveCfg } from "./config";
 import { SEL } from "./constants";
 import { $ } from "./helpers";
 import { log } from "./log";
-import { Backend, getMe } from "./backend";
+import { getMe } from "./backend/index";
+import { getActiveClient, api } from "./backend/index";
 
 let clanNames = new Set<string>();
 
@@ -53,11 +54,12 @@ export async function refreshClanNames(): Promise<void> {
   clanNames = new Set();
   const me = getMe();
   if (me && me.username) clanNames.add(String(me.username).toLowerCase());
-  if (Backend.on) {
+  const client = getActiveClient();
+  if (client?.on) {
     try {
-      const ms = await Backend.clanMembers();
+      const ms = await api(client).mailbox.clanMembers();
       (ms || []).forEach(
-        (m: any) => m.username && clanNames.add(String(m.username).toLowerCase()),
+        (m) => (m as { username?: string }).username && clanNames.add(String((m as { username?: string }).username).toLowerCase()),
       );
     } catch (e: any) {
       log("CLAN_MEMBERS", "WARN", e.toString());

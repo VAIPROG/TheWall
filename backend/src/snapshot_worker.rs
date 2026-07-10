@@ -308,31 +308,68 @@ async fn run_once(
         _ => HashMap::new(),
     };
 
-    // 4. Persist. One row per size, sharing batch_id. `discord_url` = direct
-    //    PNG on cdn.discordapp.com (what the front-end <img> consumes);
-    //    `telegram_url` = the public channel post link.
+    // 4. Persist as one unified 'snapshot' feed event. The payload groups
+    //    all three sizes under `sizes` so V2 and V3 consumers can read the
+    //    same row.
     let batch_id = Uuid::new_v4();
+    let mut sizes = serde_json::Map::new();
+    let mut media = Vec::new();
+
     for s in &shots {
         let key = s.size.as_str();
         let d = discord_cdn.get(key).cloned().unwrap_or_default();
         let tg = tg_channel.get(key).cloned().unwrap_or_default();
 
-        let _ = sqlx::query(
-            r#"INSERT INTO wall_snapshots
-                    (size, bytes, width, height, discord_url, telegram_url, batch_id)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
-        )
-        .bind(key)
-        .bind(s.png.len() as i64)
-        .bind(s.w as i32)
-        .bind(s.h as i32)
-        .bind(opt_str(&d))
-        .bind(opt_str(&tg))
-        .bind(batch_id)
-        .execute(pool)
-        .await;
+        sizes.insert(
+            key.to_string(),
+            serde_json::json!({
+                "bytes": s.png.len() as i64,
+                "width": s.w as i32,
+                "height": s.h as i32,
+                "discordUrl": opt_str_owned(&d),
+                "telegramUrl": opt_str_owned(&tg),
+            }),
+        );
+
+        if let Some(url) = [&tg, &d].into_iter().find(|u| !u.is_empty()) {
+            media.push(serde_json::json!({
+                "type": "image",
+                "url": url,
+                "label": key,
+                "size": key,
+            }));
+        }
     }
+
+    let payload = serde_json::json!({
+        "batchId": batch_id,
+        "sizes": sizes,
+    });
+
+    let _ = sqlx::query(
+        r#"INSERT INTO feed_events
+             (event_type, source, external_id, payload, media, occurred_at)
+           VALUES ('snapshot', 'filianislost', $1, $2, $3, NOW())
+           ON CONFLICT (source, external_id) DO UPDATE
+             SET payload = EXCLUDED.payload,
+                 media = EXCLUDED.media,
+                 occurred_at = EXCLUDED.occurred_at"#,
+    )
+    .bind(batch_id.to_string())
+    .bind(payload)
+    .bind(serde_json::Value::Array(media))
+    .execute(pool)
+    .await;
+
     Ok(())
+}
+
+fn opt_str_owned(s: &str) -> Option<String> {
+    if s.is_empty() { None } else { Some(s.to_string()) }
+}
+
+fn opt_str(s: &str) -> Option<&str> {
+    if s.is_empty() { None } else { Some(s) }
 }
 
 struct BuiltShot {
@@ -341,9 +378,6 @@ struct BuiltShot {
     webp: Option<Vec<u8>>,
     w: u32,
     h: u32,
-}
-fn opt_str(s: &str) -> Option<&str> {
-    if s.is_empty() { None } else { Some(s) }
 }
 
 // ---- canvas stitching -----------------------------------------------------

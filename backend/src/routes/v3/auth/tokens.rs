@@ -46,7 +46,7 @@ pub async fn refresh(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Issue new session pair.
-    let (access, new_refresh) = issue_session_pair(&state.pool, &state.config.jwt_secret, user.id)
+    let (access, new_refresh, _session_id) = issue_session_pair(&state.pool, &state.config.jwt_secret, user.id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

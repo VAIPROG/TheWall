@@ -8,7 +8,7 @@ import { applyTheme } from "./theme";
 import { initLayers } from "./overlay";
 import { buildUI } from "./ui-build";
 import { startUpdateChecker } from "./update-check";
-import { Backend, setMe } from "./backend";
+import { getActiveClient, api, setMe } from "./backend/index";
 import { siteToken } from "./site-api";
 import {
   syncProfile,
@@ -27,7 +27,7 @@ import { initEmotes } from "./emoji";
 import { startSiteChatEmotes } from "./site-chat-emotes";
 import { startSiteProfileInject } from "./site-profile-inject";
 import "./profile-modal";
-import { startMailPolling, loadMail } from "./mail";
+import { startMailPolling, loadNotifications, loadChatList } from "./mail";
 import { startPaintWatch } from "./paint-state";
 import { PAINT_REFILL_AWAY_THRESHOLD_MS } from "./constants";
 import { playPaintRefillSound } from "./paint-sound";
@@ -133,13 +133,14 @@ import { t, pluralize } from "./i18n";
       // Remote refill reminder: the paint bar knows when the refill lands —
       // file it with the backend so the linked Telegram/Discord gets a DM
       // even with the browser closed. Replaces any pending reminder.
-      if (cfg.paintReminderRemote && Backend.on) {
+      const client = getActiveClient();
+      if (cfg.paintReminderRemote && client?.on) {
         const nextRefill: number = ev?.detail?.nextRefill || 0;
         const dueInSecs =
           nextRefill > Date.now()
             ? Math.ceil((nextRefill - Date.now()) / 1000)
             : 60 * 60; // refill time unknown — fall back to the 1h cycle
-        Backend.req("POST", "/v2/me/paint-reminder", { due_in_secs: dueInSecs })
+        api(client).mailbox.setPaintReminder(dueInSecs)
           .then(() =>
             log("PAINT", "OK", `refill reminder filed (+${dueInSecs}s)`),
           )
@@ -165,21 +166,25 @@ import { t, pluralize } from "./i18n";
       );
       return;
     }
+    const client = getActiveClient();
+    if (!client) return;
+    const a = api(client);
     try {
       // Try to use existing token; if it fails (401), re-login.
       if (cfg.backendToken) {
         try {
-          setMe(await Backend.me());
+          const me = await a.auth.me();
+          setMe(me);
           log("AUTO_AUTH", "OK", "session restored");
         } catch {
           log("AUTO_AUTH", "WARN", "stored token rejected, re-logging in");
           cfg.backendToken = "";
-          await Backend.login();
-          setMe(await Backend.me());
+          await a.auth.loginWithSiteToken("filianislost", siteToken() || "");
+          setMe(await a.auth.me());
         }
       } else {
-        await Backend.login();
-        setMe(await Backend.me());
+        await a.auth.loginWithSiteToken("filianislost", siteToken() || "");
+        setMe(await a.auth.me());
         log("AUTO_AUTH", "OK", "first-time login");
       }
       // Refresh UI state
@@ -189,7 +194,8 @@ import { t, pluralize } from "./i18n";
       loadTemplates();
       loadPublicTemplates();
       loadRoster();
-      loadMail();
+      loadNotifications();
+      loadChatList();
       refreshNotifications();
       startChatPolling();
       startNotifPolling();

@@ -4,10 +4,13 @@
 //! `users` is the canonical Account; `site_identities` hold per-site
 //! connections; `provider_links` hold OAuth connections.
 
+pub mod achievements;
 pub mod admin;
 pub mod auth;
 pub mod chats;
 pub mod clans;
+pub mod deprecation;
+pub mod feed;
 pub mod middleware;
 pub mod moderation;
 pub mod notifications;

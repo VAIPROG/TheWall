@@ -175,8 +175,6 @@ pub async fn require_clan_admin(
 /// same rule, so it lives here instead of being copy-pasted per route:
 ///
 ///   - global admin/owner publishes anything pre-approved;
-///   - the extension author ("vai", case-insensitive — defeats squatting)
-///     gets the same treatment;
 ///   - clan-scoped publishes are pre-approved for that clan's
 ///     moderators/admins;
 ///   - everything else lands as 'pending' for review.
@@ -191,10 +189,10 @@ pub async fn publish_auto_approved(
             .bind(user_id)
             .fetch_optional(pool)
             .await?;
-    let Some((username, role)) = row else {
+    let Some((_, role)) = row else {
         return Ok(false);
     };
-    if GlobalRole::from_str(&role).is_admin() || username.trim().eq_ignore_ascii_case("vai") {
+    if GlobalRole::from_str(&role).is_admin() {
         return Ok(true);
     }
     if scope == "clan" {

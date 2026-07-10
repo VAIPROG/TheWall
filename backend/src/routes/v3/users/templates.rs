@@ -12,9 +12,8 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{TemplatePage, TemplateSummary},
+    routes::v3::utils::users::resolve_user_ref,
 };
-
-use super::profile::resolve_user_ref;
 
 #[derive(Debug, Deserialize)]
 pub struct UserTemplatesQuery {
@@ -28,7 +27,7 @@ pub async fn get_user_templates(
     Path(user_ref): Path<String>,
     Query(q): Query<UserTemplatesQuery>,
 ) -> Result<Json<TemplatePage>, (StatusCode, String)> {
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let page = q.page.unwrap_or(1).max(1);
     let per_page = q.per_page.unwrap_or(20).clamp(1, 100);

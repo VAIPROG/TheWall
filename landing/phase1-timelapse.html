@@ -1,0 +1,1898 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>The Wall — Phase 1 Timelapse</title>
+    <link
+      rel="icon"
+      type="image/png"
+      href="/assets/favicon/favicon-96x96.png?v=20260603"
+      sizes="96x96"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/assets/favicon/favicon.svg?v=20260603"
+    />
+    <link rel="shortcut icon" href="/assets/favicon/favicon.ico?v=20260603" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/assets/favicon/apple-touch-icon.png?v=20260603"
+    />
+    <meta name="apple-mobile-web-app-title" content="WallDev" />
+    <link rel="manifest" href="/assets/favicon/site.webmanifest?v=20260603" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --glitch-power: 0.3;
+        --neon-glow: 1.2;
+      }
+      body {
+        background-color: #020202;
+        font-family: "Consolas", "Courier New", monospace;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        background-image: radial-gradient(
+          circle at 50% 50%,
+          #0d041a 0%,
+          #020202 100%
+        );
+      }
+
+      #orientation-lock {
+        display: none;
+      }
+      @media (orientation: portrait) {
+        #orientation-lock {
+          display: flex !important;
+        }
+      }
+
+      .bg-grid {
+        background-image:
+          linear-gradient(rgba(176, 38, 255, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(176, 38, 255, 0.05) 1px, transparent 1px);
+        background-size: 40px 40px;
+      }
+      .crt-overlay {
+        background:
+          linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+          linear-gradient(
+            90deg,
+            rgba(255, 0, 0, 0.04),
+            rgba(0, 255, 0, 0.01),
+            rgba(0, 0, 255, 0.04)
+          );
+        background-size:
+          100% 2px,
+          3px 100%;
+        pointer-events: none;
+        z-index: 999;
+        box-shadow:
+          inset 0 0 120px rgba(0, 0, 0, 0.95),
+          inset 0 0 40px rgba(176, 38, 255, 0.15);
+      }
+
+      .neon-glow {
+        color: #fff;
+        text-shadow:
+          0 0 calc(var(--neon-glow) * 5px) #b026ff,
+          0 0 calc(var(--neon-glow) * 15px) #b026ff,
+          0 0 calc(var(--neon-glow) * 40px) #7a00cc;
+      }
+      .neon-glow-subtle {
+        color: #d1d5db;
+        text-shadow: 0 0 calc(var(--neon-glow) * 5px) #b026ff;
+      }
+
+      .glitch-text {
+        position: relative;
+        display: inline-block;
+      }
+      .glitch-text::before,
+      .glitch-text::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.8;
+        mix-blend-mode: screen;
+      }
+      .glitch-text::before {
+        color: #0ff;
+        z-index: -1;
+        animation: glitch-1 calc(var(--glitch-power) * 0.8s) infinite linear
+          alternate-reverse;
+      }
+      .glitch-text::after {
+        color: #f0f;
+        z-index: -2;
+        animation: glitch-2 calc(var(--glitch-power) * 1.2s) infinite linear
+          alternate-reverse;
+      }
+
+      @keyframes glitch-1 {
+        0% {
+          clip-path: inset(40% 0 61% 0);
+          transform: translate(
+            calc(var(--glitch-power) * -8px),
+            calc(var(--glitch-power) * 3px)
+          );
+        }
+        20% {
+          clip-path: inset(92% 0 1% 0);
+          transform: translate(
+            calc(var(--glitch-power) * 8px),
+            calc(var(--glitch-power) * -3px)
+          );
+        }
+        40% {
+          clip-path: inset(43% 0 1% 0);
+          transform: translate(
+            calc(var(--glitch-power) * -8px),
+            calc(var(--glitch-power) * 3px)
+          );
+        }
+        60% {
+          clip-path: inset(25% 0 58% 0);
+          transform: translate(
+            calc(var(--glitch-power) * 8px),
+            calc(var(--glitch-power) * -3px)
+          );
+        }
+        80% {
+          clip-path: inset(54% 0 7% 0);
+          transform: translate(
+            calc(var(--glitch-power) * -8px),
+            calc(var(--glitch-power) * 3px)
+          );
+        }
+        100% {
+          clip-path: inset(58% 0 43% 0);
+          transform: translate(
+            calc(var(--glitch-power) * 8px),
+            calc(var(--glitch-power) * -3px)
+          );
+        }
+      }
+      @keyframes glitch-2 {
+        0% {
+          clip-path: inset(65% 0 13% 0);
+          transform: translate(
+            calc(var(--glitch-power) * 8px),
+            calc(var(--glitch-power) * -3px)
+          );
+        }
+        20% {
+          clip-path: inset(15% 0 62% 0);
+          transform: translate(
+            calc(var(--glitch-power) * -8px),
+            calc(var(--glitch-power) * 3px)
+          );
+        }
+        40% {
+          clip-path: inset(78% 0 2% 0);
+          transform: translate(
+            calc(var(--glitch-power) * 8px),
+            calc(var(--glitch-power) * -3px)
+          );
+        }
+        60% {
+          clip-path: inset(5% 0 76% 0);
+          transform: translate(
+            calc(var(--glitch-power) * -8px),
+            calc(var(--glitch-power) * 3px)
+          );
+        }
+        80% {
+          clip-path: inset(32% 0 45% 0);
+          transform: translate(
+            calc(var(--glitch-power) * 8px),
+            calc(var(--glitch-power) * -3px)
+          );
+        }
+        100% {
+          clip-path: inset(10% 0 85% 0);
+          transform: translate(
+            calc(var(--glitch-power) * -8px),
+            calc(var(--glitch-power) * 3px)
+          );
+        }
+      }
+
+      @keyframes tv-off {
+        0% {
+          transform: scale(1, 1);
+          filter: brightness(1);
+        }
+        40% {
+          transform: scale(1.05, 1.05);
+          filter: brightness(3);
+        }
+        50% {
+          transform: scale(1, 0.005);
+          filter: brightness(10);
+        }
+        100% {
+          transform: scale(0, 0.005);
+          filter: brightness(0);
+        }
+      }
+      .tv-off-anim {
+        animation: tv-off 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+      }
+      @keyframes flicker {
+        0%,
+        19.999%,
+        22%,
+        62.999%,
+        64%,
+        64.999%,
+        70%,
+        100% {
+          opacity: 1;
+        }
+        20%,
+        21.999%,
+        63%,
+        63.999%,
+        65%,
+        69.999% {
+          opacity: 0.4;
+        }
+      }
+      .flicker {
+        animation: flicker 3s infinite;
+      }
+
+      .vid-loading {
+        position: absolute;
+        inset: 0;
+        z-index: 405;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: rgba(2, 2, 2, 0.72);
+        pointer-events: none;
+      }
+      .vid-loading.hidden {
+        display: none;
+      }
+      .vid-spinner {
+        width: 54px;
+        height: 54px;
+        border: 4px solid rgba(176, 38, 255, 0.25);
+        border-top-color: #b026ff;
+        border-radius: 50%;
+        animation: vid-spin 0.9s linear infinite;
+        box-shadow: 0 0 24px rgba(176, 38, 255, 0.5);
+      }
+      @keyframes vid-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .vid-loading-text {
+        font-family: "Consolas", "Courier New", monospace;
+        letter-spacing: 0.4em;
+        color: #d1d5db;
+        font-size: 14px;
+        text-shadow: 0 0 8px #b026ff;
+      }
+
+      /* Touch devices have no hover, so the hover-revealed control bar (with
+         its quality button) was never reachable on phones — keep it visible. */
+      @media (hover: none) {
+        #video-controls {
+          opacity: 1 !important;
+        }
+      }
+
+      .dos-text {
+        color: #b5c2d4;
+        font-size: 15px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        text-shadow: 0 0 5px rgba(181, 194, 212, 0.4);
+      }
+      .dos-highlight {
+        color: #fff;
+        font-weight: bold;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+      }
+      .dos-warning {
+        color: #ff3366;
+        font-weight: bold;
+        text-shadow: 0 0 8px rgba(255, 51, 102, 0.8);
+      }
+      .dos-red {
+        color: #ff0000;
+        font-weight: 900;
+        text-shadow: 0 0 15px rgba(255, 0, 0, 0.9);
+      }
+      .dos-success {
+        color: #00ffcc;
+        text-shadow: 0 0 8px rgba(0, 255, 204, 0.8);
+      }
+      .dos-filian {
+        color: #00ffcc;
+        font-weight: 900;
+        text-shadow:
+          0 0 15px rgba(0, 255, 204, 0.9),
+          2px 0 0 #ff00ff,
+          -2px 0 0 #00ffff;
+        letter-spacing: 1px;
+      }
+      .blink {
+        animation: blinker 0.8s step-start infinite;
+      }
+      @keyframes blinker {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      input[type="range"].vid-progress {
+        -webkit-appearance: none;
+        background: transparent;
+        width: 100%;
+        cursor: pointer;
+      }
+      input[type="range"].vid-progress::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 14px;
+        width: 14px;
+        border-radius: 50%;
+        background: #b026ff;
+        cursor: pointer;
+        margin-top: -5px;
+        box-shadow: 0 0 10px #b026ff;
+        position: relative;
+        z-index: 2;
+      }
+      input[type="range"].vid-progress::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 4px;
+        cursor: pointer;
+        background: #333;
+        border-radius: 2px;
+      }
+
+      .seekbar-wrap {
+        position: relative;
+        width: 100%;
+        height: 16px;
+        display: flex;
+        align-items: center;
+      }
+      .seekbar-buffered {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        height: 4px;
+        background: rgba(176, 38, 255, 0.3);
+        border-radius: 2px;
+        pointer-events: none;
+        transition: width 0.3s;
+      }
+      .seekbar-played {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        height: 4px;
+        background: #b026ff;
+        border-radius: 2px;
+        pointer-events: none;
+        transition: width 0.1s;
+      }
+      input[type="range"].vid-progress {
+        position: relative;
+        z-index: 3;
+        background: transparent;
+      }
+      input[type="range"].vid-progress::-webkit-slider-runnable-track {
+        background: transparent;
+      }
+
+      .center-play-btn {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(176, 38, 255, 0.18);
+        border: 2px solid rgba(176, 38, 255, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition:
+          opacity 0.3s,
+          background 0.2s;
+        z-index: 420;
+        box-shadow: 0 0 30px rgba(176, 38, 255, 0.4);
+        pointer-events: auto;
+      }
+      .center-play-btn:hover {
+        background: rgba(176, 38, 255, 0.35);
+      }
+
+      #credits-grid-wrap {
+        display: none;
+        padding: 2rem 1.5rem 1rem;
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      .credits-grid-heading {
+        color: #b026ff;
+        font-size: 12px;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+        text-shadow: 0 0 8px rgba(176, 38, 255, 0.7);
+      }
+      .credits-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 8px;
+      }
+      .name-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        letter-spacing: 0.03em;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: center;
+        word-break: break-word;
+      }
+      .name-chip-vai {
+        font-size: 18px;
+        padding: 8px 18px;
+        border: 2px solid rgba(255, 45, 45, 0.6);
+        background: linear-gradient(
+          135deg,
+          rgba(255, 45, 45, 0.15),
+          rgba(59, 13, 107, 0.4)
+        );
+        letter-spacing: 0.1em;
+        grid-column: span 2;
+        box-shadow: 0 0 18px rgba(255, 45, 45, 0.25);
+      }
+      .name-chip-vai span {
+        background: linear-gradient(90deg, #ff2d2d, #b026ff, #3b0d6b);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 900;
+      }
+
+      #back-home-wrap {
+        display: none;
+        text-align: center;
+        padding: 1.5rem 1rem 2rem;
+      }
+      .back-home-btn {
+        display: inline-block;
+        padding: 10px 28px;
+        border: 1px solid rgba(176, 38, 255, 0.6);
+        color: #c084fc;
+        font-size: 13px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        text-decoration: none;
+        transition:
+          background 0.2s,
+          color 0.2s,
+          box-shadow 0.2s;
+        background: rgba(176, 38, 255, 0.06);
+      }
+      .back-home-btn:hover {
+        background: rgba(176, 38, 255, 0.2);
+        color: #fff;
+        box-shadow: 0 0 16px rgba(176, 38, 255, 0.5);
+      }
+
+      #exit-corner {
+        position: fixed;
+        top: 14px;
+        right: 18px;
+        z-index: 9000;
+        opacity: 0.45;
+        transition: opacity 0.2s;
+      }
+      #exit-corner:hover {
+        opacity: 1;
+      }
+      #exit-corner a {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: #9ca3af;
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        text-decoration: none;
+        padding: 5px 10px;
+        border: 1px solid rgba(156, 163, 175, 0.25);
+        background: rgba(0, 0, 0, 0.5);
+        text-transform: uppercase;
+        transition:
+          color 0.2s,
+          border-color 0.2s;
+      }
+      #exit-corner a:hover {
+        color: #e879f9;
+        border-color: rgba(232, 121, 249, 0.5);
+      }
+    </style>
+  </head>
+  <body class="text-white w-screen h-screen relative">
+    <div id="exit-corner">
+      <a href="/">exit ✕</a>
+    </div>
+
+    <div
+      id="orientation-lock"
+      class="fixed inset-0 bg-black z-[10000] flex-col items-center justify-center text-center p-8"
+    >
+      <svg
+        class="w-16 h-16 text-purple-500 mb-6 animate-pulse"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+        ></path>
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 12l4-4m0 0l4 4m-4-4v12"
+        ></path>
+      </svg>
+      <h1 class="text-2xl font-bold neon-glow tracking-widest mb-4">
+        SYSTEM ERROR
+      </h1>
+      <p class="text-gray-400 dos-text">PLEASE ROTATE TO LANDSCAPE.</p>
+    </div>
+
+    <div
+      id="start-screen"
+      class="absolute inset-0 z-[5000] bg-black flex flex-col items-center justify-center transition-colors duration-500"
+    >
+      <div class="flex gap-6 mb-12">
+        <button
+          onclick="langClick('en')"
+          id="btn-en"
+          class="px-6 py-2 border border-purple-500 text-purple-400 font-bold tracking-widest hover:bg-purple-900/50 transition-colors shadow-[0_0_15px_rgba(176,38,255,0.4)]"
+        >
+          [ EN ]
+        </button>
+        <button
+          onclick="langClick('ru')"
+          id="btn-ru"
+          class="px-6 py-2 border border-gray-600 text-gray-400 font-bold tracking-widest hover:bg-gray-800 transition-colors"
+        >
+          [ RU ]
+        </button>
+      </div>
+      <h1
+        class="text-xl md:text-3xl font-bold tracking-[0.5em] glitch-text neon-glow-subtle blink cursor-pointer hover:text-purple-300"
+        id="ui-start-btn"
+        onclick="initiateExperience()"
+        data-text="CLICK TO INITIALIZE"
+      >
+        CLICK TO INITIATE
+      </h1>
+    </div>
+
+    <div class="absolute inset-0 bg-grid opacity-30 pointer-events-none"></div>
+    <div class="absolute inset-0 crt-overlay"></div>
+    <div
+      class="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.9)_100%)] pointer-events-none z-[800]"
+    ></div>
+    <canvas
+      id="noise-canvas"
+      class="absolute inset-0 w-full h-full hidden z-[700]"
+    ></canvas>
+
+    <div
+      id="dos-overlay"
+      class="absolute inset-0 bg-[#020203] z-[600] hidden p-6 md:p-12 flex-col justify-start overflow-hidden pointer-events-none"
+    >
+      <div
+        id="dos-content"
+        class="dos-text flex-grow whitespace-pre-wrap"
+      ></div>
+      <div id="credits-grid-wrap"></div>
+      <div id="back-home-wrap"></div>
+      <span id="dos-cursor" class="dos-text blink hidden">_</span>
+    </div>
+
+    <div
+      id="intro-stage-1"
+      class="absolute inset-0 flex flex-col items-center justify-center hidden z-[500]"
+    >
+      <h1
+        class="text-3xl md:text-6xl font-bold glitch-text neon-glow tracking-tighter"
+        data-text="the-wall.vai-rice.space"
+      >
+        the-wall.vai-rice.space
+      </h1>
+      <p
+        class="text-[10px] md:text-sm tracking-[1em] mt-8 text-purple-200 opacity-80 uppercase font-bold"
+      >
+        presents
+      </p>
+    </div>
+
+    <div
+      id="intro-stage-2"
+      class="absolute inset-0 flex flex-col items-center justify-center hidden z-[500] text-center px-4 bg-black/60 backdrop-blur-md"
+    >
+      <h2
+        class="text-2xl md:text-5xl font-black neon-glow-subtle mb-6 opacity-0 transition-opacity duration-1000 tracking-wide uppercase"
+        id="ui-sub-1"
+      ></h2>
+      <h2
+        class="text-lg md:text-2xl font-bold text-purple-300 mb-12 opacity-0 transition-opacity duration-1000 tracking-widest"
+        id="ui-sub-2"
+      ></h2>
+      <div
+        class="h-px w-32 bg-purple-500/50 mb-12 opacity-0 transition-opacity duration-1000"
+        id="intro-line"
+      ></div>
+      <h2
+        class="text-sm md:text-xl italic text-gray-400 opacity-0 transition-opacity duration-1000 font-serif tracking-widest"
+        id="ui-sub-3"
+      ></h2>
+    </div>
+
+    <div
+      id="intro-stage-3"
+      class="absolute inset-0 flex items-center justify-center hidden z-[500] bg-black"
+    >
+      <h1
+        class="text-5xl md:text-[8rem] font-black glitch-text neon-glow text-center px-4 uppercase leading-none"
+        data-text="THE WALL: PHASE 1"
+      >
+        THE WALL: PHASE 1
+      </h1>
+    </div>
+
+    <div
+      id="main-content"
+      class="absolute inset-0 hidden z-[400] bg-black flex-col items-center justify-center group"
+    >
+      <video
+        id="main-video"
+        class="w-full h-full object-contain hidden"
+        playsinline
+      ></video>
+
+      <div id="video-loading" class="vid-loading hidden">
+        <div class="vid-spinner"></div>
+        <div id="vid-loading-text" class="vid-loading-text">LOADING…</div>
+      </div>
+
+      <div
+        id="center-play"
+        class="center-play-btn hidden"
+        onclick="centerPlayClick()"
+      >
+        <svg width="32" height="32" fill="white" viewBox="0 0 20 20">
+          <path id="center-play-icon" d="M4 4l12 6-12 6z"></path>
+        </svg>
+      </div>
+
+      <div
+        id="video-controls"
+        class="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden flex-col gap-4 z-[410]"
+      >
+        <div class="seekbar-wrap">
+          <div
+            class="seekbar-buffered"
+            id="seekbar-buffered"
+            style="width: 0%"
+          ></div>
+          <div
+            class="seekbar-played"
+            id="seekbar-played"
+            style="width: 0%"
+          ></div>
+          <input
+            type="range"
+            id="vid-seekbar"
+            class="vid-progress"
+            value="0"
+            min="0"
+            max="100"
+            step="0.1"
+          />
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <button
+              id="vid-play"
+              class="text-white hover:text-purple-400 transition-colors"
+            >
+              <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                <path id="play-icon" d="M4 4l12 6-12 6z"></path>
+              </svg>
+            </button>
+            <button
+              id="vid-mute"
+              class="text-white hover:text-purple-400 transition-colors"
+              title="Mute (M)"
+            >
+              <svg
+                class="w-6 h-6"
+                id="mute-icon-svg"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  id="mute-icon-path"
+                  d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
+                />
+              </svg>
+            </button>
+            <button
+              id="vid-music"
+              class="text-white hover:text-purple-400 transition-colors"
+              title="Music (N)"
+            >
+              <svg
+                class="w-6 h-6"
+                id="music-icon-svg"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  id="music-icon-path"
+                  d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
+                />
+              </svg>
+            </button>
+            <span id="vid-time" class="font-mono text-sm">00:00 / 00:00</span>
+          </div>
+          <div class="flex items-center gap-4">
+            <button
+              id="vid-quality"
+              class="text-white hover:text-purple-400 transition-colors font-mono text-sm font-bold tracking-widest"
+              title="Quality (Q)"
+            >
+              HD
+            </button>
+            <button
+              id="vid-fullscreen"
+              class="text-white hover:text-purple-400 transition-colors"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                ></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="no-signal"
+        class="absolute inset-0 hidden flex-col items-center justify-center bg-[#050508]"
+      >
+        <div
+          class="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900 via-[#050508] to-[#050508]"
+        ></div>
+        <h1
+          class="text-3xl font-black text-red-500 tracking-[0.5em] blink shadow-[0_0_20px_rgba(255,0,0,0.5)] z-10"
+          id="ui-no-signal"
+        ></h1>
+      </div>
+    </div>
+
+    <script src="/assets/sfx.js"></script>
+    <script>
+      const VIDEO_URL = "/assets/wall-phase-1-master.mp4";
+
+      // Quality variants, derived from the master filename. Drop
+      // wall-phase-1-medium.mp4 / -small.mp4 next to the master and the
+      // selector switches between them live.
+      const QUALITY_SOURCES = {
+        large: VIDEO_URL,
+        medium: VIDEO_URL.replace("master", "medium"),
+        small: VIDEO_URL.replace("master", "small"),
+      };
+      const QUALITY_ORDER = ["large", "medium", "small"];
+      const QUALITY_LABEL = { large: "HD", medium: "MD", small: "SD" };
+      let currentQuality = "large";
+
+      // Background music played under the video. Leave empty to use the
+      // built-in generative epic score (WallSFX); set a royalty-free track
+      // path (e.g. "/assets/epic.mp3" from Pixabay/FreePD) to use a real one.
+      const MUSIC_URL = "";
+      let bgMusicEl = null;
+
+      // Music on/off is independent of the global mute. Remembered across visits.
+      let musicMuted = false;
+      try {
+        musicMuted = localStorage.getItem("wallMusicMuted") === "1";
+      } catch (e) {}
+
+      let LANG = "en";
+
+      const NAMES = [
+        "VAI (@vai_prog)",
+        "@daavko",
+        "@epphy",
+        "@hanburgundy",
+        "@liquidwater2",
+        "@cloudburst",
+        "@coggers5644",
+        "@dmtihtees",
+        "@devross471",
+        "@arp_kioshima",
+        "@fillion4033",
+        "@swirilniy",
+        "@vovgus",
+        "@slendycandy",
+        "@look.bak",
+        "@.ksai",
+        "@belarwhite",
+        "@justsadsmile",
+        "@matveitopn2006",
+        "@karasium",
+        "@kotovicov",
+        "@derin12",
+        "@unterminge",
+        "@air8280",
+        "@_kinder8_",
+        "@_butter_scotch",
+        "@zephyrbloom",
+        "@rixir_levi",
+        "@thyt",
+        "@monkeeuphoria",
+        "@harddesk",
+        "@crimson_0804",
+        "@teleportbread",
+        "etc...",
+      ];
+
+      function nameHue(str) {
+        let h = 0;
+        for (let i = 0; i < str.length; i++)
+          h = (h * 31 + str.charCodeAt(i)) & 0xffffffff;
+        return Math.abs(h) % 360;
+      }
+
+      function buildCreditsGrid(lang) {
+        const heading = lang === "en" ? "HALL OF LEGENDS" : "ЗАЛ ЛЕГЕНД";
+        const backLabel = lang === "en" ? "← Back to home" : "← На главную";
+        const gridWrap = document.getElementById("credits-grid-wrap");
+        const backWrap = document.getElementById("back-home-wrap");
+
+        let html = `<div class="credits-grid-heading">${heading}</div><div class="credits-grid">`;
+        for (const name of NAMES) {
+          if (name === "VAI (@vai_prog)") {
+            html += `<div class="name-chip name-chip-vai"><span>VAI</span></div>`;
+          } else {
+            const hue = nameHue(name);
+            const bg = `hsla(${hue},60%,18%,0.85)`;
+            const border = `hsla(${hue},70%,50%,0.4)`;
+            const color = `hsl(${hue},80%,78%)`;
+            html += `<div class="name-chip" style="background:${bg};border-color:${border};color:${color}">${name}</div>`;
+          }
+        }
+        html += `</div>`;
+        gridWrap.innerHTML = html;
+        gridWrap.style.display = "block";
+
+        backWrap.innerHTML = `<a href="/" class="back-home-btn">${backLabel}</a>`;
+        backWrap.style.display = "block";
+      }
+
+      const i18n = {
+        en: {
+          startBtn: "CLICK TO INITIATE",
+          sub1: "Timelapse of THE WALL.",
+          sub2: "MADE FOR SNACKERS BY VAI",
+          sub3: "Sit back, relax, and prepare for the viewing.",
+          noSignal: "NO SIGNAL DETECTED. WAITING...",
+          dosIntro: [
+            {
+              t: "VAI_OS(tm) BIOS v2.31\nCopyright (C) 1998, VAI Corporation.",
+              d: 80,
+            },
+            { t: "All Rights Reserved\n\n", d: 40 },
+            { t: "Main Processor : VAI-686(tm) 666MHz\n", d: 150 },
+            { t: "Numeric Co-Processor : Embedded\n\n", d: 100 },
+            { t: "Press DEL to enter SETUP. Press F8 for boot menu.", d: 300 },
+            { t: "\nMemory Test: 16384K", d: 100 },
+            { t: "Memory Test: 32768K", d: 100 },
+            { t: "Memory Test: 49152K", d: 100 },
+            { t: "Memory Test: 65536K OK", c: "dos-success", d: 300 },
+            {
+              t: "\nDetecting Primary Master... IDE HDD WD-WALL-6000 (128GB)",
+              d: 300,
+            },
+            { t: "Detecting Primary Slave...  IDE CDROM PIXELS-52X", d: 200 },
+            { t: "Detecting Secondary Master.. [None]", d: 150 },
+            {
+              t: "IRQ settings: IRQ0=Filian IRQ1=Snackers IRQ8=Clueless",
+              c: "dos-text",
+              d: 300,
+            },
+            {
+              t: "PCI Device Listing: Slot 1 VGA  Slot 2 SNACK-NET  Slot 3 WALL-I/O",
+              d: 200,
+            },
+            { t: "\nLoading HIMEM.SYS...", d: 300 },
+            {
+              t: "HIMEM is testing extended memory... 65536K available. OK",
+              c: "dos-success",
+              d: 400,
+            },
+            { t: "Loading EMM386.EXE... Upper Memory Blocks active.", d: 200 },
+            { t: "\nC:\\> CHKDSK /F", d: 300 },
+            { t: "Checking file system on C:\\THE_WALL_\\...", d: 200 },
+            { t: "137,438,953,472 bytes total disk space (128 GB).", d: 100 },
+            {
+              t: "        5,492 files found  (~120 GB of 6K wall snapshots).",
+              c: "dos-text",
+              d: 300,
+            },
+            {
+              t: "        4,096 bytes in 1 bad sector (Sector 7G — don't ask).",
+              c: "dos-warning",
+              d: 300,
+            },
+            {
+              t: "8,021,200,896 bytes available on disk. Lgtm.",
+              c: "dos-success",
+              d: 300,
+            },
+            { t: "\nProcessing C:\\CONFIG.SYS...", d: 200 },
+            { t: "  DEVICE=C:\\DOS\\HIMEM.SYS", d: 100 },
+            { t: "  DEVICE=C:\\DOS\\EMM386.EXE NOEMS", d: 100 },
+            { t: "  FILES=99  ; you'll need them all", d: 150 },
+            { t: "  BUFFERS=32  ; likewise", d: 150 },
+            {
+              t: "  STACKS=9,512  ; stack overflows are Filian's problem now",
+              c: "dos-text",
+              d: 200,
+            },
+            { t: "\nProcessing C:\\AUTOEXEC.BAT...", d: 200 },
+            { t: "  SET COMSPEC=C:\\DOS\\COMMAND.COM", d: 100 },
+            { t: "  SET PATH=C:\\DOS;C:\\WALL;C:\\VAI\\BIN", d: 100 },
+            { t: "  SET SNACKERS=TRUE", c: "dos-success", d: 200 },
+            { t: "  SET FILIAN=LOST_BUT_FINDABLE", c: "dos-highlight", d: 200 },
+            { t: "  CALL C:\\VAI\\INIT_WALL.BAT", d: 600 },
+            { t: "VAI_OS [Version 10.0.19045]", d: 200, clearBefore: true },
+            { t: "(c) VAI Corporation. All rights reserved.\n", d: 300 },
+            { t: "Connecting to filianislost.com...", d: 500 },
+            { t: "Establishing secure tunnel... OK", c: "dos-success", d: 400 },
+            {
+              t: "\nWARNING: UNAUTHORIZED ACCESS DETECTED.",
+              c: "dos-warning",
+              d: 600,
+              err: true,
+            },
+            { t: "Are you sure you want to find her? (Y / n)", d: 600 },
+            { t: "> Y", c: "dos-highlight", d: 400 },
+            { t: "Access granted.", c: "dos-success", d: 500, sfx: "powerUp" },
+            { t: "Let the wall begin.", c: "dos-highlight", d: 800, sfx: "chime" },
+            { t: "\nLoading pixel wall architecture...", d: 300 },
+            { loader: true, c: "dos-success", d: 1500 },
+          ],
+          dosOutro: [
+            { t: "C:\\THE_WALL_\\> taskkill /F /IM wall.phase1.exe", d: 400 },
+            {
+              t: 'SUCCESS: The process "wall.phase1.exe" with PID 8008 has been terminated.',
+              c: "dos-success",
+              d: 600,
+            },
+            {
+              t: "\nTransitioning to the next phase of the wall. Continue? (Y / n)",
+              d: 600,
+            },
+            { t: "> Y", c: "dos-highlight", d: 400 },
+            {
+              t: "Are you ready to witness the power of Snackers? (Y / n)",
+              d: 600,
+            },
+            { t: "> Y", c: "dos-highlight", d: 400 },
+            { t: "\n Getting access to Snackers network...", d: 300 },
+            { loader: true, c: "dos-success", d: 1200 },
+            {
+              t: "\nFATAL EXCEPTION 0x00000008: Database corruption detected in sector 7G.",
+              c: "dos-warning",
+              d: 600,
+              err: true,
+            },
+            { t: "Attempting automatic data recovery...", d: 500 },
+            { t: "Scanning Sector 1... [FAIL]", c: "dos-warning", d: 300 },
+            { t: "Scanning Sector 2... [FAIL]", c: "dos-warning", d: 300 },
+            { t: "Scanning Sector 3... [FAIL]", c: "dos-warning", d: 400 },
+            {
+              t: "CRITICAL FAILURE. SIGNAL LOST.",
+              c: "dos-red blink",
+              d: 1000,
+              err: true,
+            },
+            {
+              t: "WARNING: ALL USER DATA HAS BEEN RESET TO ZERO.",
+              c: "dos-red",
+              d: 800,
+            },
+            { t: "\nReverting to fallback state...", d: 800 },
+            { t: "Establishing manual override coordinates...", d: 600 },
+            {
+              t: "\n>>> MEET US AT SHIBUYA CROSSING ON THE BIGGEST BILLBOARD IN THE WORLD. <<<\n",
+              c: "dos-highlight glitch-text",
+              d: 2000,
+              glitch: true,
+            },
+            {
+              t: "DEFINITELY_NOT_FILIAN: Friends, you are closer to me now than ever before. Keep it up. See you soon... I hope...",
+              c: "dos-filian",
+              d: 3000,
+              glitchLine: true,
+            },
+            { t: "\nC:\\VAI\\ROOT> type big_respect.txt", d: 600 },
+          ],
+          credits: [
+            {
+              t: "===< WITHOUT WHOM THIS WOULD BE IMPOSSIBLE >===",
+              c: "dos-highlight",
+              d: 500,
+              clearBefore: true,
+            },
+            { t: "The Wall: filianislost.com & x.com/THE_W4LL_", d: 250 },
+            { t: "VAI: vai_prog & x.com/VAI_PROG", d: 250 },
+            { t: "Snackers: discord.gg/filian", d: 250 },
+            { t: "Snackers RU: discord.gg/snackers", d: 250 },
+            { t: "Snackers ARG: discord.gg/esfqqUFBS5", d: 250 },
+            { t: "Neuro-sama Headquarters: discord.gg/neurosama", d: 700 },
+            {
+              t: "\nEdited by one person who regrets nothing...",
+              d: 1100,
+            },
+            {
+              t: "\n...except the almost two days — two full, sleepless, soul-crushing days — spent downloading all 5,492 snapshots (~120 GB of 6K images) over a VPN, one file at a time.",
+              d: 1700,
+            },
+            {
+              t: "\nWas it worth it?",
+              d: 1300,
+            },
+            {
+              t: "Every single pixel of it.",
+              c: "dos-success",
+              d: 1200,
+            },
+            {
+              t: "\nWould I do it again?",
+              d: 1300,
+            },
+            {
+              t: "...ask me after a nap.",
+              d: 1600,
+            },
+            {
+              t: "\nVAI is always ready to serve the Filian community — and beyond.",
+              c: "dos-success",
+              d: 1900,
+            },
+            {
+              t: "\nThanks for watching. Truly. <3",
+              c: "dos-highlight",
+              d: 1600,
+            },
+            {
+              t: "The full video will land on YouTube a little later — stay tuned.",
+              c: "dos-success",
+              d: 1900,
+            },
+            {
+              t: "===< SPECIAL THANKS FROM VAI, TOO >===",
+              c: "dos-highlight",
+              d: 500,
+              clearBefore: true,
+            },
+            {
+              t: "Legends assembled below. You know exactly who you are.",
+              c: "dos-text",
+              d: 800,
+            },
+            {
+              t: "\nThere are far too many of you to fit in a line — so I wrote down every legend I could remember. Thank you. All of you.",
+              c: "dos-highlight",
+              d: 2200,
+            },
+          ],
+        },
+        ru: {
+          startBtn: "НАЖМИТЕ ДЛЯ ЗАПУСКА",
+          sub1: "Таймлапс СТЕНЫ.",
+          sub2: "СДЕЛАНО ДЛЯ СНЭКЕРСОВ ОТ VAI",
+          sub3: "Присаживайтесь поудобнее и приготовьтесь к просмотру.",
+          noSignal: "СИГНАЛ НЕ ОБНАРУЖЕН. ОЖИДАНИЕ...",
+          dosIntro: [
+            {
+              t: "VAI_OS(tm) BIOS v2.31\nCopyright (C) 1998, VAI Corporation.",
+              d: 80,
+            },
+            { t: "Все права защищены\n\n", d: 40 },
+            { t: "Главный процессор : VAI-686(tm) 666MHz\n", d: 150 },
+            { t: "Числовой сопроцессор : Встроенный\n\n", d: 100 },
+            { t: "Нажмите DEL для входа в SETUP. F8 — меню загрузки.", d: 300 },
+            { t: "\nПроверка памяти: 16384K", d: 100 },
+            { t: "Проверка памяти: 32768K", d: 100 },
+            { t: "Проверка памяти: 49152K", d: 100 },
+            { t: "Проверка памяти: 65536K OK", c: "dos-success", d: 300 },
+            {
+              t: "\nОбнаружение Primary Master... IDE HDD WD-WALL-6000 (128GB)",
+              d: 300,
+            },
+            { t: "Обнаружение Primary Slave...  IDE CDROM PIXELS-52X", d: 200 },
+            { t: "Обнаружение Secondary Master.. [Нет]", d: 150 },
+            {
+              t: "IRQ настройки: IRQ0=Filian IRQ1=Snackers IRQ8=Без понятия",
+              c: "dos-text",
+              d: 300,
+            },
+            {
+              t: "Устройства PCI: Слот 1 VGA  Слот 2 SNACK-NET  Слот 3 WALL-I/O",
+              d: 200,
+            },
+            { t: "\nЗагрузка HIMEM.SYS...", d: 300 },
+            {
+              t: "HIMEM тестирует расширенную память... 65536K доступно. OK",
+              c: "dos-success",
+              d: 400,
+            },
+            {
+              t: "Загрузка EMM386.EXE... Верхние блоки памяти активны.",
+              d: 200,
+            },
+            { t: "\nC:\\> CHKDSK /F", d: 300 },
+            { t: "Проверка файловой системы C:\\THE_WALL_\\...", d: 200 },
+            { t: "137,438,953,472 байт всего на диске (128 ГБ).", d: 100 },
+            {
+              t: "        5,492 файла найдено  (~120 ГБ 6K-снимков стены).",
+              c: "dos-text",
+              d: 300,
+            },
+            {
+              t: "        4,096 байт в 1 плохом секторе (Сектор 7G — не спрашивайте).",
+              c: "dos-warning",
+              d: 300,
+            },
+            {
+              t: "8,021,200,896 байт доступно на диске. Сойдёт.",
+              c: "dos-success",
+              d: 300,
+            },
+            { t: "\nОбработка C:\\CONFIG.SYS...", d: 200 },
+            { t: "  DEVICE=C:\\DOS\\HIMEM.SYS", d: 100 },
+            { t: "  DEVICE=C:\\DOS\\EMM386.EXE NOEMS", d: 100 },
+            { t: "  FILES=99  ; все пригодятся", d: 150 },
+            { t: "  BUFFERS=32  ; аналогично", d: 150 },
+            {
+              t: "  STACKS=9,512  ; переполнение стека — теперь проблемы Filian",
+              c: "dos-text",
+              d: 200,
+            },
+            { t: "\nОбработка C:\\AUTOEXEC.BAT...", d: 200 },
+            { t: "  SET COMSPEC=C:\\DOS\\COMMAND.COM", d: 100 },
+            { t: "  SET PATH=C:\\DOS;C:\\WALL;C:\\VAI\\BIN", d: 100 },
+            { t: "  SET SNACKERS=TRUE", c: "dos-success", d: 200 },
+            {
+              t: "  SET FILIAN=ПОТЕРЯНА_НО_НАЙДЁТСЯ",
+              c: "dos-highlight",
+              d: 200,
+            },
+            { t: "  CALL C:\\VAI\\INIT_WALL.BAT", d: 600 },
+            { t: "VAI_OS [Версия 10.0.19045]", d: 200, clearBefore: true },
+            { t: "(c) Корпорация VAI. Все права защищены.\n", d: 300 },
+            { t: "Подключение к filianislost.com...", d: 500 },
+            {
+              t: "Установка защищенного туннеля... OK",
+              c: "dos-success",
+              d: 400,
+            },
+            {
+              t: "\nВНИМАНИЕ: ОБНАРУЖЕН НЕСАНКЦИОНИРОВАННЫЙ ДОСТУП.",
+              c: "dos-warning",
+              d: 600,
+              err: true,
+            },
+            { t: "Вы уверены, что хотите найти ее? (Y / n)", d: 600 },
+            { t: "> Y", c: "dos-highlight", d: 400 },
+            { t: "Доступ разрешен.", c: "dos-success", d: 500, sfx: "powerUp" },
+            { t: "Пусть стена начнётся.", c: "dos-highlight", d: 800, sfx: "chime" },
+            { t: "\nЗагрузка архитектуры пиксельной стены...", d: 300 },
+            { loader: true, c: "dos-success", d: 1500 },
+          ],
+          dosOutro: [
+            { t: "C:\\THE_WALL_\\> taskkill /F /IM wall.phase1.exe", d: 400 },
+            {
+              t: 'УСПЕХ: Процесс "wall.phase1.exe" с PID 8008 был завершен.',
+              c: "dos-success",
+              d: 600,
+            },
+            {
+              t: "\nПереход к следующему этапу стены. Продолжить? (Y / n)",
+              d: 600,
+            },
+            { t: "> Y", c: "dos-highlight", d: 400 },
+            { t: "Готовы ли вы узреть мощь Snackers? (Y / n)", d: 600 },
+            { t: "> Y", c: "dos-highlight", d: 400 },
+            { t: "\nПолучение доступа к сети Snackers...", d: 300 },
+            { loader: true, c: "dos-success", d: 1200 },
+            {
+              t: "\nФАТАЛЬНАЯ ОШИБКА 0x00000008: Повреждение базы данных в секторе 7G.",
+              c: "dos-warning",
+              d: 600,
+              err: true,
+            },
+            { t: "Попытка автоматического восстановления данных...", d: 500 },
+            {
+              t: "Сканирование сектора 1... [ОШИБКА]",
+              c: "dos-warning",
+              d: 300,
+            },
+            {
+              t: "Сканирование сектора 2... [ОШИБКА]",
+              c: "dos-warning",
+              d: 300,
+            },
+            {
+              t: "Сканирование сектора 3... [ОШИБКА]",
+              c: "dos-warning",
+              d: 400,
+            },
+            {
+              t: "КРИТИЧЕСКИЙ СБОЙ. СИГНАЛ ПОТЕРЯН.",
+              c: "dos-red blink",
+              d: 1000,
+              err: true,
+            },
+            {
+              t: "ВНИМАНИЕ: ВСЕ ДАННЫЕ ПОЛЬЗОВАТЕЛЕЙ ОБНУЛЕНЫ.",
+              c: "dos-red",
+              d: 800,
+            },
+            { t: "\nВозврат к исходному состоянию...", d: 800 },
+            { t: "Установка координат ручного управления...", d: 600 },
+            {
+              t: "\n>>> ВСТРЕТИМСЯ НА ПЕРЕХОДЕ СИБУЯ НА САМОМ БОЛЬШОМ БИЛБОРДЕ В МИРЕ. <<<\n",
+              c: "dos-highlight glitch-text",
+              d: 2000,
+              glitch: true,
+            },
+            {
+              t: "DEFINITELY_NOT_FILIAN: Друзья вы уже очень близки ко мне, так как никогда раньше продолжайте в том же духе. Скоро увидимся... Надеюсь...",
+              c: "dos-filian",
+              d: 3000,
+              glitchLine: true,
+            },
+            { t: "\nC:\\VAI\\ROOT> type big_respect.txt", d: 600 },
+          ],
+          credits: [
+            {
+              t: "===< БЕЗ КОГО ЭТО БЫЛО БЫ НЕВОЗМОЖНО >===",
+              c: "dos-highlight",
+              d: 500,
+              clearBefore: true,
+            },
+            { t: "The Wall: filianislost.com & x.com/THE_W4LL_", d: 250 },
+            { t: "VAI: vai_prog & x.com/VAI_PROG", d: 250 },
+            { t: "Snackers: discord.gg/filian", d: 250 },
+            { t: "Snackers RU: discord.gg/snackers", d: 250 },
+            { t: "Snackers ARG: discord.gg/esfqqUFBS5", d: 250 },
+            { t: "Neuro-sama Headquarters: discord.gg/neurosama", d: 700 },
+            {
+              t: "\nСмонтировано одним человеком, который ни о чём не жалеет...",
+              d: 1100,
+            },
+            {
+              t: "\n...кроме почти двух дней — двух полных, бессонных, выжигающих душу дней — потраченных на скачивание всех 5 492 снимков (~120 ГБ 6K-изображений) через VPN, по одному файлу.",
+              d: 1700,
+            },
+            {
+              t: "\nСтоило ли оно того?",
+              d: 1300,
+            },
+            {
+              t: "До последнего пикселя.",
+              c: "dos-success",
+              d: 1200,
+            },
+            {
+              t: "\nПовторил бы снова?",
+              d: 1300,
+            },
+            {
+              t: "...спросите после сна.",
+              d: 1600,
+            },
+            {
+              t: "\nVAI всегда готов служить сообществу Filian — и не только.",
+              c: "dos-success",
+              d: 1900,
+            },
+            {
+              t: "\nСпасибо, что досмотрели. Правда. <3",
+              c: "dos-highlight",
+              d: 1600,
+            },
+            {
+              t: "Полное видео чуть позже зальём на YouTube — следите за обновлениями.",
+              c: "dos-success",
+              d: 1900,
+            },
+            {
+              t: "===< ОСОБАЯ БЛАГОДАРНОСТЬ ТАКЖЕ ОТ VAI >===",
+              c: "dos-highlight",
+              d: 500,
+              clearBefore: true,
+            },
+            {
+              t: "Легенды собраны ниже. Вы точно знаете, кто вы.",
+              c: "dos-text",
+              d: 800,
+            },
+            {
+              t: "\nВас слишком много, чтобы уместить в одну строку — поэтому я выписал каждую легенду, какую только вспомнил. Спасибо вам. Всем.",
+              c: "dos-highlight",
+              d: 2200,
+            },
+          ],
+        },
+      };
+
+      // Language pick is the first user gesture — wake audio + give a tick.
+      function langClick(lang) {
+        WallSFX.init();
+        WallSFX.select();
+        setLang(lang);
+      }
+
+      function setLang(lang) {
+        LANG = lang;
+        document.getElementById("btn-en").className =
+          lang === "en"
+            ? "px-6 py-2 border border-purple-500 text-purple-400 font-bold tracking-widest bg-purple-900/50 shadow-[0_0_15px_rgba(176,38,255,0.4)]"
+            : "px-6 py-2 border border-gray-600 text-gray-400 font-bold tracking-widest hover:bg-gray-800 transition-colors";
+        document.getElementById("btn-ru").className =
+          lang === "ru"
+            ? "px-6 py-2 border border-purple-500 text-purple-400 font-bold tracking-widest bg-purple-900/50 shadow-[0_0_15px_rgba(176,38,255,0.4)]"
+            : "px-6 py-2 border border-gray-600 text-gray-400 font-bold tracking-widest hover:bg-gray-800 transition-colors";
+        document
+          .getElementById("ui-start-btn")
+          .setAttribute("data-text", i18n[LANG].startBtn);
+        document.getElementById("ui-start-btn").innerText = i18n[LANG].startBtn;
+        document.getElementById("ui-sub-1").innerText = i18n[LANG].sub1;
+        document.getElementById("ui-sub-2").innerText = i18n[LANG].sub2;
+        document.getElementById("ui-sub-3").innerText = i18n[LANG].sub3;
+        document.getElementById("ui-no-signal").innerText = i18n[LANG].noSignal;
+      }
+
+      setLang("en");
+
+      // Audio is the shared WallSFX bank (assets/sfx.js) — synthesised live,
+      // no files. These thin aliases keep the existing call sites unchanged.
+      const initAudio = () => WallSFX.init();
+      const playTypingSound = () => WallSFX.typing();
+      const playGlitchSound = (ms) => WallSFX.glitch(ms);
+      const playErrorSound = () => WallSFX.error();
+      const playImpactSound = () => WallSFX.impact();
+
+      const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
+      function playNoiseFX(duration) {
+        playGlitchSound(duration);
+        const canvas = document.getElementById("noise-canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.classList.remove("hidden");
+        const rect = document.body.getBoundingClientRect();
+        canvas.width = Math.max(1, Math.floor(rect.width / 4));
+        canvas.height = Math.max(1, Math.floor(rect.height / 4));
+        canvas.style.imageRendering = "pixelated";
+
+        const start = Date.now();
+        function render() {
+          if (Date.now() - start > duration) {
+            canvas.classList.add("hidden");
+            return;
+          }
+          const imgData = ctx.createImageData(canvas.width, canvas.height);
+          for (let i = 0; i < imgData.data.length; i += 4) {
+            const v = Math.random() * 255;
+            imgData.data[i] = v * 0.9;
+            imgData.data[i + 1] = v * 0.1;
+            imgData.data[i + 2] = v;
+            imgData.data[i + 3] = Math.random() * 255;
+          }
+          ctx.putImageData(imgData, 0, 0);
+          requestAnimationFrame(render);
+        }
+        render();
+      }
+
+      async function typeDOS(lines) {
+        const content = document.getElementById("dos-content");
+        let cursor = document.getElementById("dos-cursor");
+        if (!cursor) {
+          cursor = document.createElement("span");
+          cursor.id = "dos-cursor";
+          cursor.className = "dos-text blink";
+          cursor.textContent = "_";
+        }
+        cursor.classList.remove("hidden");
+
+        for (let line of lines) {
+          if (line.clearBefore) {
+            content.innerHTML = "";
+            content.appendChild(cursor);
+            await delay(120);
+          }
+          const span = document.createElement("span");
+          span.className = line.c || "dos-text";
+          content.appendChild(span);
+          content.appendChild(cursor);
+
+          if (line.err) playErrorSound();
+          if (line.glitch) playGlitchSound(200);
+          if (line.sfx && WallSFX[line.sfx]) WallSFX[line.sfx]();
+
+          if (line.loader) {
+            const steps = 20;
+            const stepDelay = line.d / steps;
+            for (let i = 1; i <= steps; i++) {
+              const percent = Math.floor((i / steps) * 100);
+              const bars = "█".repeat(i) + "░".repeat(steps - i);
+              span.textContent = `[${bars}] ${percent}%`;
+              if (i % 2 === 0) playTypingSound();
+              await delay(stepDelay);
+            }
+          } else if (line.instant) {
+            span.textContent = line.t;
+            await delay(line.d);
+          } else {
+            const charDelay = line.glitchLine ? 50 : 25;
+            for (let char of line.t) {
+              span.textContent += char;
+              if (char !== " ") playTypingSound();
+
+              if (line.glitchLine && Math.random() > 0.8) {
+                playGlitchSound(50);
+                span.style.transform = `translate(${(Math.random() - 0.5) * 4}px, ${(Math.random() - 0.5) * 4}px)`;
+                setTimeout(() => (span.style.transform = "none"), 50);
+              }
+
+              if (content.parentElement)
+                content.parentElement.scrollTop =
+                  content.parentElement.scrollHeight;
+              await delay(charDelay);
+            }
+            await delay(line.d);
+          }
+          content.appendChild(document.createTextNode("\n"));
+        }
+      }
+
+      function goFullscreen() {
+        const el = document.documentElement;
+        const req =
+          el.requestFullscreen ||
+          el.webkitRequestFullscreen ||
+          el.mozRequestFullScreen ||
+          el.msRequestFullscreen;
+        if (!req) return;
+        try {
+          const p = req.call(el);
+          if (p && p.catch) p.catch(() => {});
+        } catch (e) {}
+      }
+
+      async function initiateExperience() {
+        goFullscreen();
+        document.getElementById("start-screen").classList.add("hidden");
+        initAudio();
+        document.body.style.cursor = "none";
+        await playIntro();
+      }
+
+      async function playIntro() {
+        const dosOverlay = document.getElementById("dos-overlay");
+        dosOverlay.classList.remove("hidden");
+
+        await typeDOS(i18n[LANG].dosIntro);
+
+        dosOverlay.classList.add("hidden");
+        const st1 = document.getElementById("intro-stage-1"),
+          st2 = document.getElementById("intro-stage-2"),
+          st3 = document.getElementById("intro-stage-3");
+
+        st1.classList.remove("hidden");
+        await delay(3000);
+        st1.classList.add("tv-off-anim");
+        playErrorSound();
+        await delay(500);
+        st1.classList.add("hidden");
+
+        st2.classList.remove("hidden");
+        WallSFX.whoosh();
+        document.getElementById("ui-sub-1").style.opacity = "1";
+        await delay(1500);
+        document.getElementById("ui-sub-2").style.opacity = "1";
+        document.getElementById("intro-line").style.opacity = "1";
+        await delay(1500);
+        document.getElementById("ui-sub-3").style.opacity = "1";
+        WallSFX.chime();
+        await delay(3000);
+        st2.style.transition = "opacity 1s";
+        st2.style.opacity = "0";
+        await delay(1000);
+        st2.classList.add("hidden");
+
+        playNoiseFX(600);
+        await delay(500);
+        st3.classList.remove("hidden");
+        st3.classList.add("flicker");
+        playImpactSound();
+        await delay(3500);
+        st3.style.transition = "all 2.5s cubic-bezier(0.4, 0, 0.2, 1)";
+        st3.style.opacity = "0";
+        st3.style.filter = "blur(40px)";
+        st3.classList.remove("flicker");
+        await delay(2500);
+        st3.classList.add("hidden");
+
+        startMainPhase();
+      }
+
+      function startMainPhase() {
+        document.body.style.cursor = "default";
+        const mainContent = document.getElementById("main-content");
+        mainContent.classList.remove("hidden");
+        mainContent.classList.add("flex");
+
+        if (VIDEO_URL && VIDEO_URL.trim() !== "") {
+          initVideoPlayer();
+        } else {
+          initNoSignal();
+        }
+      }
+
+      function initVideoPlayer() {
+        const video = document.getElementById("main-video");
+        const controls = document.getElementById("video-controls");
+        const playBtn = document.getElementById("vid-play");
+        const muteBtn = document.getElementById("vid-mute");
+        const seekbar = document.getElementById("vid-seekbar");
+        const bufferedBar = document.getElementById("seekbar-buffered");
+        const playedBar = document.getElementById("seekbar-played");
+        const timeDisplay = document.getElementById("vid-time");
+        const fullscreenBtn = document.getElementById("vid-fullscreen");
+        const iconPath = document.getElementById("play-icon");
+        const centerPlay = document.getElementById("center-play");
+        const centerPlayIcon = document.getElementById("center-play-icon");
+        const muteIconPath = document.getElementById("mute-icon-path");
+        const musicBtn = document.getElementById("vid-music");
+        const musicIconPath = document.getElementById("music-icon-path");
+        const qualityBtn = document.getElementById("vid-quality");
+        const loadingEl = document.getElementById("video-loading");
+        const loadingText = document.getElementById("vid-loading-text");
+
+        const showLoading = (txt) => {
+          loadingText.textContent = txt;
+          loadingEl.classList.remove("hidden");
+        };
+        const hideLoading = () => loadingEl.classList.add("hidden");
+
+        // Background music: a real track when MUSIC_URL is set, otherwise the
+        // generative epic score from WallSFX. Starts with playback and follows
+        // the video's mute state.
+        const startMusic = () => {
+          if (MUSIC_URL) {
+            if (!bgMusicEl) {
+              bgMusicEl = new Audio(MUSIC_URL);
+              bgMusicEl.loop = true;
+              bgMusicEl.volume = 0.5;
+            }
+            bgMusicEl.muted = video.muted || musicMuted;
+            bgMusicEl.play().catch(() => {});
+          } else {
+            WallSFX.startScore();
+          }
+        };
+        const stopMusic = () => {
+          if (bgMusicEl) {
+            bgMusicEl.pause();
+            bgMusicEl.currentTime = 0;
+          }
+          WallSFX.stopScore();
+        };
+        window.__stopTimelapseMusic = stopMusic;
+
+        qualityBtn.textContent = QUALITY_LABEL[currentQuality];
+        video.src = QUALITY_SOURCES[currentQuality];
+        showLoading("LOADING…");
+        video.classList.remove("hidden");
+        controls.classList.remove("hidden");
+        controls.classList.add("flex");
+        centerPlay.classList.remove("hidden");
+
+        const formatTime = (sec) => {
+          if (isNaN(sec)) return "00:00";
+          let m = Math.floor(sec / 60),
+            s = Math.floor(sec % 60);
+          return `${m < 10 ? "0" + m : m}:${s < 10 ? "0" + s : s}`;
+        };
+
+        const PLAY_D = "M4 4l12 6-12 6z";
+        const PAUSE_D = "M6 4h4v12H6zM14 4h4v12h-4z";
+        const VOL_ON_D =
+          "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z";
+        const VOL_OFF_D =
+          "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z";
+
+        const MUSIC_ON_D =
+          "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z";
+        const MUSIC_OFF_D =
+          "M4.27 3L3 4.27l9 9v.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4v-1.73L19.73 21 21 19.73 4.27 3zM14 7h4V3h-6v5.18l2 2z";
+
+        const syncMuteIcon = () => {
+          muteIconPath.setAttribute("d", video.muted ? VOL_OFF_D : VOL_ON_D);
+          WallSFX.setMuted(video.muted);
+          if (bgMusicEl) bgMusicEl.muted = video.muted || musicMuted;
+        };
+
+        // The music toggle silences only the score, independent of the global
+        // mute. Dimmed icon (with a slash) signals "music off".
+        const syncMusicIcon = () => {
+          musicIconPath.setAttribute("d", musicMuted ? MUSIC_OFF_D : MUSIC_ON_D);
+          musicBtn.classList.toggle("text-gray-500", musicMuted);
+          musicBtn.classList.toggle("text-white", !musicMuted);
+          WallSFX.setMusicMuted(musicMuted);
+          if (bgMusicEl) bgMusicEl.muted = video.muted || musicMuted;
+        };
+
+        const toggleMusic = () => {
+          WallSFX.select();
+          musicMuted = !musicMuted;
+          try {
+            localStorage.setItem("wallMusicMuted", musicMuted ? "1" : "0");
+          } catch (e) {}
+          syncMusicIcon();
+        };
+
+        const syncPlayIcon = (playing) => {
+          iconPath.setAttribute("d", playing ? PAUSE_D : PLAY_D);
+          centerPlayIcon.setAttribute("d", playing ? PAUSE_D : PLAY_D);
+          centerPlay.style.opacity = playing ? "0" : "1";
+          centerPlay.style.pointerEvents = playing ? "none" : "auto";
+        };
+
+        const togglePlay = () => {
+          WallSFX.select();
+          if (video.paused) {
+            video.play();
+          } else {
+            video.pause();
+          }
+        };
+
+        window.centerPlayClick = togglePlay;
+
+        video.onplay = () => {
+          syncPlayIcon(true);
+          startMusic();
+        };
+        video.onpause = () => syncPlayIcon(false);
+
+        // Loading / buffering overlay.
+        video.addEventListener("waiting", () => showLoading("BUFFERING…"));
+        video.addEventListener("stalled", () => showLoading("BUFFERING…"));
+        video.addEventListener("playing", hideLoading);
+        video.addEventListener("canplay", hideLoading);
+        video.addEventListener("loadeddata", hideLoading);
+
+        playBtn.onclick = togglePlay;
+        video.onclick = togglePlay;
+
+        muteBtn.onclick = () => {
+          WallSFX.select();
+          video.muted = !video.muted;
+          syncMuteIcon();
+        };
+
+        musicBtn.onclick = toggleMusic;
+
+        video.ontimeupdate = () => {
+          if (!video.duration) return;
+          const pct = (video.currentTime / video.duration) * 100;
+          seekbar.value = pct;
+          playedBar.style.width = pct + "%";
+          timeDisplay.innerText = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+        };
+
+        video.onprogress = () => {
+          if (video.buffered.length > 0 && video.duration) {
+            const buffPct =
+              (video.buffered.end(video.buffered.length - 1) / video.duration) *
+              100;
+            bufferedBar.style.width = buffPct + "%";
+          }
+        };
+
+        seekbar.oninput = (e) => {
+          video.currentTime = (e.target.value / 100) * video.duration;
+          playedBar.style.width = e.target.value + "%";
+        };
+
+        const toggleFullscreen = () => {
+          WallSFX.whoosh();
+          const el = document.getElementById("main-content");
+          if (document.fullscreenElement) {
+            document.exitFullscreen && document.exitFullscreen();
+          } else {
+            el.requestFullscreen
+              ? el.requestFullscreen()
+              : el.webkitRequestFullscreen && el.webkitRequestFullscreen();
+          }
+        };
+
+        fullscreenBtn.onclick = toggleFullscreen;
+
+        // Cycle large → medium → small, keeping position + play state.
+        const switchQuality = () => {
+          const idx = QUALITY_ORDER.indexOf(currentQuality);
+          currentQuality = QUALITY_ORDER[(idx + 1) % QUALITY_ORDER.length];
+          qualityBtn.textContent = QUALITY_LABEL[currentQuality];
+          WallSFX.beep();
+          const t = video.currentTime;
+          const wasPlaying = !video.paused;
+          showLoading("LOADING…");
+          video.src = QUALITY_SOURCES[currentQuality];
+          video.addEventListener("loadedmetadata", function onMeta() {
+            video.removeEventListener("loadedmetadata", onMeta);
+            try {
+              video.currentTime = t;
+            } catch (e) {}
+            if (wasPlaying) video.play().catch(() => {});
+          });
+        };
+        qualityBtn.onclick = switchQuality;
+
+        document.addEventListener("keydown", (e) => {
+          if (
+            !document.getElementById("main-content") ||
+            document.getElementById("main-content").classList.contains("hidden")
+          )
+            return;
+          switch (e.key) {
+            case " ":
+            case "k":
+              e.preventDefault();
+              togglePlay();
+              break;
+            case "f":
+            case "F":
+              e.preventDefault();
+              toggleFullscreen();
+              break;
+            case "m":
+            case "M":
+              video.muted = !video.muted;
+              syncMuteIcon();
+              break;
+            case "n":
+            case "N":
+              toggleMusic();
+              break;
+            case "q":
+            case "Q":
+              switchQuality();
+              break;
+            case "ArrowLeft":
+              video.currentTime = Math.max(0, video.currentTime - 5);
+              break;
+            case "ArrowRight":
+              video.currentTime = Math.min(
+                video.duration || 0,
+                video.currentTime + 5,
+              );
+              break;
+          }
+        });
+
+        video.onended = () => {
+          stopMusic();
+          hideLoading();
+          document.getElementById("main-content").classList.add("hidden");
+          playOutro();
+        };
+
+        video.play().catch(() => {
+          syncPlayIcon(false);
+        });
+
+        syncMuteIcon();
+        syncMusicIcon();
+      }
+
+      async function initNoSignal() {
+        const noSig = document.getElementById("no-signal");
+        noSig.classList.remove("hidden");
+        noSig.classList.add("flex");
+
+        await delay(5000);
+        document.getElementById("main-content").classList.add("hidden");
+        playOutro();
+      }
+
+      async function playOutro() {
+        if (window.__stopTimelapseMusic) window.__stopTimelapseMusic();
+        document.body.style.cursor = "none";
+        const dos = document.getElementById("dos-overlay");
+        const dosContent = document.getElementById("dos-content");
+        dosContent.innerHTML = "";
+        playNoiseFX(500);
+        await delay(300);
+
+        dos.classList.remove("hidden");
+        dos.style.opacity = "1";
+
+        await typeDOS(i18n[LANG].dosOutro);
+        await delay(1000);
+
+        await typeDOS(i18n[LANG].credits);
+
+        document.getElementById("dos-cursor")?.classList.remove("hidden");
+
+        buildCreditsGrid(LANG);
+
+        const dosOverlay = document.getElementById("dos-overlay");
+        dosOverlay.style.overflowY = "auto";
+        dosOverlay.style.pointerEvents = "auto";
+        document.body.style.cursor = "default";
+        dosOverlay.scrollTop = dosOverlay.scrollHeight;
+      }
+    </script>
+  </body>
+</html>

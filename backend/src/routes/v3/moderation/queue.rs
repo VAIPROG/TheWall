@@ -21,7 +21,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{ModAction, TemplatePage, TemplateSummary, TemplateV3},
-    routes::v3::utils::{audit, permissions::global_role_of},
+    routes::v3::utils::{audit, permissions},
 };
 
 /// Columns for a TemplateV3 RETURNING clause (mirrors templates/verify.rs).
@@ -30,21 +30,6 @@ const COLS: &str = r#"
     document, version, verified_by, verified_at,
     rejection_reason, clan_id, author, created_at
 "#;
-
-/// Moderator+ gate.
-async fn require_moderator(
-    pool: &sqlx::PgPool,
-    user_id: Uuid,
-) -> Result<(), (StatusCode, String)> {
-    let role = global_role_of(pool, user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    if role.is_moderator() {
-        Ok(())
-    } else {
-        Err((StatusCode::FORBIDDEN, "moderator required".to_string()))
-    }
-}
 
 #[derive(Debug, Deserialize)]
 pub struct QueueQuery {
@@ -61,7 +46,7 @@ pub async fn get_queue(
     State(state): State<AppState>,
     Query(q): Query<QueueQuery>,
 ) -> Result<Json<TemplatePage>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
 
     let page = q.page.unwrap_or(1).max(1);
     let per_page = q.per_page.unwrap_or(20).clamp(1, 100);
@@ -102,7 +87,7 @@ pub async fn approve_template(
     Path(id): Path<Uuid>,
     Json(body): Json<ModAction>,
 ) -> Result<Json<TemplateV3>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
     set_template_decision(&state, id, auth.user_id, true, body.notes.as_deref()).await
 }
 
@@ -116,7 +101,7 @@ pub async fn reject_template(
     Path(id): Path<Uuid>,
     Json(body): Json<ModAction>,
 ) -> Result<Json<TemplateV3>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
     set_template_decision(&state, id, auth.user_id, false, body.notes.as_deref()).await
 }
 

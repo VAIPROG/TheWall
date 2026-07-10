@@ -1,20 +1,23 @@
 /**
- * Mail tab — unified inbox over /api/v2/mailbox.
+ * Notifications + chat inbox tab.
  *
- * Renders DMs, announcements, clan alerts, modmail, template events with
- * filtering, reply-in-thread, mark-as-read, and quick reply.
+ * Replaces the legacy `/v2/mailbox` UI with V3 primitives:
+ *   - notifications list for system/news/alert items
+ *   - V3 chats for clan chat and DMs
  */
-import { Backend } from "./backend";
 import { $, esc, mdToHtml, errMsg } from "./helpers";
 import { ic } from "./icons";
 import { toast } from "./notify";
 import { log } from "./log";
 import { replaceEmotes } from "./emoji";
 import { renderMentions } from "./mentions";
-import { promptDlg, errorDlg, infoDlg, confirmDlg } from "./dialog";
+import { promptDlg, errorDlg, confirmDlg } from "./dialog";
 import { t } from "./i18n";
+import { getActiveClient, api } from "./backend/index";
+import type { NotificationView } from "./backend/notifications";
+import type { MessageView, ChatSummary } from "./backend/chats";
 
-let activeKind = "";
+let activeChatId = "";
 
 function timeAgo(iso?: string): string {
   if (!iso) return "";
@@ -25,213 +28,201 @@ function timeAgo(iso?: string): string {
   return Math.floor(diff / 86400_000) + "d";
 }
 
-function kindColor(kind: string): string {
-  switch (kind) {
-    case "dm": return "#08a";
-    case "announcement": return "#08a";
-    case "clan_alert": return "#c93";
-    case "clan_announcement": return "#48a";
-    case "mod_alert": return "#c33";
-    case "modmail": return "#a3a";
-    case "template_event": return "#393";
+function notificationHtml(n: NotificationView): string {
+  const ts = timeAgo(n.createdAt);
+  const unread = !n.isRead;
+  const style = unread
+    ? "border-left:3px solid var(--accent);background:rgba(40,137,255,.10);"
+    : "opacity:.85;";
+  const body = renderMentions(replaceEmotes(mdToHtml(n.body || "")));
+  return `<div class="wp-li mail-item" data-id="${esc(n.id)}" data-type="${esc(n.type)}" data-unread="${unread ? "1" : "0"}" style="${style}align-items:flex-start">
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:9px;font-weight:bold;color:#fff;background:${typeColor(n.type)};padding:0 5px;border-radius:2px">${typeLabel(n.type)}</span>
+        <b>${esc(n.title)}</b>
+        <span style="margin-left:auto;color:var(--sub);font-size:10px">${ts}</span>
+      </div>
+      <div class="bd" style="margin-top:3px;line-height:1.4;word-wrap:break-word">${body}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px;align-items:stretch">
+      ${unread ? `<button class="wp-btn" data-read="${esc(n.id)}" style="padding:2px 6px;margin:0" title="Mark as read">✓</button>` : ""}
+      <button class="wp-btn" data-dismiss="${esc(n.id)}" style="padding:2px 6px;margin:0" title="Dismiss">${ic("trash", 10)}</button>
+    </div>
+  </div>`;
+}
+
+function typeColor(type: string): string {
+  switch (type) {
+    case "system_announcement": return "#08a";
+    case "news_announcement": return "#48a";
+    case "clan_invite": return "#c93";
+    case "restriction_update": return "#c33";
+    case "mod_action": return "#a3a";
+    case "mention": return "#393";
+    case "template_status_change": return "#393";
     default: return "var(--sub)";
   }
 }
 
-function kindLabel(kind: string): string {
-  switch (kind) {
-    case "dm": return "DM";
-    case "announcement": return "NEWS";
-    case "clan_alert": return "ALERT";
-    case "clan_announcement": return "CLAN";
-    case "mod_alert": return "MOD";
-    case "modmail": return "MODMAIL";
-    case "template_event": return "TPL";
-    default: return kind.toUpperCase();
+function typeLabel(type: string): string {
+  switch (type) {
+    case "system_announcement": return "SYS";
+    case "news_announcement": return "NEWS";
+    case "clan_invite": return "CLAN";
+    case "restriction_update": return "BAN";
+    case "mod_action": return "MOD";
+    case "mention": return "@";
+    case "template_status_change": return "TPL";
+    default: return type.split("_").map((s) => s[0]).join("").toUpperCase();
   }
 }
 
-function itemHtml(it: any): string {
-  const k = String(it.kind || "");
-  const unread = !it.is_read;
-  const ts = timeAgo(it.created_at);
-  const title = it.title ? esc(it.title) : "";
-  const body = renderMentions(replaceEmotes(mdToHtml(String(it.body || ""))));
-  // DMs lead with sender prominently. Other kinds show the sender as small
-  // metadata because the title / channel context matters more.
-  const isPerson = k === "dm" || k === "modmail";
-  const senderName = it.sender_username || "system";
-  const senderHtml = it.sender_username
-    ? `<span class="wp-mention" data-user="${esc(it.sender_username)}">@${esc(it.sender_username)}</span>`
-    : `<span style="color:var(--sub)">system</span>`;
-  const replyBtn = isPerson
-    ? `<button class="wp-btn" data-reply="${esc(it.id)}" data-reply-to="${esc(senderName)}" style="padding:2px 6px;margin:0" title="Reply to ${esc(senderName)}">${ic("send", 10)}Reply</button>`
-    : "";
-  const readBtn = unread
-    ? `<button class="wp-btn" data-read="${esc(it.id)}" style="padding:2px 6px;margin:0" title="Mark as read">✓</button>`
-    : "";
-  const unreadStyle = unread
-    ? "border-left:3px solid var(--accent);background:rgba(40,137,255,.10);"
-    : "opacity:.85;";
-  // For DM-style items: header is "@sender  · time" with the kind tag on
-  // the right. For announcements / alerts: header is "[KIND] Title · time".
-  const header = isPerson
-    ? `<div style="display:flex;align-items:center;gap:6px">
-         <span style="font-size:11px;font-weight:bold;color:${kindColor(k)}">${senderHtml}</span>
-         ${title ? `<span style="color:var(--sub)">·</span><b>${title}</b>` : ""}
-         <span style="margin-left:auto;font-size:9px;font-weight:bold;color:#fff;background:${kindColor(k)};padding:0 5px;border-radius:2px">${kindLabel(k)}</span>
-         <span style="color:var(--sub);font-size:10px;min-width:32px;text-align:right">${ts}</span>
-       </div>`
-    : `<div style="display:flex;align-items:center;gap:4px">
-         <span style="font-size:9px;font-weight:bold;color:#fff;background:${kindColor(k)};padding:0 5px;border-radius:2px">${kindLabel(k)}</span>
-         ${title ? `<b>${title}</b>` : ""}
-         <span style="margin-left:auto;color:var(--sub);font-size:10px">${ts}</span>
-       </div>
-       <div style="margin:2px 0;color:var(--sub);font-size:10px">from ${senderHtml}</div>`;
-  return `<div class="wp-li mail-item" data-id="${esc(it.id)}" data-kind="${esc(k)}" data-unread="${unread ? "1" : "0"}" style="${unreadStyle}align-items:flex-start">
-    <div style="flex:1;min-width:0">
-      ${header}
-      <div class="bd" style="margin-top:3px;line-height:1.4;word-wrap:break-word">${body}</div>
+function messageHtml(m: MessageView): string {
+  const ts = timeAgo(m.createdAt);
+  const author = esc(m.authorUsername || "system");
+  const body = m.isDeleted
+    ? `<i style="color:var(--sub)">deleted</i>`
+    : renderMentions(replaceEmotes(mdToHtml(m.content)));
+  return `<div class="m" data-msg="${esc(m.id)}">
+    <div class="bd">
+      <span class="au" data-user="${author}">${author}</span>
+      ${ts ? ` <span class="ts" title="${esc(m.createdAt)}">${ts}</span>` : ""}
+      ${body}
     </div>
-    <div style="display:flex;flex-direction:column;gap:3px;align-items:stretch">${readBtn}${replyBtn}</div>
   </div>`;
 }
 
-/** Update the unread count chip in the Inbox legend. */
-function refreshUnreadBadge(list: any[]): void {
+function refreshUnreadBadge(count: number): void {
   const el = $("mail-unread-count");
   if (!el) return;
-  const n = list.filter((it) => !it.is_read).length;
-  el.textContent = n > 0 ? `· ${t("mailUnreadBadge", { n })}` : "";
+  el.textContent = count > 0 ? `· ${t("mailUnreadBadge", { n: count })}` : "";
 }
 
-export async function loadMail(): Promise<void> {
+export async function loadNotifications(): Promise<void> {
   const box = $("mail-list");
-  if (!box || !Backend.on) {
-    log("MAIL", "INFO", `loadMail skipped — box=${!!box} backend=${Backend.on}`);
+  const client = getActiveClient();
+  if (!box || !client?.on) {
+    log("NOTIF", "INFO", `loadNotifications skipped — box=${!!box} backend=${client?.on ?? false}`);
     return;
   }
   box.innerHTML = `<div style="padding:6px;color:var(--sub)">Loading…</div>`;
-  log("MAIL", "INFO", `loading kind="${activeKind || "all"}"`);
   try {
-    const list = await Backend.listMailbox(activeKind || undefined);
-    log("MAIL", "OK", `${list?.length || 0} items`);
-    if (!list?.length) {
-      box.innerHTML = `<div style="padding:6px;color:var(--sub)">— inbox empty —</div>`;
+    const page = await api(client).notifications.list({ perPage: 100 });
+    const list = page.items || [];
+    log("NOTIF", "OK", `${list.length} items`);
+    if (!list.length) {
+      box.innerHTML = `<div style="padding:6px;color:var(--sub)">— no notifications —</div>`;
+      refreshUnreadBadge(0);
       return;
     }
-    box.innerHTML = list.map(itemHtml).join("");
-    refreshUnreadBadge(list);
-    // Mark-read
-    box.querySelectorAll("[data-read]").forEach((b) => {
+    box.innerHTML = list.map(notificationHtml).join("");
+    refreshUnreadBadge(list.filter((n) => !n.isRead).length);
+    box.querySelectorAll("[data-read]").forEach((b) =>
       b.addEventListener("click", async () => {
         const id = (b as HTMLElement).dataset.read!;
-        try { await Backend.req("POST", `/v2/mailbox/${id}/read`); loadMail(); }
-        catch (e: any) { toast("Mail", "read fail: " + errMsg(e)); }
-      });
-    });
-    // Reply — the dialog title now carries the recipient name so the
-    // sender knows who they're replying to without scanning the inbox.
-    box.querySelectorAll("[data-reply]").forEach((b) => {
+        try { await api(client).notifications.ack([id]); loadNotifications(); }
+        catch (e: any) { toast("Notifications", "ack fail: " + errMsg(e)); }
+      }),
+    );
+    box.querySelectorAll("[data-dismiss]").forEach((b) =>
       b.addEventListener("click", async () => {
-        const el = b as HTMLElement;
-        const id = el.dataset.reply!;
-        const to = el.dataset.replyTo || "user";
-        const text = await promptDlg(
-          `Reply to @${to}:`,
-          "",
-          "Send reply",
-        );
-        if (text == null || !String(text).trim()) return;
-        try {
-          await Backend.req("POST", `/v2/mailbox/${id}/reply`, { body: String(text).trim() });
-          toast("Mail", `reply to @${to} sent`);
-          loadMail();
-        } catch (e: any) { errorDlg("Reply failed: " + errMsg(e)); }
-      });
-    });
+        const id = (b as HTMLElement).dataset.dismiss!;
+        try { await api(client).notifications.dismiss(id); loadNotifications(); }
+        catch (e: any) { toast("Notifications", "dismiss fail: " + errMsg(e)); }
+      }),
+    );
   } catch (e: any) {
-    box.innerHTML = `<div style="padding:6px;color:#b33">mail error: ${esc(errMsg(e))}</div>`;
-    log("MAIL", "ERR", errMsg(e));
+    box.innerHTML = `<div style="padding:6px;color:#b33">notifications error: ${esc(errMsg(e))}</div>`;
+    log("NOTIF", "ERR", errMsg(e));
   }
 }
 
-export function wireMailUI(): void {
-  document.querySelectorAll("[data-mail-kind]").forEach((b) => {
-    b.addEventListener("click", () => {
-      activeKind = (b as HTMLElement).dataset.mailKind || "";
-      document.querySelectorAll("[data-mail-kind]").forEach((x) => x.classList.toggle("active", x === b));
-      loadMail();
-    });
-  });
-  $("btn-mail-refresh")?.addEventListener("click", loadMail);
+export async function loadChatMessages(chatId: string): Promise<void> {
+  activeChatId = chatId;
+  const box = $("chat-messages");
+  const client = getActiveClient();
+  if (!box || !client?.on || !chatId) return;
+  try {
+    const msgs = await api(client).chats.messages(chatId, { limit: 50 });
+    box.innerHTML = (msgs || []).map(messageHtml).join("") || `<div style="color:var(--sub)">— empty —</div>`;
+    box.scrollTop = box.scrollHeight;
+  } catch (e: any) {
+    box.innerHTML = `<div style="color:#b33">chat error: ${esc(errMsg(e))}</div>`;
+  }
+}
 
-  /**
-   * Mark every item in the current filter as read. The backend handles
-   * direct + broadcast scopes — the response carries the row counts so we
-   * can show a concise confirmation toast.
-   *
-   * We ask for an explicit confirm only when there's enough unread mail
-   * to plausibly need a second look (more than 10). For small inboxes the
-   * round-trip would be more friction than the action.
-   */
+export async function sendChatMessage(): Promise<void> {
+  const ta = $("chat-input") as HTMLTextAreaElement | null;
+  const text = ta?.value.trim();
+  if (!text || !activeChatId) return;
+  const client = getActiveClient();
+  if (!client?.on) { await errorDlg("Connect to backend first"); return; }
+  try {
+    await api(client).chats.send(activeChatId, { content: text });
+    if (ta) ta.value = "";
+    await loadChatMessages(activeChatId);
+  } catch (e: any) { await errorDlg("Send failed: " + errMsg(e)); }
+}
+
+export async function sendDm(): Promise<void> {
+  const to = (($("dm-to") as HTMLInputElement)?.value || "").trim().replace(/^@/, "");
+  const body = ($("dm-body") as HTMLTextAreaElement)?.value.trim();
+  if (!to || !body) { await errorDlg("Both recipient and body are required"); return; }
+  const client = getActiveClient();
+  if (!client?.on) return;
+  try {
+    await api(client).chats.sendDm(to, { content: body });
+    ($("dm-to") as HTMLInputElement).value = "";
+    ($("dm-body") as HTMLTextAreaElement).value = "";
+    toast("DM", `Sent to @${to}`);
+  } catch (e: any) { await errorDlg("Send failed: " + errMsg(e)); }
+}
+
+export function wireMailUI(): void {
+  $("btn-mail-refresh")?.addEventListener("click", loadNotifications);
+
   $("btn-mail-markread")?.addEventListener("click", async () => {
+    const client = getActiveClient();
+    if (!client?.on) return;
     const box = $("mail-list");
     const unreadCount = box
-      ? box.querySelectorAll<HTMLElement>(".mail-item[data-unread=\"1\"]").length
+      ? box.querySelectorAll<HTMLElement>('.mail-item[data-unread="1"]').length
       : 0;
     if (unreadCount === 0) {
-      toast("Mail", "Nothing unread in this view.");
+      toast("Notifications", "Nothing unread.");
       return;
     }
     if (unreadCount > 10) {
       const ok = await confirmDlg(
-        `Mark all ${unreadCount} unread items as read?`,
+        `Mark all ${unreadCount} notifications as read?`,
         "Mark all as read",
       );
       if (!ok) return;
     }
     try {
-      const q = activeKind ? `?kind=${encodeURIComponent(activeKind)}` : "";
-      const res = await Backend.req("POST", `/v2/mailbox/read-all${q}`);
-      const direct = res?.direct_marked ?? 0;
-      const broadcast = res?.broadcast_marked ?? 0;
-      toast("Mail", `Marked ${direct + broadcast} item(s) as read.`);
-      loadMail();
+      await api(client).notifications.ackAll();
+      toast("Notifications", "Marked all as read.");
+      loadNotifications();
     } catch (e: any) {
       errorDlg("Mark-all failed: " + errMsg(e));
     }
   });
 
-  $("btn-dm-send")?.addEventListener("click", async () => {
-    const toRaw = ($("dm-to") as HTMLInputElement)?.value.trim().replace(/^@/, "");
-    const body = ($("dm-body") as HTMLTextAreaElement)?.value.trim();
-    if (!toRaw || !body) { await errorDlg("Both recipient and body are required"); return; }
-    let toId = toRaw;
-    if (!/^[0-9a-f-]{36}$/i.test(toRaw)) {
-      try {
-        const roster = await Backend.req("GET", "/clan/members") as any[];
-        const found = (roster || []).find((m: any) => m.username?.toLowerCase() === toRaw.toLowerCase());
-        if (!found) { await errorDlg(`Unknown user @${toRaw}`); return; }
-        toId = found.id;
-      } catch (e: any) { await errorDlg("Roster lookup: " + errMsg(e)); return; }
-    }
-    try {
-      await Backend.req("POST", "/v2/mailbox/dm", { to: toId, body });
-      ($("dm-to") as HTMLInputElement).value = "";
-      ($("dm-body") as HTMLTextAreaElement).value = "";
-      toast("DM", `Sent to @${toRaw}`);
-      loadMail();
-    } catch (e: any) { await errorDlg("Send failed: " + errMsg(e)); }
-  });
-
-  // Ctrl/⌘+Enter inside the DM body submits — matches the chat send
-  // shortcut on filianislost and the clan-chat textarea.
+  $("btn-dm-send")?.addEventListener("click", () => void sendDm());
   $("dm-body")?.addEventListener("keydown", (e: Event) => {
     const k = e as KeyboardEvent;
     if (k.key === "Enter" && (k.ctrlKey || k.metaKey)) {
       k.preventDefault();
-      ($("btn-dm-send") as HTMLButtonElement | null)?.click();
+      void sendDm();
+    }
+  });
+
+  $("chat-send")?.addEventListener("click", () => void sendChatMessage());
+  $("chat-input")?.addEventListener("keydown", (e: Event) => {
+    const k = e as KeyboardEvent;
+    if (k.key === "Enter" && (k.ctrlKey || k.metaKey)) {
+      k.preventDefault();
+      void sendChatMessage();
     }
   });
 }
@@ -240,6 +231,33 @@ let mailTimer: number | null = null;
 export function startMailPolling(): void {
   if (mailTimer != null) return;
   mailTimer = window.setInterval(() => {
-    if (document.querySelector('.wp-pane[data-p="ma"].active')) loadMail();
+    if (document.querySelector('.wp-pane[data-p="ma"].active')) loadNotifications();
   }, 30_000);
+}
+
+export async function loadChatList(): Promise<void> {
+  const box = $("chat-list");
+  const client = getActiveClient();
+  if (!box || !client?.on) return;
+  try {
+    const chats = await api(client).chats.list();
+    box.innerHTML = (chats || [])
+      .map((c: ChatSummary) => {
+        const unread = c.unreadCount > 0 ? ` <span class="sub">(${c.unreadCount})</span>` : "";
+        return `<div class="wp-li chat-row${c.id === activeChatId ? " active" : ""}" data-chat="${esc(c.id)}" style="cursor:pointer">
+          <span>${esc(c.topic || c.type)}${unread}</span>
+          <span class="ts">${timeAgo(c.lastMessageAt)}</span>
+        </div>`;
+      })
+      .join("") || `<div style="color:var(--sub)">— no chats —</div>`;
+    box.querySelectorAll("[data-chat]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const id = (b as HTMLElement).dataset.chat!;
+        void loadChatMessages(id);
+        void loadChatList();
+      }),
+    );
+  } catch (e: any) {
+    box.innerHTML = `<div style="color:#b33">chat list error: ${esc(errMsg(e))}</div>`;
+  }
 }

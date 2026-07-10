@@ -27,8 +27,20 @@ import {
 } from "./wall-anim";
 import { exportToWallDevJson, applyWallDevExport } from "./walldev-config";
 import { exportToCharityConfig } from "./charity-import";
-import { Backend } from "./backend";
+import { getActiveClient, api } from "./backend/index";
 import { importShare } from "./share";
+
+// Animated templates + region protection still ride the legacy V1/V2 surface
+// (WallAnim configs, region-guard). See buildLegacyApi. TODO(phase3): fold
+// animation into the-wall-dev/2 template docs; regions await a V3 endpoint.
+function legacyOrThrow() {
+  const client = getActiveClient();
+  if (!client) throw new Error("backend offline");
+  return api(client).legacy;
+}
+function apiRoot(): string {
+  return getActiveClient()?.rootUrl ?? "";
+}
 import {
   loadTemplates,
   loadPublicTemplates,
@@ -64,7 +76,9 @@ async function copyToClipboard(label: string, text: string): Promise<void> {
 /** First active clan id of the current user, for clan-scoped publishing. */
 async function myClanId(): Promise<string | null> {
   try {
-    const clans: any[] = await Backend.req("GET", "/v2/clans/mine");
+    const client = getActiveClient();
+    if (!client) return null;
+    const clans = (await client.getRoot<any[]>("/v2/clans/mine")) || [];
     return clans?.[0]?.id ?? null;
   } catch {
     return null;
@@ -179,7 +193,7 @@ async function uploadAnimConfig(): Promise<void> {
   }
   if (pass) body.access_password = pass;
   try {
-    const row: any = await Backend.createAnimTemplate(body);
+    const row: any = await legacyOrThrow().createAnimTemplate(body);
     toast(t("animLegend"), `uploaded "${row.name}" (${row.scope})`);
     // Password-shared config → hand the user a ready-to-send access code.
     // Recipient pastes it (plus the password) into "Load by code" on their
@@ -205,7 +219,7 @@ async function browseAnimConfigs(): Promise<void> {
   list.innerHTML = noteBox(t("syncing"));
   let rows: any[] = [];
   try {
-    rows = await Backend.listAnimTemplates();
+    rows = ((await legacyOrThrow().listAnimTemplates()) as any[]) || [];
   } catch (e) {
     list.innerHTML = noteBox("load failed: " + errMsg(e), "err");
     return;
@@ -288,9 +302,9 @@ async function renderProtectLists(): Promise<void> {
     );
   }
 
-  if (Backend.on) {
+  if (getActiveClient()?.on) {
     try {
-      const rows: any[] = await Backend.listRegions();
+      const rows: any[] = ((await legacyOrThrow().listRegions()) as any[]) || [];
       for (const r of rows) {
         const actions: Array<{ text: string; title?: string; onClick: () => void }> = [];
         if (r.status === "pending") {
@@ -298,20 +312,22 @@ async function renderProtectLists(): Promise<void> {
           actions.push({
             text: "✓",
             title: "approve (clan mods / global admins)",
-            onClick: () => {
-              Backend.approveRegion(r.id)
-                .then(() => renderProtectLists())
-                .catch((e: any) => errorDlg("approve failed: " + errMsg(e)));
+            onClick: async () => {
+              try {
+                await legacyOrThrow().approveRegion(r.id);
+                await renderProtectLists();
+              } catch (e: any) { await errorDlg("approve failed: " + errMsg(e)); }
             },
           });
         }
         actions.push({
           text: "✕",
           title: "delete (owner / clan admin)",
-          onClick: () => {
-            Backend.deleteRegion(r.id)
-              .then(() => renderProtectLists())
-              .catch((e: any) => errorDlg("delete failed: " + errMsg(e)));
+          onClick: async () => {
+            try {
+              await legacyOrThrow().deleteRegion(r.id);
+              await renderProtectLists();
+            } catch (e: any) { await errorDlg("delete failed: " + errMsg(e)); }
           },
         });
         const row = protectRow(r.name, regionStateLabel(r), actions);
@@ -361,7 +377,7 @@ async function fixRegion(zone: boolean): Promise<void> {
 
   // Non-local scopes also publish to the backend so the server-side guard
   // watches the region around the clock (approval per scope applies).
-  if (scope !== "local" && Backend.on) {
+  if (scope !== "local" && getActiveClient()?.on) {
     const body: any = {
       name: region.name,
       x: region.x,
@@ -381,7 +397,7 @@ async function fixRegion(zone: boolean): Promise<void> {
       }
     }
     try {
-      const row: any = await Backend.createRegion(body);
+      const row: any = await legacyOrThrow().createRegion(body);
       toast(
         t("protectLegend"),
         row.status === "pending" ? "uploaded — awaiting approval" : "uploaded & guarded",
@@ -406,10 +422,10 @@ async function appendAnimRows(
   list: HTMLElement,
   scope: "public" | "clan" | "private",
 ): Promise<void> {
-  if (!Backend.on) return;
+  if (!getActiveClient()?.on) return;
   let rows: any[] = [];
   try {
-    rows = ((await Backend.listAnimTemplates()) || []) as any[];
+    rows = ((await legacyOrThrow().listAnimTemplates()) || []) as any[];
   } catch {
     return; // classic rows are already on screen; a failed anim fetch stays quiet
   }
@@ -422,7 +438,7 @@ async function appendAnimRows(
   for (const r of rows.slice(0, 40)) {
     const row = listRow();
     const img = document.createElement("img");
-    img.src = `${Backend.base}/v2/animated/templates/${encodeURIComponent(r.id)}/preview?size=64`;
+    img.src = `${apiRoot()}/v2/animated/templates/${encodeURIComponent(r.id)}/preview?size=64`;
     img.style.cssText =
       "width:32px;height:32px;image-rendering:pixelated;border:1px solid var(--shadow);background:#808080;flex:0 0 32px";
     img.loading = "lazy";
@@ -449,10 +465,11 @@ async function appendAnimRows(
       row.appendChild(
         miniBtn(
           "✓",
-          () => {
-            Backend.req("POST", `/v2/animated/templates/${encodeURIComponent(r.id)}/approve`)
-              .then(reload)
-              .catch((e) => errorDlg("approve failed: " + errMsg(e)));
+          async () => {
+            try {
+              await legacyOrThrow().approveAnimTemplate(r.id);
+              reload();
+            } catch (e) { await errorDlg("approve failed: " + errMsg(e)); }
           },
           "approve (clan mods / global admins)",
         ),
@@ -461,10 +478,11 @@ async function appendAnimRows(
     row.appendChild(
       miniBtn(
         "✕",
-        () => {
-          Backend.deleteAnimTemplate(r.id)
-            .then(reload)
-            .catch((e) => errorDlg("delete failed: " + errMsg(e)));
+        async () => {
+          try {
+            await legacyOrThrow().deleteAnimTemplate(r.id);
+            reload();
+          } catch (e) { await errorDlg("delete failed: " + errMsg(e)); }
         },
         "delete (owner / clan mod)",
       ),
@@ -491,7 +509,7 @@ async function loadSharedByCode(): Promise<void> {
     return;
   }
   try {
-    const r: any = await Backend.sharedTemplate(m[0], pass || undefined);
+    const r: any = await legacyOrThrow().sharedTemplate(m[0], pass || undefined);
     importShare(r.share);
     toast(t("sharePublishLegend"), `"${r.name}" loaded`);
     return;
@@ -499,7 +517,7 @@ async function loadSharedByCode(): Promise<void> {
     // Not a classic template (or not visible as one) — try animated.
   }
   try {
-    const r: any = await Backend.sharedAnimTemplate(m[0], pass || undefined);
+    const r: any = await legacyOrThrow().sharedAnimTemplate(m[0], pass || undefined);
     await applyWallDevExport(r.config);
     updateAnimStatus();
     toast(t("animPublishLegend"), `"${r.name}" loaded`);

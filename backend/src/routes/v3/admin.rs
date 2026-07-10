@@ -26,7 +26,7 @@ use crate::{
         moderation::{AuditLogEntry, AuditLogPage, AuditLogRow, RestrictionRow, RestrictionView},
         users::User,
     },
-    routes::v3::utils::{audit, permissions::global_role_of},
+    routes::v3::utils::{audit, permissions::global_role_of, users::resolve_user_ref},
 };
 
 use crate::routes::v3::utils::permissions::GlobalRole;
@@ -43,29 +43,6 @@ async fn require_role(
         return Err((StatusCode::FORBIDDEN, "insufficient role".to_string()));
     }
     Ok(role)
-}
-
-async fn resolve_user_ref(
-    pool: &sqlx::PgPool,
-    user_ref: &str,
-) -> Result<Uuid, (StatusCode, String)> {
-    if let Ok(uid) = Uuid::parse_str(user_ref) {
-        let exists: Option<bool> = sqlx::query_scalar("SELECT TRUE FROM users WHERE id = $1")
-            .bind(uid)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        if exists.is_some() {
-            return Ok(uid);
-        }
-    }
-    let row: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM users WHERE lower(username) = lower($1)")
-        .bind(user_ref)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    row.map(|(id,)| id)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))
 }
 
 async fn load_user(
@@ -95,7 +72,7 @@ pub async fn admin_get_user(
     Path(user_ref): Path<String>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
     let user = load_user(&state.pool, target_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
@@ -124,7 +101,7 @@ pub async fn admin_update_user(
     Json(body): Json<AdminUserUpdate>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     if let Some(ref role) = body.role {
         if !matches!(role.as_str(), "member" | "moderator" | "admin" | "owner") {
@@ -189,7 +166,7 @@ pub async fn admin_ban_user(
     Json(body): Json<BanRequest>,
 ) -> Result<Json<RestrictionView>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     if target_id == auth.user_id {
         return Err((StatusCode::BAD_REQUEST, "cannot ban yourself".to_string()));
@@ -233,7 +210,7 @@ pub async fn admin_unban_user(
     Path(user_ref): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let result = sqlx::query(
         "UPDATE restrictions SET removed_at = NOW(), removed_by = $1
@@ -281,7 +258,7 @@ pub async fn admin_mute_user(
     Json(body): Json<MuteRequest>,
 ) -> Result<Json<RestrictionView>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     if target_id == auth.user_id {
         return Err((StatusCode::BAD_REQUEST, "cannot mute yourself".to_string()));
@@ -325,7 +302,7 @@ pub async fn admin_unmute_user(
     Path(user_ref): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let result = sqlx::query(
         "UPDATE restrictions SET removed_at = NOW(), removed_by = $1
@@ -371,7 +348,7 @@ pub async fn admin_promote_user(
     Json(body): Json<PromoteRequest>,
 ) -> Result<Json<User>, (StatusCode, String)> {
     let caller_role = require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let new_role = match body.role.as_str() {
         "member" | "user" => GlobalRole::User,
@@ -425,7 +402,7 @@ pub async fn admin_wipeout_user(
     Json(body): Json<ConfirmationRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Owner).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     if body.confirmation != "WIPEOUT" {
         return Err((StatusCode::BAD_REQUEST, "confirmation required".to_string()));
@@ -470,7 +447,7 @@ pub async fn admin_remove_from_clan(
     Path(user_ref): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let result = sqlx::query("DELETE FROM clan_memberships WHERE user_id = $1 AND active = TRUE")
         .bind(target_id)
@@ -501,7 +478,7 @@ pub async fn admin_reset_avatar(
     Path(user_ref): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     sqlx::query("DELETE FROM avatars WHERE user_id = $1")
         .bind(target_id)
@@ -532,7 +509,7 @@ pub async fn admin_reset_username(
     Path(user_ref): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let suffix: String = target_id.to_string().replace('-', "").chars().take(8).collect();
     let new_username = format!("user_{}", suffix);
@@ -567,7 +544,7 @@ pub async fn admin_get_user_sessions(
     Path(user_ref): Path<String>,
 ) -> Result<Json<Vec<SessionSummary>>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let rows: Vec<SessionSummary> = sqlx::query_as(
         r#"SELECT id AS session_id, ip::TEXT AS ip, user_agent, created_at, last_activity AS last_activity_at
@@ -589,7 +566,7 @@ pub async fn admin_terminate_user_sessions(
     Path(user_ref): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let result = sqlx::query("DELETE FROM sessions WHERE user_id = $1")
         .bind(target_id)
@@ -637,7 +614,7 @@ pub async fn admin_get_user_notes(
     Path(user_ref): Path<String>,
 ) -> Result<Json<Vec<AdminNote>>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let rows: Vec<AdminNote> = sqlx::query_as(
         r#"SELECT n.id, n.author_id, u.username AS author_username, n.content, n.created_at
@@ -661,7 +638,7 @@ pub async fn admin_add_user_note(
     Json(body): Json<AdminNoteCreate>,
 ) -> Result<Json<AdminNote>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let content = body.content.trim();
     if content.is_empty() || content.len() > 2000 {
@@ -712,7 +689,7 @@ pub async fn admin_impersonate_user(
     Json(body): Json<ImpersonateRequest>,
 ) -> Result<Json<crate::models::auth::V3AuthResponse>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     let target = load_user(&state.pool, target_id)
         .await?
@@ -720,17 +697,17 @@ pub async fn admin_impersonate_user(
 
     let mins = body.duration_minutes.unwrap_or(60).clamp(1, 240);
     let expires = Utc::now() + chrono::Duration::minutes(mins);
-
-    let token = crate::auth::create_token(&target_id, &state.config.jwt_secret, mins)
+    let session_id = Uuid::new_v4();
+    let (token, token_hash) = crate::auth::create_token(&target_id, &session_id, &state.config.jwt_secret, mins)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:?}")))?;
 
     sqlx::query(
         r#"INSERT INTO sessions (id, user_id, token_hash, refresh_hash, expires_at, created_at)
            VALUES ($1, $2, $3, $4, $5, NOW())"#,
     )
-    .bind(Uuid::new_v4())
+    .bind(session_id)
     .bind(target_id)
-    .bind(crate::auth::hash_token(&token))
+    .bind(token_hash)
     .bind(None::<String>)
     .bind(expires)
     .execute(&state.pool)

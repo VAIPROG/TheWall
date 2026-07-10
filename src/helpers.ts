@@ -19,7 +19,7 @@ export function esc(s: unknown): string {
   );
 }
 
-export function guildIcon(id: string, icon: string | null): string {
+export function guildIcon(id: string, icon: string | null | undefined): string {
   return icon
     ? `${DISCORD_CDN}/icons/${id}/${icon}.${icon.startsWith("a_") ? "gif" : "png"}?size=64`
     : "";
@@ -35,7 +35,7 @@ export function defaultDiscordAvatar(uid: string): string {
 
 export function avatarSrcs(
   wallId: string | number | null,
-  discordId: string | null,
+  discordId: string | null | undefined,
   backendBase: string,
   hasCustomAvatar?: boolean,
 ): string[] {

@@ -24,27 +24,12 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{ReportDismiss, ReportPage, ReportResolve, ReportRow, ReportUpdate, ReportView},
-    routes::v3::utils::{audit, permissions::global_role_of},
+    routes::v3::utils::{audit, permissions},
 };
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-/// Moderator+ gate. Returns 403 for anyone below global moderator.
-async fn require_moderator(
-    pool: &sqlx::PgPool,
-    user_id: Uuid,
-) -> Result<(), (StatusCode, String)> {
-    let role = global_role_of(pool, user_id)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    if role.is_moderator() {
-        Ok(())
-    } else {
-        Err((StatusCode::FORBIDDEN, "moderator required".to_string()))
-    }
-}
 
 /// Column list shared by every report SELECT.
 const REPORT_COLS: &str = r#"
@@ -133,7 +118,7 @@ pub async fn list_reports(
     State(state): State<AppState>,
     Query(q): Query<ListReportsQuery>,
 ) -> Result<Json<ReportPage>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
 
     let page = q.page.unwrap_or(1).max(1);
     let per_page = q.per_page.unwrap_or(20).clamp(1, 100);
@@ -182,7 +167,7 @@ pub async fn get_report(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ReportView>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
     let row = load_report(&state.pool, id).await?;
     Ok(Json(ReportView::from_row(row)))
 }
@@ -197,7 +182,7 @@ pub async fn update_report(
     Path(id): Path<Uuid>,
     Json(body): Json<ReportUpdate>,
 ) -> Result<Json<ReportView>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
     load_report(&state.pool, id).await?; // 404 if absent
 
     if let Some(ref s) = body.status {
@@ -259,7 +244,7 @@ pub async fn resolve_report(
     Path(id): Path<Uuid>,
     Json(body): Json<ReportResolve>,
 ) -> Result<Json<ReportView>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
     let existing = load_report(&state.pool, id).await?;
 
     if !matches!(
@@ -350,7 +335,7 @@ pub async fn dismiss_report(
     Path(id): Path<Uuid>,
     Json(body): Json<ReportDismiss>,
 ) -> Result<Json<ReportView>, (StatusCode, String)> {
-    require_moderator(&state.pool, auth.user_id).await?;
+    permissions::require_moderator(&auth, &state.pool).await?;
     let existing = load_report(&state.pool, id).await?;
 
     if let Some(ref r) = body.reason {

@@ -349,7 +349,7 @@ pub async fn merge(
     })?;
 
     // 8. Issue fresh session for A and load account row.
-    let (access, refresh_tok) = issue_session_pair(&state.pool, &state.config.jwt_secret, a)
+    let (access, refresh_tok, _session_id) = issue_session_pair(&state.pool, &state.config.jwt_secret, a)
         .await
         .map_err(|e| {
             (

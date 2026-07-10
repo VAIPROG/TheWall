@@ -112,7 +112,7 @@ pub async fn recover(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::UNAUTHORIZED, "account not found".to_string()))?;
 
-    let (access, refresh) = issue_session_pair(&state.pool, &state.config.jwt_secret, user.id)
+    let (access, refresh, _session_id) = issue_session_pair(&state.pool, &state.config.jwt_secret, user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 

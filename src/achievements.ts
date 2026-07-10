@@ -1,7 +1,7 @@
 /**
  * The Wall Dev achievement system — client side.
  *
- * Backend lives at `/api/v2/me/achievements/*` and `/api/v2/admin/achievements`.
+ * Backend lives at `/api/v2/users/me/achievements/*` and `/api/v3/admin/achievements`.
  * This module:
  *   - exposes thin async helpers that wrap each endpoint;
  *   - dedupes rapid trigger fires inside one session;
@@ -15,7 +15,6 @@
  * line. The actual claim is manual (user pings @vai_prog), so we don't track
  * redemption server-side.
  */
-import { Backend } from "./backend";
 import { log } from "./log";
 import { t } from "./i18n";
 import { isWalldevDark } from "./theme";
@@ -23,19 +22,20 @@ import { esc, errMsg } from "./helpers";
 import { achIcon } from "./icons";
 import { getCached, setCached } from "./cache";
 import { CACHE_TTL_PROFILE_MS, CACHE_TTL_ACH_CATALOGUE_MS } from "./constants";
+import { getActiveClient, api } from "./backend/index";
 
 export type AchievementRow = {
   id: string;
-  name: string;
+  title: string;
   description: string;
-  icon: string;
+  iconUrl: string;
   category: string;
   points: number;
   secret: boolean;
-  unlocked_at?: string | null;
+  unlockedAt?: string | null;
 };
 
-type GrantResult = { achievement: AchievementRow; was_new: boolean };
+type GrantResult = { achievement: AchievementRow; wasNew: boolean };
 
 const triggeredThisSession = new Set<string>();
 
@@ -46,42 +46,42 @@ function gateOnce(key: string): boolean {
   return true;
 }
 
+function getClient() {
+  return getActiveClient();
+}
+
 /**
  * Public: viewer opened VAI's profile. Always fires once per session; the
  * backend takes care of idempotency across sessions.
  */
 export async function triggerFoundTheDev(): Promise<void> {
   if (!gateOnce("found_the_dev")) return;
-  if (!Backend.on) {
+  const client = getClient();
+  if (!client?.on) {
     log.debug("ACHIEVE", "found-the-dev skipped: backend offline");
     return;
   }
   try {
-    const res = (await Backend.req(
-      "POST",
-      "/v2/me/achievements/found-the-dev",
-      {},
-    )) as GrantResult;
-    log.info("ACHIEVE", `found-the-dev was_new=${res.was_new}`);
-    if (res.was_new) showUnlock(res.achievement);
+    const res = await api(client).achievements.event({ event: "found_the_dev" }) as unknown as GrantResult;
+    log.info("ACHIEVE", `found-the-dev wasNew=${res.wasNew}`);
+    if (res.wasNew) showUnlock(res.achievement);
   } catch (e: any) {
     log.warn("ACHIEVE", "found-the-dev grant failed: " + errMsg(e));
   }
 }
 
 /**
- * Generic UX-event trigger. Wraps the `/v2/me/achievements/event` endpoint
+ * Generic UX-event trigger. Wraps the `/v3/users/me/achievements/event` endpoint
  * which knows the allowlist of meaningful events.
  */
 export async function triggerEvent(event: string): Promise<void> {
   if (!gateOnce("event:" + event)) return;
-  if (!Backend.on) return;
+  const client = getClient();
+  if (!client?.on) return;
   try {
-    const res = (await Backend.req("POST", "/v2/me/achievements/event", {
-      event,
-    })) as { new: boolean; achievement?: AchievementRow };
+    const res = await api(client).achievements.event({ event });
     log.info("ACHIEVE", `event=${event} new=${res?.new}`);
-    if (res?.new && res.achievement) showUnlock(res.achievement);
+    if (res?.new && res.achievement) showUnlock(res.achievement as unknown as AchievementRow);
   } catch (e: any) {
     log.warn("ACHIEVE", `event=${event} failed: ${errMsg(e)}`);
   }
@@ -92,22 +92,16 @@ export async function triggerEvent(event: string): Promise<void> {
  * actions that bump backend counters (template share, profile save, …).
  */
 export async function recheckMine(): Promise<void> {
-  if (!Backend.on) return;
+  const client = getClient();
+  if (!client?.on) return;
   try {
-    const res = (await Backend.req(
-      "POST",
-      "/v2/me/achievements/recheck",
-      {},
-    )) as { newly_unlocked: string[] };
-    log.info("ACHIEVE", `recheck newly=${res?.newly_unlocked?.length || 0}`);
-    const newlyIds = res?.newly_unlocked || [];
+    const res = await api(client).achievements.recheck();
+    log.info("ACHIEVE", `recheck newly=${res?.newlyUnlocked?.length || 0}`);
+    const newlyIds = res?.newlyUnlocked || [];
     if (newlyIds.length) {
       // Pull the catalogue rows so we can render names/icons.
-      const all = (await Backend.req(
-        "GET",
-        "/v2/me/achievements",
-      )) as AchievementRow[];
-      const byId = new Map(all.map((a) => [a.id, a]));
+      const all = await api(client).achievements.listMine();
+      const byId = new Map(all.map((a) => [a.achievement.id, a.achievement as unknown as AchievementRow]));
       for (const id of newlyIds) {
         const row = byId.get(id);
         if (row) showUnlock(row);
@@ -125,11 +119,12 @@ export async function recheckMine(): Promise<void> {
  * already gzips responses, so this cache is a *paint hint*, not a CDN.
  */
 export async function listMine(): Promise<AchievementRow[]> {
-  if (!Backend.on) {
+  const client = getClient();
+  if (!client?.on) {
     return getCached<AchievementRow[]>("ach:mine", CACHE_TTL_PROFILE_MS) || [];
   }
   try {
-    const fresh = (await Backend.req("GET", "/v2/me/achievements")) as AchievementRow[];
+    const fresh = await api(client).achievements.listMine() as unknown as AchievementRow[];
     setCached("ach:mine", fresh);
     return fresh;
   } catch (e: any) {
@@ -147,11 +142,10 @@ const CAT_CACHE_KEY = "ach:catalogue";
 
 export async function listCatalogue(): Promise<AchievementRow[]> {
   const cached = getCached<AchievementRow[]>(CAT_CACHE_KEY, CACHE_TTL_ACH_CATALOGUE_MS);
+  const client = getClient();
+  if (!client?.on) return cached || [];
   try {
-    const fresh = (await Backend.req(
-      "GET",
-      "/v2/admin/achievements",
-    )) as AchievementRow[];
+    const fresh = await api(client).achievements.adminCatalog(true) as unknown as AchievementRow[];
     setCached(CAT_CACHE_KEY, fresh);
     return fresh;
   } catch {
@@ -167,21 +161,29 @@ export function listCatalogueCached(): AchievementRow[] {
 
 export type NewAchievement = {
   id: string;
-  name: string;
+  title: string;
   description: string;
-  icon: string;
+  iconUrl: string;
   category: string;
   points: number;
   secret: boolean;
 };
 
 export async function adminCreate(body: NewAchievement): Promise<AchievementRow | null> {
+  const client = getClient();
+  if (!client?.on) return null;
   try {
-    return (await Backend.req(
-      "POST",
-      "/v2/admin/achievements",
-      body,
-    )) as AchievementRow;
+    return await api(client).achievements.adminCreate({
+      id: body.id,
+      category: body.category,
+      title: body.title,
+      description: body.description,
+      iconUrl: body.iconUrl,
+      rarity: "common",
+      unlockCriteria: { kind: "manual" },
+      points: body.points,
+      secret: body.secret,
+    }) as unknown as AchievementRow;
   } catch (e: any) {
     log.err("ACHIEVE", `admin create failed: ${errMsg(e)}`);
     throw e;
@@ -192,12 +194,10 @@ export async function adminGrant(
   userId: string,
   achievementId: string,
 ): Promise<GrantResult | null> {
+  const client = getClient();
+  if (!client?.on) return null;
   try {
-    return (await Backend.req(
-      "POST",
-      `/v2/admin/users/${userId}/achievements/${achievementId}`,
-      {},
-    )) as GrantResult;
+    return await api(client).achievements.adminGrant(achievementId, { userId }) as unknown as GrantResult;
   } catch (e: any) {
     log.err("ACHIEVE", `admin grant failed: ${errMsg(e)}`);
     return null;
@@ -208,11 +208,10 @@ export async function adminRevoke(
   userId: string,
   achievementId: string,
 ): Promise<boolean> {
+  const client = getClient();
+  if (!client?.on) return false;
   try {
-    await Backend.req(
-      "DELETE",
-      `/v2/admin/users/${userId}/achievements/${achievementId}`,
-    );
+    await api(client).achievements.adminRevoke(achievementId, userId);
     return true;
   } catch (e: any) {
     log.err("ACHIEVE", `admin revoke failed: ${errMsg(e)}`);
@@ -226,21 +225,18 @@ export async function adminGrantByName(
   username: string,
   achievementId: string,
 ): Promise<GrantResult | null> {
-  return (await Backend.req(
-    "POST",
-    `/v2/admin/achievements/${achievementId}/by-username`,
-    { username },
-  )) as GrantResult;
+  const client = getClient();
+  if (!client?.on) return null;
+  return await api(client).achievements.adminGrant(achievementId, { userId: username }) as unknown as GrantResult;
 }
 
 export async function adminRevokeByName(
   username: string,
   achievementId: string,
 ): Promise<boolean> {
-  await Backend.req(
-    "DELETE",
-    `/v2/admin/achievements/${achievementId}/by-username/${encodeURIComponent(username)}`,
-  );
+  const client = getClient();
+  if (!client?.on) return false;
+  await api(client).achievements.adminRevoke(achievementId, username);
   return true;
 }
 
@@ -416,10 +412,10 @@ function drainUnlock(): void {
       </div>
       <div class="wd-ach-bd">
         <div class="wd-ach-head">
-          <div class="wd-ach-icon">${iconChar(ach.icon)}</div>
+          <div class="wd-ach-icon">${iconChar(ach.iconUrl)}</div>
           <div class="wd-ach-meta">
             <div class="wd-ach-eyebrow">${esc(t("achTitle"))}</div>
-            <div class="wd-ach-name">${esc(ach.name)}</div>
+            <div class="wd-ach-name">${esc(ach.title)}</div>
             <span class="wd-ach-pts">+${ach.points} ${esc(t("achPoints"))}</span>
           </div>
         </div>

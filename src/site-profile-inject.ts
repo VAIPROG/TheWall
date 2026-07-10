@@ -11,7 +11,7 @@
  * No site code is modified: this is purely DOM mutation from a content
  * script, in the same vein as our chat-emote rendering.
  */
-import { Backend } from "./backend";
+import { getActiveClient } from "./backend/index";
 import { esc } from "./helpers";
 import { replaceEmotes } from "./emoji";
 import { isWalldevDark } from "./theme";
@@ -21,6 +21,17 @@ import { triggerFoundTheDev } from "./achievements";
 
 const SECTION_ID = "wd-profile-section";
 const MODAL_SEL = ".settings-modal.modal-content";
+
+// Public-profile reads still use the V2 user surface; resolve against the API
+// root, not the V3 base. TODO(phase3): adopt /api/v3/users/{ref}.
+function piReq<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  const client = getActiveClient();
+  if (!client) return Promise.reject(new Error("backend offline"));
+  return client.req<T>({ method, path, body, root: true });
+}
+function piRoot(): string {
+  return getActiveClient()?.rootUrl ?? "";
+}
 
 let observer: MutationObserver | null = null;
 /** Username (lowercased) -> resolved profile or `null` if confirmed missing. */
@@ -195,7 +206,7 @@ async function fetchProfileByUsername(
   }
   let profile: any;
   try {
-    profile = await Backend.req(
+    profile = await piReq(
       "GET",
       `/v2/users/by-username/${encodeURIComponent(username)}`,
     );
@@ -207,7 +218,7 @@ async function fetchProfileByUsername(
   let achievementCount = 0;
   if (profile?.id) {
     try {
-      const a = (await Backend.req(
+      const a = (await piReq(
         "GET",
         `/v2/users/${profile.id}/achievements`,
       )) as any[];
@@ -279,14 +290,14 @@ function localiseClanRole(role: string | undefined): string | null {
 function avatarUrl(profile: any): string {
   // /api/avatar?userId=<uuid> returns the custom avatar or 404 — falls back
   // to Discord proxy via onerror handler in the template.
-  return `${Backend.base}/avatar?userId=${encodeURIComponent(profile.id)}`;
+  return `${piRoot()}/avatar?userId=${encodeURIComponent(profile.id)}`;
 }
 
 function discordAvatarUrl(profile: any): string | null {
   // We don't have the snowflake here unless discord_id is on the public
   // profile. If so we can use the second-level fallback chain in the <img>.
   if (profile.discord_id) {
-    return `${Backend.base}/discord/avatar?userId=${encodeURIComponent(profile.discord_id)}`;
+    return `${piRoot()}/discord/avatar?userId=${encodeURIComponent(profile.discord_id)}`;
   }
   return null;
 }
@@ -312,7 +323,7 @@ function renderProfile(profile: any, achievementCount: number, username: string)
 
   // -- Pinned templates
   const pinsHtml = (profile.pinned_templates || []).map((p: any) =>
-    `<div class="wd-pin" title="${esc(p.name || "")}" style="background-image:url('${Backend.base}/v2/templates/${encodeURIComponent(p.id)}/preview?size=64')"></div>`,
+    `<div class="wd-pin" title="${esc(p.name || "")}" style="background-image:url('${piRoot()}/v2/templates/${encodeURIComponent(p.id)}/preview?size=64')"></div>`,
   ).join("");
   const pinsBlock = pinsHtml
     ? `<div class="wd-section-title">${esc(t("profilePinned"))}</div><div class="wd-pins">${pinsHtml}</div>`

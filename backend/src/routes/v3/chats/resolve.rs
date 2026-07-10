@@ -90,26 +90,6 @@ pub async fn modmail_chat_id(pool: &sqlx::PgPool, opener: Uuid) -> Result<Uuid, 
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-/// Resolve a userRef that is either a UUID or a case-insensitive username.
-/// Returns `None` if the user does not exist.
-pub async fn resolve_user_ref(pool: &sqlx::PgPool, user_ref: &str) -> Result<Option<Uuid>, (StatusCode, String)> {
-    if let Ok(uid) = uuid::Uuid::parse_str(user_ref) {
-        // UUID path: verify the row exists.
-        let exists: Option<bool> = sqlx::query_scalar("SELECT TRUE FROM users WHERE id = $1")
-            .bind(uid)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        return Ok(exists.map(|_| uid));
-    }
-    // Username path: case-insensitive lookup.
-    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE LOWER(username) = LOWER($1)")
-        .bind(user_ref)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
 /// Canonical dm_key: `min(a,b):max(a,b)`.
 pub fn dm_key_for(a: Uuid, b: Uuid) -> String {
     if a < b {
@@ -117,6 +97,17 @@ pub fn dm_key_for(a: Uuid, b: Uuid) -> String {
     } else {
         format!("{}:{}", b, a)
     }
+}
+
+/// Parse a DM key into its two participant UUIDs.
+pub fn parse_dm_key(dm_key: &str) -> Option<(Uuid, Uuid)> {
+    let mut parts = dm_key.split(':');
+    let a = parts.next().and_then(|p| Uuid::parse_str(p).ok())?;
+    let b = parts.next().and_then(|p| Uuid::parse_str(p).ok())?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((a, b))
 }
 
 /// Load a chat row by id, returning `None` if absent.
@@ -136,7 +127,7 @@ pub async fn load_chat(pool: &sqlx::PgPool, chat_id: Uuid) -> Result<Option<Chat
 /// - global: any authenticated user.
 /// - clan:   active member of the chat's clan.
 /// - dm:     user_id is one of the two participants in dm_key.
-/// - modmail: clan mod+ of the chat's clan (opener check deferred).
+/// - modmail: opener or global/clan moderator+.
 pub async fn can_access_chat(
     pool: &sqlx::PgPool,
     user_id: Uuid,
@@ -162,11 +153,13 @@ pub async fn can_access_chat(
         }
         "dm" => {
             let key = match &chat.dm_key {
-                Some(k) => k.clone(),
+                Some(k) => k,
                 None => return Ok(false),
             };
-            // dm_key is "uuidA:uuidB" — check if user_id appears as either part.
-            Ok(key.contains(&user_id.to_string()))
+            match parse_dm_key(key) {
+                Some((a, b)) => Ok(a == user_id || b == user_id),
+                None => Ok(false),
+            }
         }
         "modmail" => {
             // Opener sees their own thread.
@@ -198,3 +191,48 @@ pub async fn can_access_chat(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::{dm_key_for, parse_dm_key};
+    use uuid::Uuid;
+
+    #[test]
+    fn dm_key_is_sorted() {
+        let a = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        let b = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let key = dm_key_for(a, b);
+        assert!(key.starts_with(&a.to_string()));
+        assert!(key.ends_with(&b.to_string()));
+        assert_eq!(dm_key_for(a, b), dm_key_for(b, a));
+    }
+
+    #[test]
+    fn parse_dm_key_round_trip() {
+        let a = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        let b = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let key = dm_key_for(a, b);
+        let parsed = parse_dm_key(&key).unwrap();
+        assert_eq!(parsed, (a, b));
+    }
+
+    #[test]
+    fn parse_dm_key_rejects_invalid() {
+        assert!(parse_dm_key("not-a-uuid:also-not").is_none());
+        assert!(parse_dm_key("too:many:colons").is_none());
+        assert!(parse_dm_key("").is_none());
+    }
+
+    #[test]
+    fn parse_dm_key_preserves_canonical_order() {
+        let a = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        let b = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let key = dm_key_for(a, b);
+        let parsed = parse_dm_key(&key).unwrap();
+        assert_eq!(parsed.0, a);
+        assert_eq!(parsed.1, b);
+    }
+}

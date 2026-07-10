@@ -799,7 +799,7 @@ pub async fn telegram_login_exchange(
         "no Wall account is linked to this Telegram — link it first from the extension"
             .to_string(),
     ))?;
-    let (token, refresh_token) =
+    let (token, refresh_token, _session_id) =
         crate::auth::issue_session_pair(&state.pool, &state.config.jwt_secret, uid)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
@@ -841,7 +841,7 @@ pub async fn discord_login_exchange(
         "no Wall account is linked to this Discord — link it first from the extension"
             .to_string(),
     ))?;
-    let (token, refresh_token) =
+    let (token, refresh_token, _session_id) =
         crate::auth::issue_session_pair(&state.pool, &state.config.jwt_secret, uid)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;

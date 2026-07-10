@@ -41,7 +41,7 @@ import {
   getOverlayAnimation,
   renderOverlay,
 } from "./overlay";
-import { Backend, getMe } from "./backend";
+import { getActiveClient, getMe } from "./backend/index";
 import { PALETTE, quantizeBuffer } from "./palette";
 import { diffTemplate } from "./template-diff";
 import { readWallRegion } from "./overlay-region";
@@ -119,10 +119,10 @@ export function installDevTools(): void {
     /** Raw backend access — same client the UI uses. */
     backend: {
       req: (method: string, path: string, body?: unknown) =>
-        Backend.req(method, path, body),
+        getActiveClient()?.req({ method, path, body }),
       me: () => getMe(),
       get connected() {
-        return Backend.on;
+        return getActiveClient()?.on ?? false;
       },
     },
 

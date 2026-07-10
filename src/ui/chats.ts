@@ -3,8 +3,19 @@ import { ic } from "../icons";
 import { t } from "../i18n";
 import { toast } from "../notify";
 import { errorDlg, promptDlg } from "../dialog";
-import { Backend } from "../backend";
+import { getActiveClient } from "../backend/index";
 import { sendClanMessage } from "../data";
+
+// Clan roster/announcements + mod application still use the V1/V2 root surface.
+// TODO(phase3): move to /api/v3/clans/{id}/members + clan chat + role applies.
+function chReq<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  const client = getActiveClient();
+  if (!client) return Promise.reject(new Error("backend offline"));
+  return client.req<T>({ method, path, body, root: true });
+}
+function chRoot(): string {
+  return getActiveClient()?.rootUrl ?? "";
+}
 import { openEmojiPicker } from "../emoji-picker";
 import { attachMentions } from "../mentions";
 
@@ -15,7 +26,7 @@ export function wireChats(_win: HTMLElement): void {
   if (dmTa && dmMention) {
     attachMentions(dmTa, dmMention, async () => {
       try {
-        const roster = (await Backend.req("GET", "/clan/members")) as any[];
+        const roster = (await chReq("GET", "/clan/members")) as any[];
         return (roster || []).map((r) => ({ username: r.username, id: r.id }));
       } catch {
         return [];
@@ -40,7 +51,7 @@ export function wireChats(_win: HTMLElement): void {
         toast("Announce", "No clan found");
         return;
       }
-      await Backend.req("POST", `/v2/clans/${clanId}/announcements`, {
+      await chReq("POST", `/v2/clans/${clanId}/announcements`, {
         title,
         body,
       });
@@ -69,12 +80,12 @@ export function wireChats(_win: HTMLElement): void {
   if (chatTa && mentionEl) {
     attachMentions(chatTa, mentionEl, async () => {
       try {
-        const roster = (await Backend.req("GET", "/clan/members")) as any[];
+        const roster = (await chReq("GET", "/clan/members")) as any[];
         return (roster || []).map((r) => ({
           username: r.username,
           id: r.id,
           avatar_url: r.id
-            ? `${Backend.base}/avatar?userId=${encodeURIComponent(r.id)}`
+            ? `${chRoot()}/avatar?userId=${encodeURIComponent(r.id)}`
             : undefined,
         }));
       } catch {
@@ -96,7 +107,7 @@ export function wireChats(_win: HTMLElement): void {
   });
 
   $("btn-mod-apply")!.addEventListener("click", async () => {
-    if (!Backend.on) {
+    if (!getActiveClient()?.on) {
       await errorDlg("Connect to VAI-PROG backend first (Settings)");
       return;
     }
@@ -107,7 +118,7 @@ export function wireChats(_win: HTMLElement): void {
     );
     if (msg == null || !String(msg).trim()) return;
     try {
-      await Backend.moderationApply(String(msg).trim());
+      await chReq("POST", "/clan/moderation/apply", { message: String(msg).trim() });
       toast("moderation", t("modSubmittedToast"));
     } catch (e: any) {
       await errorDlg("Apply failed: " + errMsg(e));

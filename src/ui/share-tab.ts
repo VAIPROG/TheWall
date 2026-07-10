@@ -10,7 +10,15 @@ import { overlayData } from "../overlay";
 import { insertTemplate } from "../template-insert";
 import { importShare, genShare } from "../share";
 import { applyParsedJson } from "../url-autoload";
-import { getMe, Backend } from "../backend";
+import { getMe, getActiveClient } from "../backend/index";
+
+// Public-profile + template reads via the V2 root surface (rich shapes the
+// export dialog renders). TODO(phase3): move to V3 users/templates.
+function stReq<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  const client = getActiveClient();
+  if (!client) return Promise.reject(new Error("backend offline"));
+  return client.req<T>({ method, path, body, root: true });
+}
 import { fetchCharityConfig } from "../charity-import";
 import { openExportOptionsDialog, pickLayer } from "../overlay-share-dialogs";
 import { applyLayer } from "../formats/apply-layer";
@@ -128,14 +136,14 @@ export function wireShare(win: HTMLElement): void {
   }> => {
     const me = getMe();
     const username = me?.username || "";
-    if (!username || !Backend.on) {
+    if (!username || !getActiveClient()?.on) {
       return { username, clanName: null, clanRole: null };
     }
     try {
       // NB: the profile endpoint is /v2/users/{id} (no "/profile" suffix) —
       // the suffixed path 404'd silently and the export dialog showed the
       // clan as "—" forever even for clan members.
-      const prof: any = await Backend.req(
+      const prof: any = await stReq(
         "GET",
         `/v2/users/${encodeURIComponent(String(me!.id))}`,
       );
@@ -446,7 +454,7 @@ export function wireShare(win: HTMLElement): void {
     const id = (window as any).__wd_last_shared_template_id as
       | string
       | undefined;
-    if (!id || !Backend.on) return null;
+    if (!id || !getActiveClient()?.on) return null;
     const base = (cfg.backendUrl || "").replace(/\/+$/, "");
     if (!base) return null;
     const jsonUrl = `${base}/v2/templates/${encodeURIComponent(id)}/json`;
@@ -458,7 +466,7 @@ export function wireShare(win: HTMLElement): void {
     const id = (window as any).__wd_last_shared_template_id as
       | string
       | undefined;
-    if (!id || !Backend.on) return null;
+    if (!id || !getActiveClient()?.on) return null;
     const base = (cfg.backendUrl || "").replace(/\/+$/, "");
     if (!base) return null;
     const charityUrl = `${base}/v2/templates/${encodeURIComponent(id)}/charity`;
@@ -564,9 +572,9 @@ export function wireShare(win: HTMLElement): void {
     // — the backend renders a single-template Charity config that already
     // points at the hosted PNG and drops fields Charity doesn't have. Zero
     // prompts, perfect output.
-    if (Backend.on && lastTplId) {
+    if (getActiveClient()?.on && lastTplId) {
       try {
-        const body = await Backend.req(
+        const body = await stReq(
           "GET",
           `/v2/templates/${encodeURIComponent(lastTplId)}/charity`,
         );

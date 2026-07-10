@@ -180,11 +180,7 @@ pub async fn create(
         ));
     }
     let is_global_admin = permissions::GlobalRole::from_str(&global_role).is_admin();
-    // VAI easter egg: the extension's author is always treated as a
-    // global admin for the purpose of auto-approval. Comparison is
-    // case-insensitive to defeat squatting attempts.
-    let is_vai = username.trim().eq_ignore_ascii_case("vai");
-    let is_admin = is_global_admin || is_vai;
+    let is_admin = is_global_admin;
 
     // SECURITY: a 'clan' scope template MUST be tagged with a clan_id; the
     // body field is optional, so for that case fall back to the caller's

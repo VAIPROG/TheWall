@@ -23,6 +23,8 @@ pub struct AppConfig {
     pub notify: NotifyTargets,
     pub maintenance: MaintenanceConfig,
     pub runtime: Arc<RwLock<RuntimeConfig>>,
+    pub owner: ServerOwnerConfig,
+    pub owner_seed: Option<OwnerSeed>,
 }
 
 impl AppConfig {
@@ -45,6 +47,8 @@ impl AppConfig {
                 let maintenance = MaintenanceConfig::load();
                 Arc::new(RwLock::new(RuntimeConfig::from_env_defaults(&maintenance)))
             },
+            owner: ServerOwnerConfig::load(),
+            owner_seed: OwnerSeed::load(),
         }
     }
 }
@@ -187,6 +191,22 @@ pub struct MaintenanceConfig {
     pub estimated_duration_minutes: Option<i64>,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct ServerOwnerConfig {
+    pub name: String,
+    pub contact: String,
+    pub link: Option<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct OwnerSeed {
+    pub username: String,
+    pub external_id: String,
+    pub source: String,
+    pub role: String,
+    pub global_role: String,
+}
+
 impl MaintenanceConfig {
     fn load() -> Self {
         let enabled = env::var("WALL_MAINTENANCE_MODE")
@@ -199,6 +219,36 @@ impl MaintenanceConfig {
                 .ok()
                 .and_then(|v| v.parse().ok()),
         }
+    }
+}
+
+impl ServerOwnerConfig {
+    fn load() -> Self {
+        Self {
+            name: env::var("WALL_OWNER_NAME")
+                .unwrap_or_else(|_| "The Wall Dev".to_string()),
+            contact: env::var("WALL_OWNER_CONTACT")
+                .unwrap_or_else(|_| "vadim+the_wall@vai-rice.space".to_string()),
+            link: opt_env("WALL_OWNER_LINK"),
+        }
+    }
+}
+
+impl OwnerSeed {
+    fn load() -> Option<Self> {
+        let raw = env::var("WALL_OWNER_SEED").ok()?;
+        let raw = raw.trim();
+        if raw.is_empty() {
+            return None;
+        }
+        let v: serde_json::Value = serde_json::from_str(raw).ok()?;
+        Some(Self {
+            username: v.get("username")?.as_str()?.to_string(),
+            external_id: v.get("external_id")?.as_str()?.to_string(),
+            source: v.get("source").and_then(|v| v.as_str()).unwrap_or("site").to_string(),
+            role: v.get("role").and_then(|v| v.as_str()).unwrap_or("admin").to_string(),
+            global_role: v.get("global_role").and_then(|v| v.as_str()).unwrap_or("owner").to_string(),
+        })
     }
 }
 
@@ -295,6 +345,10 @@ const KNOWN_ENV_KEYS: &[&str] = &[
     "WALL_MAINTENANCE_MODE",
     "WALL_MAINTENANCE_REASON",
     "WALL_MAINTENANCE_DURATION_MINUTES",
+    "WALL_OWNER_SEED",
+    "WALL_OWNER_NAME",
+    "WALL_OWNER_CONTACT",
+    "WALL_OWNER_LINK",
 ];
 
 /// Flag env-file keys the backend never reads. A misspelled key is otherwise

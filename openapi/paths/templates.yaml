@@ -392,6 +392,61 @@ TemplatePng:
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
 
+TemplateAnimated:
+  get:
+    tags: [Templates]
+    summary: Get template layer as an animated GIF
+    operationId: getTemplateAnimated
+    description: |
+      Renders a layer's sprite-sheet animation (its `animation` block in the
+      the-wall-dev/2 document) as an animated GIF. Honours the sheet layout and
+      traversal order, per-frame durations, skipped frames, per-frame image
+      overrides, and the looping flag. Layers with no `animation` block fall
+      back to a single still PNG, so this endpoint is always safe to point an
+      `<img>` at. Public approved templates are readable without authentication;
+      clan/private templates require auth, session, or password.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
+      - $ref: "../components/parameters/common.yaml#/SessionQuery"
+      - $ref: "../components/parameters/common.yaml#/PasswordQuery"
+      - name: layer
+        in: query
+        description: Zero-based layer index in document.templates[].
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        description: >
+          Fit each frame into a size×size box (nearest-neighbour, aspect
+          preserved). Omit to render at native frame size (capped at 512px).
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 512
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: >
+          Animated GIF (animated layers) or still PNG (static layers).
+        content:
+          image/gif:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "422":
+        description: Animation timeline resolved to zero visible frames.
+
 TemplateCharity:
   get:
     tags: [Templates]

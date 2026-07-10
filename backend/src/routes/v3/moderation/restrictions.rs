@@ -24,10 +24,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{RestrictionCreate, RestrictionPage, RestrictionRow, RestrictionUpdate, RestrictionView},
-    routes::v3::utils::{
-        audit,
-        permissions::{effective_clan_role, global_role_of},
-    },
+    routes::v3::utils::{audit, permissions, users::resolve_user_ref},
 };
 
 // ---------------------------------------------------------------------------
@@ -61,7 +58,7 @@ async fn authorize_restriction(
     scope: &str,
     clan_id: Option<Uuid>,
 ) -> Result<(), (StatusCode, String)> {
-    let global = global_role_of(pool, caller_id)
+    let global = permissions::global_role_of(pool, caller_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -71,7 +68,7 @@ async fn authorize_restriction(
 
     if scope == "clan" {
         if let Some(cid) = clan_id {
-            let effective = effective_clan_role(pool, caller_id, cid)
+            let effective = permissions::effective_clan_role(pool, caller_id, cid)
                 .await
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
             if effective.map(|r| r.is_moderator()).unwrap_or(false) {
@@ -180,7 +177,7 @@ pub async fn list_restrictions(
     State(state): State<AppState>,
     Query(q): Query<ListRestrictionsQuery>,
 ) -> Result<Json<RestrictionPage>, (StatusCode, String)> {
-    let global = global_role_of(&state.pool, auth.user_id)
+    let global = permissions::global_role_of(&state.pool, auth.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if !global.is_moderator() {
@@ -494,29 +491,10 @@ pub async fn user_restrictions(
     Path(user_ref): Path<String>,
     Query(q): Query<UserRestrictionsQuery>,
 ) -> Result<Json<RestrictionPage>, (StatusCode, String)> {
-    let target_id = if let Ok(uid) = Uuid::parse_str(&user_ref) {
-        let exists: Option<bool> = sqlx::query_scalar("SELECT TRUE FROM users WHERE id = $1")
-            .bind(uid)
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        if exists.is_none() {
-            return Err((StatusCode::NOT_FOUND, "user not found".to_string()));
-        }
-        uid
-    } else {
-        let row: Option<(Uuid,)> =
-            sqlx::query_as("SELECT id FROM users WHERE lower(username) = lower($1)")
-                .bind(&user_ref)
-                .fetch_optional(&state.pool)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        row.map(|(id,)| id)
-            .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?
-    };
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
     if target_id != auth.user_id {
-        let global = global_role_of(&state.pool, auth.user_id)
+        let global = permissions::global_role_of(&state.pool, auth.user_id)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         if !global.is_moderator() {

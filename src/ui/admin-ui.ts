@@ -1,10 +1,23 @@
-import { Backend, getMe } from "../backend";
+import { getActiveClient, getMe } from "../backend/index";
 import { $, esc, errMsg } from "../helpers";
 import { ic } from "../icons";
 import { log } from "../log";
 import { toast } from "../notify";
 import { confirmDlg, errorDlg, openDialog, promptDlg } from "../dialog";
 import { isWalldevDark } from "../theme";
+
+// This console still drives the legacy V1/V2 admin surface (`/admin/*` list
+// endpoints, `/v2/templates/*` previews). Those resolve against the API root,
+// not the V3 base — hence `root: true`.
+// TODO(phase3): move to the V3 admin/moderation endpoints (richer, per-user).
+function adminReq<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  const client = getActiveClient();
+  if (!client) return Promise.reject(new Error("backend offline"));
+  return client.req<T>({ method, path, body, root: true });
+}
+function adminRoot(): string {
+  return getActiveClient()?.rootUrl ?? "";
+}
 
 /** Global roles in V2: user / admin / owner. */
 const GLOBAL_ROLES = ["user", "admin", "owner"] as const;
@@ -22,7 +35,7 @@ export async function loadAdminUsers(): Promise<void> {
   const box = $("admin-users");
   if (!box) return;
   try {
-    const users = await Backend.req("GET", "/admin/users");
+    const users = await adminReq("GET", "/admin/users");
     box.innerHTML = (users || [])
       .map((u: any) => {
         const role = String(u.global_role || u.role || "user").toLowerCase();
@@ -44,7 +57,7 @@ export async function loadAdminUsers(): Promise<void> {
     box.querySelectorAll<HTMLSelectElement>(".wd-role-sel").forEach((sel) =>
       sel.addEventListener("change", async () => {
         try {
-          await Backend.req("PUT", `/admin/users/${sel.dataset.uid}/role`, { role: sel.value });
+          await adminReq("PUT", `/admin/users/${sel.dataset.uid}/role`, { role: sel.value });
           toast("Admin", "role updated");
         } catch (e: any) { await errorDlg("Role update failed: " + errMsg(e)); }
       }),
@@ -53,7 +66,7 @@ export async function loadAdminUsers(): Promise<void> {
       b.addEventListener("click", async () => {
         if (!(await confirmDlg("Delete this user permanently?", "Confirm Delete"))) return;
         try {
-          await Backend.req("DELETE", `/admin/users/${b.dataset.delUid}`);
+          await adminReq("DELETE", `/admin/users/${b.dataset.delUid}`);
           toast("Admin", "user deleted");
           loadAdminUsers();
         } catch (e: any) { await errorDlg("Delete failed: " + errMsg(e)); }
@@ -68,7 +81,7 @@ export async function loadModApps(): Promise<void> {
   const box = $("admin-modapps");
   if (!box) return;
   try {
-    const apps = await Backend.req("GET", "/admin/moderation");
+    const apps = await adminReq("GET", "/admin/moderation");
     box.innerHTML = (apps || [])
       .map((a: any) => {
         // Show the applicant's current role + clan so the reviewer doesn't
@@ -100,7 +113,7 @@ export async function loadModApps(): Promise<void> {
         const ctx = clan ? ` from clan "${clan}"` : "";
         if (!(await confirmDlg(`Approve and grant admin role${ctx}?`, "Confirm"))) return;
         try {
-          await Backend.req("PUT", `/admin/moderation/${b.dataset.approveMod}`, { status: "approved", new_role: "admin" });
+          await adminReq("PUT", `/admin/moderation/${b.dataset.approveMod}`, { status: "approved", new_role: "admin" });
           toast("Admin", "approved");
           loadModApps();
         } catch (e: any) { await errorDlg(errMsg(e)); }
@@ -112,7 +125,7 @@ export async function loadModApps(): Promise<void> {
         const ctx = clan ? ` from clan "${clan}"` : "";
         if (!(await confirmDlg(`Reject this application${ctx}?`, "Confirm"))) return;
         try {
-          await Backend.req("PUT", `/admin/moderation/${b.dataset.rejectMod}`, { status: "rejected" });
+          await adminReq("PUT", `/admin/moderation/${b.dataset.rejectMod}`, { status: "rejected" });
           toast("Admin", "rejected");
           loadModApps();
         } catch (e: any) { await errorDlg(errMsg(e)); }
@@ -216,7 +229,7 @@ export async function broadcastNotification(): Promise<void> {
       if (!ok) { statusLeft.textContent = "Cancelled"; return; }
       statusLeft.textContent = "Sending…";
       try {
-        await Backend.req("POST", "/admin/broadcast", { title, body, kind });
+        await adminReq("POST", "/admin/broadcast", { title, body, kind });
         toast("Admin", `broadcast sent as ${typeLabel}`);
         close();
       } catch (e: any) {
@@ -396,7 +409,7 @@ export async function loadAdminTemplates(): Promise<void> {
   const box = $("admin-templates");
   if (!box) return;
   try {
-    const items = await Backend.req("GET", "/admin/templates");
+    const items = await adminReq("GET", "/admin/templates");
     box.innerHTML = (items || []).map((tp: any) => {
       const badge = tp.status === "approved"
         ? `<span class="wp-badge mod">approved</span>`
@@ -408,7 +421,7 @@ export async function loadAdminTemplates(): Promise<void> {
       const clanLine = tp.scope === "clan"
         ? `<span class="wp-badge mod" title="${esc(tp.clan_id || "")}">🛡 ${esc(tp.clan_name || `clan ${tp.clan_id?.slice(0, 8) || "?"}`)}</span>`
         : "";
-      const thumb = `<img src="${Backend.base}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" class="wp-tpl-thumb" loading="lazy" onerror="this.style.opacity=0.3">`;
+      const thumb = `<img src="${adminRoot()}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" class="wp-tpl-thumb" loading="lazy" onerror="this.style.opacity=0.3">`;
       return `<div class="wp-li">${thumb}
         <div style="flex:1">
           <b>${esc(tp.name)}</b> ${badge} <span class="wp-badge member">${esc(tp.scope)}</span> ${clanLine}
@@ -423,7 +436,7 @@ export async function loadAdminTemplates(): Promise<void> {
         const ok = await confirmDlg("Delete this template?", "Confirm Delete");
         if (!ok) return;
         try {
-          await Backend.req("DELETE", `/admin/templates/${b.dataset.adminDelTpl}`);
+          await adminReq("DELETE", `/admin/templates/${b.dataset.adminDelTpl}`);
           toast("Admin", "template deleted");
           loadAdminTemplates();
         } catch (e: any) { await errorDlg(errMsg(e)); }
@@ -438,7 +451,7 @@ export async function loadAdminNotifs(): Promise<void> {
   const box = $("admin-notifs");
   if (!box) return;
   try {
-    const items = await Backend.req("GET", "/admin/notifications");
+    const items = await adminReq("GET", "/admin/notifications");
     box.innerHTML = (items || []).map((n: any) => `
       <div class="wp-li">
         <div style="flex:1">
@@ -452,7 +465,7 @@ export async function loadAdminNotifs(): Promise<void> {
       b.addEventListener("click", async () => {
         if (!(await confirmDlg("Delete this notification?", "Confirm"))) return;
         try {
-          await Backend.req("DELETE", `/admin/notifications/${b.dataset.adminDelNotif}`);
+          await adminReq("DELETE", `/admin/notifications/${b.dataset.adminDelNotif}`);
           toast("Admin", "notification deleted");
           loadAdminNotifs();
         } catch (e: any) { await errorDlg(errMsg(e)); }

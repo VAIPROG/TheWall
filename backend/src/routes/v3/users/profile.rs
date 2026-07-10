@@ -15,7 +15,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     models::{ProviderLink, SiteIdentity, SocialAccountPublic, User, UserProfilePublic, UserSelf, UserUpdate},
-    routes::v3::utils::audit,
+    routes::v3::utils::{audit, users::resolve_user_ref as resolve_user_ref_util},
 };
 
 // ---------------------------------------------------------------------------
@@ -178,11 +178,11 @@ pub async fn update_me(
 // ---------------------------------------------------------------------------
 
 pub async fn get_user_by_ref(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Path(user_ref): Path<String>,
 ) -> Result<Json<UserProfilePublic>, (StatusCode, String)> {
-    let target_id = resolve_user_ref(&state.pool, &user_ref).await?;
+    let target_id = resolve_user_ref_util(&state.pool, &user_ref, auth.user_id).await?;
 
     let user = load_user(&state.pool, target_id)
         .await?
@@ -264,33 +264,6 @@ pub(crate) async fn avatar_url_for(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(url)
-}
-
-pub(crate) async fn resolve_user_ref(
-    pool: &sqlx::PgPool,
-    user_ref: &str,
-) -> Result<Uuid, (StatusCode, String)> {
-    if let Ok(uid) = Uuid::parse_str(user_ref) {
-        let exists: Option<bool> = sqlx::query_scalar("SELECT TRUE FROM users WHERE id = $1")
-            .bind(uid)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        if exists.is_some() {
-            return Ok(uid);
-        }
-    }
-
-    let row: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM users WHERE lower(username) = lower($1)",
-    )
-    .bind(user_ref)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    row.map(|(id,)| id)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))
 }
 
 // V3 uses a deterministic generated avatar URL when no custom avatar is set.

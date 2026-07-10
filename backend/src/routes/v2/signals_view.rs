@@ -1,8 +1,8 @@
 //! Read + annotate side of the mirrored canvas signals.
 //!
-//! Storage is JSONB in signals_cache; this module normalises it into a clean
-//! `SignalView` and bundles any admin-written notes (per-language) so the
-//! front-end can render a single typed object instead of poking at raw JSON.
+//! NOTE: this module is legacy V2. Storage has moved to the unified
+//! `feed_events` table (`event_type = 'signal'`). Notes live in
+//! `feed_event_notes`. These endpoints keep the original V2 API shape.
 
 use std::collections::HashMap;
 
@@ -45,7 +45,7 @@ pub struct ListQuery {
 #[derive(FromRow)]
 struct RawRow {
     id: Uuid,
-    external_id: Option<String>,
+    external_id: String,
     tag: Option<String>,
     payload: serde_json::Value,
     sampled_at: DateTime<Utc>,
@@ -53,7 +53,7 @@ struct RawRow {
 
 fn build_view(r: RawRow, notes: HashMap<String, String>) -> SignalView {
     let p = &r.payload;
-    // submitted_at upstream is a string of millisecond epoch — parse to UTC.
+
     let submitted_at = p
         .get("submitted_at")
         .and_then(|v| match v {
@@ -61,7 +61,7 @@ fn build_view(r: RawRow, notes: HashMap<String, String>) -> SignalView {
             serde_json::Value::Number(n) => n.as_i64(),
             _ => None,
         })
-        .and_then(|ms| DateTime::<Utc>::from_timestamp_millis(ms));
+        .and_then(DateTime::<Utc>::from_timestamp_millis);
 
     let image_file = p
         .get("image_file")
@@ -75,7 +75,7 @@ fn build_view(r: RawRow, notes: HashMap<String, String>) -> SignalView {
     SignalView {
         id: r.id,
         num_id,
-        external_id: r.external_id,
+        external_id: Some(r.external_id),
         tag: r.tag.filter(|s| !s.is_empty()),
         name: p.get("name").and_then(|v| v.as_str()).map(String::from),
         location: p.get("location").and_then(|v| v.as_str()).map(String::from),
@@ -93,10 +93,11 @@ pub async fn list(
 ) -> Result<Json<Vec<SignalView>>, (StatusCode, String)> {
     let limit = q.limit.unwrap_or(50).clamp(1, 200);
     let rows: Vec<RawRow> = sqlx::query_as(
-        r#"SELECT id, external_id, tag, payload, sampled_at
-             FROM signals_cache
-            WHERE ($1::timestamptz IS NULL OR sampled_at > $1)
-            ORDER BY sampled_at DESC
+        r#"SELECT id, external_id, payload->>'tag' AS tag, payload, occurred_at AS sampled_at
+             FROM feed_events
+            WHERE event_type = 'signal'
+              AND ($1::timestamptz IS NULL OR occurred_at > $1)
+            ORDER BY occurred_at DESC
             LIMIT $2"#,
     )
     .bind(q.since)
@@ -105,20 +106,20 @@ pub async fn list(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // Batch-fetch notes for these IDs.
     let ids: Vec<Uuid> = rows.iter().map(|r| r.id).collect();
     let notes_rows: Vec<(Uuid, String, String)> = if ids.is_empty() {
         Vec::new()
     } else {
-        sqlx::query_as("SELECT signal_id, lang, note FROM signal_notes WHERE signal_id = ANY($1)")
+        sqlx::query_as("SELECT event_id, lang, note FROM feed_event_notes WHERE event_id = ANY($1)")
             .bind(&ids[..])
             .fetch_all(&state.pool)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     };
+
     let mut by_id: HashMap<Uuid, HashMap<String, String>> = HashMap::new();
-    for (sid, lang, note) in notes_rows {
-        by_id.entry(sid).or_default().insert(lang, note);
+    for (eid, lang, note) in notes_rows {
+        by_id.entry(eid).or_default().insert(lang, note);
     }
 
     Ok(Json(
@@ -136,7 +137,9 @@ pub async fn get_one(
     Path(id): Path<Uuid>,
 ) -> Result<Json<SignalView>, (StatusCode, String)> {
     let r: RawRow = sqlx::query_as(
-        "SELECT id, external_id, tag, payload, sampled_at FROM signals_cache WHERE id = $1",
+        r#"SELECT id, external_id, payload->>'tag' AS tag, payload, occurred_at AS sampled_at
+             FROM feed_events
+            WHERE id = $1 AND event_type = 'signal'"#,
     )
     .bind(id)
     .fetch_optional(&state.pool)
@@ -145,7 +148,7 @@ pub async fn get_one(
     .ok_or((StatusCode::NOT_FOUND, "signal not found".into()))?;
 
     let notes_rows: Vec<(String, String)> =
-        sqlx::query_as("SELECT lang, note FROM signal_notes WHERE signal_id = $1")
+        sqlx::query_as("SELECT lang, note FROM feed_event_notes WHERE event_id = $1")
             .bind(id)
             .fetch_all(&state.pool)
             .await
@@ -167,13 +170,25 @@ pub async fn upsert_note(
     Json(b): Json<UpsertNote>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     permissions::require_admin(&auth, &state.pool).await?;
+
+    // Verify the target event exists and is a signal.
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM feed_events WHERE id = $1 AND event_type = 'signal')",
+    )
+    .bind(id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !exists {
+        return Err((StatusCode::NOT_FOUND, "signal not found".into()));
+    }
+
     let lang = b.lang.trim().to_ascii_lowercase();
     if !matches!(lang.as_str(), "en" | "ru" | "de" | "fr") {
         return Err((StatusCode::BAD_REQUEST, "unsupported lang".into()));
     }
     if b.note.trim().is_empty() {
-        // Empty body deletes the note.
-        sqlx::query("DELETE FROM signal_notes WHERE signal_id = $1 AND lang = $2")
+        sqlx::query("DELETE FROM feed_event_notes WHERE event_id = $1 AND lang = $2")
             .bind(id)
             .bind(&lang)
             .execute(&state.pool)
@@ -184,10 +199,11 @@ pub async fn upsert_note(
     if b.note.chars().count() > 2000 {
         return Err((StatusCode::PAYLOAD_TOO_LARGE, "max 2000 chars".into()));
     }
+
     sqlx::query(
-        r#"INSERT INTO signal_notes (signal_id, lang, note, author_id)
+        r#"INSERT INTO feed_event_notes (event_id, lang, note, author_id)
            VALUES ($1, $2, $3, $4)
-           ON CONFLICT (signal_id, lang) DO UPDATE
+           ON CONFLICT (event_id, lang) DO UPDATE
              SET note = EXCLUDED.note, author_id = EXCLUDED.author_id, updated_at = NOW()"#,
     )
     .bind(id)

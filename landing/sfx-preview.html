@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WallSFX — Sound Preview</title>
+    <link rel="icon" href="https://filianislost.com/static/favicon.png" />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at 50% 30%, #0d041a, #020202);
+        color: #d1d5db;
+        font-family: "Consolas", "Courier New", monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 32px 16px 64px;
+        box-sizing: border-box;
+      }
+      h1 {
+        color: #fff;
+        letter-spacing: 0.3em;
+        text-shadow: 0 0 12px #b026ff;
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      p.sub {
+        color: #9aa3b2;
+        font-size: 13px;
+        margin: 0 0 24px;
+        text-align: center;
+        max-width: 520px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        width: 100%;
+        max-width: 720px;
+      }
+      button {
+        font-family: inherit;
+        font-size: 14px;
+        letter-spacing: 0.05em;
+        color: #e5e7eb;
+        background: #14091f;
+        border: 1px solid rgba(176, 38, 255, 0.4);
+        border-radius: 4px;
+        padding: 14px 10px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          box-shadow 0.15s,
+          transform 0.05s;
+      }
+      button:hover {
+        background: #1f0d30;
+        box-shadow: 0 0 14px rgba(176, 38, 255, 0.45);
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      button .k {
+        display: block;
+        font-size: 11px;
+        color: #8b93a3;
+        margin-top: 3px;
+      }
+      .section {
+        margin: 28px 0 8px;
+        color: #b026ff;
+        letter-spacing: 0.25em;
+        font-size: 12px;
+        text-transform: uppercase;
+        align-self: flex-start;
+        max-width: 720px;
+        width: 100%;
+      }
+      .score-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        width: 100%;
+        max-width: 720px;
+      }
+      .score-row button {
+        flex: 1;
+        min-width: 140px;
+      }
+      .hint {
+        margin-top: 28px;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      a {
+        color: #b026ff;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WallSFX (DevPage)</h1>
+    <p class="sub">
+      Live preview of every synthesised sound on the Phase 1 timelapse page. All
+      of it is generated in the browser — no audio files. Click anything to hear
+      it (the first click wakes the audio engine).
+    </p>
+
+    <div class="section">One-shot sounds</div>
+    <div class="grid" id="sound-grid"></div>
+
+    <div class="section">Epic score (plays under the video)</div>
+    <div class="score-row">
+      <button data-fn="startScore">▶ Start score</button>
+      <button data-fn="stopScore">■ Stop score</button>
+      <button id="mute-toggle">🔈 Mute: off</button>
+    </div>
+
+    <p class="hint">
+      ← <a href="/feed.html">feed</a> ·
+      <a href="/phase1-timelapse.html">timelapse</a>
+    </p>
+
+    <script src="/assets/sfx.js"></script>
+    <script>
+      const SOUNDS = [
+        ["typing", "key click"],
+        ["glitch", "static burst"],
+        ["error", "error buzz"],
+        ["impact", "deep impact"],
+        ["beep", "confirm beep"],
+        ["select", "select tick"],
+        ["powerUp", "power up"],
+        ["denied", "denied"],
+        ["chime", "success chime"],
+        ["whoosh", "transition"],
+        ["scan", "modem scan"],
+      ];
+
+      const grid = document.getElementById("sound-grid");
+      for (const [fn, label] of SOUNDS) {
+        const b = document.createElement("button");
+        b.innerHTML = `${label}<span class="k">WallSFX.${fn}()</span>`;
+        b.addEventListener("click", () => {
+          WallSFX.init();
+          if (fn === "glitch") WallSFX.glitch(150);
+          else WallSFX[fn]();
+        });
+        grid.appendChild(b);
+      }
+
+      document.querySelectorAll("[data-fn]").forEach((b) => {
+        b.addEventListener("click", () => {
+          WallSFX.init();
+          WallSFX[b.dataset.fn]();
+        });
+      });
+
+      let muted = false;
+      const muteBtn = document.getElementById("mute-toggle");
+      muteBtn.addEventListener("click", () => {
+        WallSFX.init();
+        muted = !muted;
+        WallSFX.setMuted(muted);
+        muteBtn.textContent = `${muted ? "🔇" : "🔈"} Mute: ${muted ? "on" : "off"}`;
+      });
+    </script>
+  </body>
+</html>

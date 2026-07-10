@@ -6,10 +6,9 @@
 //! we've caught up to the tail). A safety cap of `MAX_PAGES` prevents the
 //! loop from running away if upstream ignores `after`.
 //!
-//! Dedup story (post-migration 010): every row carries a non-null
-//! `external_id` so `ON CONFLICT (source, external_id) DO NOTHING` actually
-//! fires. We prefer the upstream's `num_id`/`id`; fall back to a SHA256 of a
-//! narrow content slice.
+//! Storage: signals are written to the unified `feed_events` table with
+//! `event_type = 'signal'`. `external_id` is used for dedup via the
+//! `(source, external_id)` unique constraint.
 
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -18,6 +17,7 @@ use std::time::Duration;
 const SIGNALS_URL: &str = "https://signal.filianislost.com/fetch";
 const PAGE_SIZE: i64 = 64;
 const MAX_PAGES: usize = 32;
+const SIGNAL_IMAGE_BASE: &str = "https://signal.filianislost.com/static/uploads/";
 
 pub async fn poll_once(pool: &PgPool) -> Result<(), String> {
     let client = reqwest::Client::builder()
@@ -46,21 +46,26 @@ pub async fn poll_once(pool: &PgPool) -> Result<(), String> {
         let mut page_new = 0usize;
         for item in &items {
             let ext_id = dedup_key(item);
-            let tag = item
-                .get("tag")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+
+            let title = item.get("name").and_then(|v| v.as_str()).map(String::from);
+            let description = item.get("location").and_then(|v| v.as_str()).map(String::from);
+            let media = build_media(item);
+
             let res = sqlx::query(
-                r#"INSERT INTO signals_cache (source, external_id, tag, payload)
-                   VALUES ('filianislost', $1, $2, $3)
+                r#"INSERT INTO feed_events
+                     (event_type, source, external_id, title, description, payload, media, occurred_at)
+                   VALUES ('signal', 'filianislost', $1, $2, $3, $4, $5, NOW())
                    ON CONFLICT (source, external_id) DO NOTHING"#,
             )
-            .bind(ext_id)
-            .bind(tag)
+            .bind(&ext_id)
+            .bind(title.as_deref())
+            .bind(description.as_deref())
             .bind(item)
+            .bind(media)
             .execute(pool)
             .await
             .map_err(|e| e.to_string())?;
+
             if res.rows_affected() > 0 {
                 page_new += 1;
             }
@@ -68,7 +73,6 @@ pub async fn poll_once(pool: &PgPool) -> Result<(), String> {
         total_seen += items.len();
         total_new += page_new;
 
-        // Caught up: every row on this page was already in our cache.
         if page_new == 0 {
             tracing::debug!("signals: page {page} fully dedupes (after={after}), stopping");
             break;
@@ -77,6 +81,22 @@ pub async fn poll_once(pool: &PgPool) -> Result<(), String> {
     }
     tracing::info!("signals poll: seen={total_seen} new={total_new}");
     Ok(())
+}
+
+fn build_media(item: &serde_json::Value) -> serde_json::Value {
+    item.get("image_file")
+        .and_then(|v| v.as_str())
+        .filter(|f| !f.is_empty())
+        .map(|f| {
+            serde_json::json!([
+                {
+                    "type": "image",
+                    "url": format!("{SIGNAL_IMAGE_BASE}{f}"),
+                    "label": "photo",
+                }
+            ])
+        })
+        .unwrap_or_else(|| serde_json::json!([]))
 }
 
 fn extract_items(body: &serde_json::Value) -> Vec<serde_json::Value> {
