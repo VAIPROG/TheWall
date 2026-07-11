@@ -4,6 +4,7 @@ mod config;
 mod bot_core;
 mod discord_commands;
 mod discord_gateway;
+mod error_envelope;
 mod formats;
 mod http_error;
 mod models;
@@ -912,6 +913,15 @@ async fn main() {
             state.clone(),
             routes::v3::middleware::auth_and_ban_middleware,
         ))
+        // Rewrite plain-text error bodies into the structured
+        // `{ error: { code, message, traceId } }` envelope (v6.1.3). Placed
+        // OUTSIDE auth (so it also catches the 401/403 the auth layer emits)
+        // but INSIDE the compression layer (so the JSON it produces is what
+        // gets compressed — otherwise it would see a compressed body and
+        // corrupt it).
+        .layer(axum::middleware::from_fn(
+            error_envelope::error_envelope_middleware,
+        ))
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
@@ -921,6 +931,14 @@ async fn main() {
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             routes::v3::deprecation::v1_v2_deprecation_middleware,
+        ))
+        // Envelope OUTSIDE the deprecation middleware: legacy handler text
+        // errors are wrapped after deprecation has passed them through, while
+        // the deprecation middleware's own JSON error bodies (410/403) already
+        // have a JSON content-type and so pass through the envelope untouched.
+        // Legacy has no compression layer, so ordering vs. compression is moot.
+        .layer(axum::middleware::from_fn(
+            error_envelope::error_envelope_middleware,
         ))
         .with_state(state.clone());
 
