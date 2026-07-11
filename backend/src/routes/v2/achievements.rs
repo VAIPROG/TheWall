@@ -18,6 +18,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Serialize;
+use crate::http_error::ResultExt;
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
@@ -53,7 +54,7 @@ pub async fn list_for_me(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -73,7 +74,7 @@ pub async fn list_for_user(
     .bind(user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -83,7 +84,7 @@ pub async fn recheck_me(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let unlocked = evaluate(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(Json(serde_json::json!({ "newly_unlocked": unlocked })))
 }
 
@@ -292,7 +293,7 @@ pub async fn grant_found_the_dev(
 ) -> Result<Json<GrantResult>, (StatusCode, String)> {
     grant_with_diff(&state.pool, auth.user_id, "found_the_dev")
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .map(Json)
         .ok_or_else(|| {
             (
@@ -342,7 +343,7 @@ pub async fn grant_event(
     }
     let grant = grant_with_diff(&state.pool, auth.user_id, &event)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(Json(serde_json::json!({
         "new": grant.as_ref().map(|g| g.was_new).unwrap_or(false),
         "achievement": grant.map(|g| g.achievement),
@@ -374,7 +375,7 @@ async fn resolve_username(pool: &PgPool, name: &str) -> Result<Uuid, (StatusCode
     .bind(trimmed)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     row.ok_or_else(|| (StatusCode::NOT_FOUND, format!("no such user: {trimmed}")))
 }
 
@@ -391,7 +392,7 @@ pub async fn admin_grant_by_name(
     let user_id = resolve_username(&state.pool, &body.username).await?;
     let result = grant_with_diff(&state.pool, user_id, &achievement_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "no such achievement".into()))?;
     if result.was_new && achievement_id != "owner_blessed" {
         let _ = grant_one(&state.pool, user_id, "owner_blessed").await;
@@ -418,7 +419,7 @@ pub async fn admin_revoke_by_name(
     .bind(&achievement_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     tracing::info!(
         "admin {} revoked '{}' from {}={} (rows={})",
         auth.user_id, achievement_id, username, user_id, res.rows_affected(),
@@ -435,7 +436,7 @@ pub async fn admin_grant(
     permissions::require_admin(&auth, &state.pool).await?;
     let result = grant_with_diff(&state.pool, user_id, &achievement_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "no such achievement".into()))?;
     // If this was the first-ever award, also unlock the "owner_blessed" badge
     // so admin gifts feel a little extra.
@@ -463,7 +464,7 @@ pub async fn admin_revoke(
     .bind(&achievement_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     tracing::info!(
         "admin {} revoked achievement {} from user {} (rows={})",
         auth.user_id, achievement_id, user_id, res.rows_affected()
@@ -546,7 +547,7 @@ pub async fn admin_create(
     .bind(&id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     tracing::info!(
         "admin {} created achievement {} (name='{}', points={})",
         auth.user_id, id, row.name, row.points
@@ -568,6 +569,6 @@ pub async fn admin_list_catalogue(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }

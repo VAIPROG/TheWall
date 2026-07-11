@@ -40,3 +40,16 @@ landing/assets/*.mp4
 
 # Generated standalone API docs (reproduce with: bun run docs)
 landing/api-docs/redoc-static.html
+
+# Brainstorming visual companion
+.superpowers/
+
+# Generated icon gallery (reproduce with: bun run icons)
+icons-preview.html
+
+# UI smoke-test artifacts
+.smoke/
+
+# Never commit DB dumps
+*.dump
+*.sql.gz

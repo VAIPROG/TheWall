@@ -7,6 +7,7 @@ use axum::{
     http::StatusCode,
 };
 use uuid::Uuid;
+use crate::http_error::ResultExt;
 
 use crate::{
     AppState,
@@ -70,7 +71,7 @@ pub async fn build_detail(
         .bind(chat.id)
         .fetch_optional(pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .map(|row: MessageJoinRow| {
             let preview_text: String = row.content.chars().take(120).collect();
             LastMessagePreview {
@@ -99,7 +100,7 @@ pub async fn build_detail(
     .bind(50i64)
     .fetch_all(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .into_iter()
     .map(|r| r.into_view())
     .collect();
@@ -116,7 +117,7 @@ pub async fn build_detail(
     .bind(chat.id)
     .fetch_all(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let participant_count = participants.len() as i64;
 
@@ -167,7 +168,7 @@ async fn build_participants_and_viewer(
             .bind(&ids)
             .fetch_all(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             let mut participants = Vec::new();
             for (uid, username, display_name, avatar_url) in rows {
@@ -179,7 +180,7 @@ async fn build_participants_and_viewer(
                 .bind(uid)
                 .fetch_optional(pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .flatten();
 
                 participants.push(ParticipantView {
@@ -203,7 +204,7 @@ async fn build_participants_and_viewer(
             .bind(viewer_id)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .flatten();
 
             let viewer = ChatViewerContext {
@@ -226,7 +227,7 @@ async fn build_participants_and_viewer(
             .bind(opener_id)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             {
                 let (username, display_name, avatar_url) = opener_row;
                 participants.push(ParticipantView {
@@ -250,7 +251,7 @@ async fn build_participants_and_viewer(
             )
             .fetch_all(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             for (uid, username, display_name, avatar_url) in mod_rows {
                 if uid == opener_id {
@@ -271,7 +272,7 @@ async fn build_participants_and_viewer(
 
             let is_mod = permissions::global_role_of(pool, viewer_id)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .is_moderator();
 
             let viewer = ChatViewerContext {
@@ -310,7 +311,7 @@ async fn build_participants_and_viewer(
                 .bind(clan_id)
                 .fetch_all(pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
             } else {
                 // Global chat: no participant list.
                 Vec::new()
@@ -336,7 +337,7 @@ async fn build_participants_and_viewer(
             let (can_post, is_muted, role) = if let Some(clan_id) = chat.clan_id {
                 let effective = permissions::effective_clan_role(pool, viewer_id, clan_id)
                     .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                    .or_500()?;
                 let can_post = effective.is_some();
                 let is_muted = crate::routes::v3::utils::sanctions::has_sanction(
                     pool,
@@ -345,7 +346,7 @@ async fn build_participants_and_viewer(
                     Some(clan_id),
                 )
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
                 (can_post, is_muted, effective.map(|r| r.as_str().to_string()))
             } else {
                 let is_muted = crate::routes::v3::utils::sanctions::has_sanction(
@@ -355,7 +356,7 @@ async fn build_participants_and_viewer(
                     None,
                 )
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
                 (true, is_muted, None)
             };
 
@@ -367,7 +368,7 @@ async fn build_participants_and_viewer(
             .bind(viewer_id)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .flatten();
 
             let viewer = ChatViewerContext {

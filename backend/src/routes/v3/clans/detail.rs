@@ -1,5 +1,6 @@
 //! GET /api/v3/clans/{id}     — fetch a single clan
 //! PATCH /api/v3/clans/{id}   — update clan fields (lock-aware)
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -51,7 +52,7 @@ pub async fn update_clan(
 
     let effective = effective_clan_role(&state.pool, auth.user_id, id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if !effective.map(|r| r.is_admin()).unwrap_or(false) {
         return Err((StatusCode::FORBIDDEN, "clan admin required".to_string()));
@@ -71,7 +72,7 @@ pub async fn update_clan(
 
     let caller_global = global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     let is_global_mod = caller_global.is_moderator();
 
     let field_lock_checks: &[(&str, bool, &str)] = &[

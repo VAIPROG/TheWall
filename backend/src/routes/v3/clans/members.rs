@@ -2,6 +2,7 @@
 //! GET    /api/v3/clans/{cid}/members/{uid}   — single member
 //! PATCH  /api/v3/clans/{cid}/members/{uid}   — update member role (admin+)
 //! DELETE /api/v3/clans/{cid}/members/{uid}   — kick member (moderator+)
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -100,7 +101,7 @@ async fn fetch_member_row(
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(row.map(|(uid, username, display_name, clan_role, joined_at)| MemberRow {
         user_id: uid,
@@ -169,7 +170,7 @@ pub async fn list_members(
     if !clan.discoverable
         && effective_clan_role(&state.pool, auth.user_id, clan_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .is_none()
     {
         return Err((StatusCode::FORBIDDEN, "clan roster is private".to_string()));
@@ -185,7 +186,7 @@ pub async fn list_members(
     .bind(clan_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // Fetch rows; we derive role_rank in Rust so we ORDER BY after mapping.
     // Use a stable secondary key (joined_at ASC) and compute owner override.
@@ -202,7 +203,7 @@ pub async fn list_members(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let owner_id = clan.owner_id;
 
@@ -240,7 +241,7 @@ pub async fn get_member(
     if !clan.discoverable
         && effective_clan_role(&state.pool, auth.user_id, clan_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .is_none()
     {
         return Err((StatusCode::FORBIDDEN, "clan roster is private".to_string()));
@@ -270,7 +271,7 @@ pub async fn update_member_role(
     // Actor authorization — must be admin+
     let actor_effective = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or_else(|| (StatusCode::FORBIDDEN, "not a clan member".to_string()))?;
 
     if !actor_effective.is_admin() {
@@ -321,7 +322,7 @@ pub async fn update_member_role(
     .bind(user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // Re-fetch and return updated view
     let updated_row = fetch_member_row(&state.pool, clan_id, user_id)
@@ -347,7 +348,7 @@ pub async fn kick_member(
     // Actor must be moderator+
     let actor_effective = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or_else(|| (StatusCode::FORBIDDEN, "not a clan member".to_string()))?;
 
     if !actor_effective.is_moderator() {
@@ -386,7 +387,7 @@ pub async fn kick_member(
     .bind(user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(json!({"ok": true, "message": "member removed"})))
 }

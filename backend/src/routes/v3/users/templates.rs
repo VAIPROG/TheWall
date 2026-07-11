@@ -1,5 +1,6 @@
 //! User templates endpoint:
 //!   GET /api/v3/users/{user_ref}/templates
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -51,7 +52,7 @@ pub async fn get_user_templates(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let rows = sqlx::query_as::<_, TemplateSummary>(
         r#"SELECT id, user_id, name, x, y, scale, scope, status,
@@ -76,7 +77,7 @@ pub async fn get_user_templates(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };
 

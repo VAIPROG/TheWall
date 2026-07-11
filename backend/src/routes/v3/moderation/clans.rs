@@ -11,6 +11,7 @@ use axum::{
     http::StatusCode,
 };
 use serde_json::json;
+use crate::http_error::ResultExt;
 use uuid::Uuid;
 
 use crate::{
@@ -122,7 +123,7 @@ pub async fn takedown_clan(
         .bind(clan_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -199,7 +200,7 @@ pub async fn unlock_clan(
         .bind(clan_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,

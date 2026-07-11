@@ -2,6 +2,7 @@
 //!   GET    /api/v3/users/me/block-list
 //!   POST   /api/v3/users/{user_ref}/block
 //!   POST   /api/v3/users/{user_ref}/unblock
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -30,7 +31,7 @@ pub async fn get_block_list(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let mut users = Vec::new();
     for (uid,) in rows {
@@ -107,7 +108,7 @@ pub async fn unblock_user(
     .bind(target_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "not blocked".to_string()));

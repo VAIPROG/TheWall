@@ -5,6 +5,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
+use crate::http_error::ResultExt;
 use uuid::Uuid;
 
 use crate::{AppState, auth::AuthUser};
@@ -18,7 +19,7 @@ async fn require_admin(auth: &AuthUser, pool: &sqlx::PgPool) -> Result<(), (Stat
         .bind(auth.user_id)
         .fetch_optional(pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     let role = row
         .ok_or((StatusCode::UNAUTHORIZED, "user not found".to_string()))?
         .0;
@@ -48,7 +49,7 @@ pub async fn list_users(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -69,7 +70,7 @@ pub async fn set_role(
         .bind(user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::OK)
 }
 
@@ -103,7 +104,7 @@ pub async fn delete_user(
         .bind(user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -150,7 +151,7 @@ pub async fn broadcast_notification(
     .bind(body.body.as_deref().unwrap_or(""))
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     tracing::info!(
         "admin {} broadcast kind={} title={:?}",
         auth.user_id, kind, body.title
@@ -197,7 +198,7 @@ pub async fn mod_applications(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -234,14 +235,14 @@ pub async fn decide_mod_application(
         .bind(app_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if let Some(role) = &body.new_role {
         sqlx::query("UPDATE users SET role = $1 WHERE id = (SELECT user_id FROM moderation_applications WHERE id = $2)")
             .bind(role)
             .bind(app_id)
             .execute(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     }
     Ok(StatusCode::OK)
 }
@@ -267,7 +268,7 @@ pub async fn list_notifications(
         "SELECT id, user_id, title, body, read, created_at FROM notifications ORDER BY created_at DESC LIMIT 200"
     )
     .fetch_all(&state.pool).await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -281,7 +282,7 @@ pub async fn delete_notification(
         .bind(id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -320,7 +321,7 @@ pub async fn list_all_templates(
             LIMIT 500"#,
     )
     .fetch_all(&state.pool).await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -339,6 +340,6 @@ pub async fn delete_template_admin(
         .bind(id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }

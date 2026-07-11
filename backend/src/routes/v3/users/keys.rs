@@ -6,6 +6,7 @@
 //!   PATCH  /api/v3/users/me/keys/{id}
 //!   DELETE /api/v3/users/me/keys/{id}
 //!   POST   /api/v3/users/me/keys/{id}/request-higher-limits
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -56,7 +57,7 @@ async fn load_key(
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .or_500()
 }
 
 fn meta_from_row(row: &ApiKeyRow) -> ApiKeyMeta {
@@ -83,7 +84,7 @@ pub async fn get_my_keys(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows.iter().map(meta_from_row).collect()))
 }
@@ -115,7 +116,7 @@ pub async fn create_key(
     .bind(&perms)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -166,7 +167,7 @@ pub async fn update_key(
     .bind(body.permissions.as_ref())
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let row = row.ok_or_else(|| (StatusCode::NOT_FOUND, "api key not found".to_string()))?;
     Ok(Json(meta_from_row(&row)))
@@ -182,7 +183,7 @@ pub async fn delete_key(
         .bind(auth.user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "api key not found".to_string()));

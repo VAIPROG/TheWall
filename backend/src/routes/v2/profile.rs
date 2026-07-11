@@ -1,4 +1,5 @@
 //! Profile v2: public profile view + edit my own bio/social_links + stats.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -110,7 +111,7 @@ pub async fn update_me(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::OK)
 }
 
@@ -163,7 +164,7 @@ pub async fn get_public(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or((StatusCode::NOT_FOUND, "user not found".into()))?;
     Ok(Json(row))
 }
@@ -201,7 +202,7 @@ pub async fn get_public_by_username(
     .bind(username.trim())
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or((StatusCode::NOT_FOUND, "user not found".into()))?;
     Ok(Json(row))
 }
@@ -230,6 +231,6 @@ pub async fn push_stats(
     .bind(delta)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::OK)
 }

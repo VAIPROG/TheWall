@@ -10,6 +10,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Deserialize;
+use crate::http_error::ResultExt;
 
 use crate::{
     AppState,
@@ -44,7 +45,7 @@ pub async fn get_modmail(
             auth.user_id,
         )
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
         if !role.is_moderator() {
             return Err((StatusCode::FORBIDDEN, "moderator required".to_string()));
         }

@@ -10,6 +10,7 @@ use axum::{
     http::StatusCode,
 };
 use uuid::Uuid;
+use crate::http_error::ResultExt;
 
 use crate::{
     AppState,
@@ -59,7 +60,7 @@ pub async fn list_messages(
         .bind(limit)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     } else if let Some(after_id) = q.after {
         // Messages newer than the cursor message.
         sqlx::query_as::<_, MessageJoinRow>(&format!(
@@ -76,7 +77,7 @@ pub async fn list_messages(
         .bind(limit)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     } else {
         // Default: newest first.
         sqlx::query_as::<_, MessageJoinRow>(&format!(
@@ -91,7 +92,7 @@ pub async fn list_messages(
         .bind(limit)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     };
 
     let mut views: Vec<MessageView> = rows.into_iter().map(|r| r.into_view()).collect();
@@ -171,7 +172,7 @@ pub async fn edit_message(
     .bind(chat_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or_else(|| (StatusCode::NOT_FOUND, "message not found".to_string()))?;
 
     // AUTHOR-ONLY: no other role may edit.
@@ -219,7 +220,7 @@ pub async fn edit_message(
     .bind(message_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let mut view = updated.into_view();
     attach_reactions_one(&state.pool, auth.user_id, &mut view).await?;
@@ -246,7 +247,7 @@ pub async fn delete_message(
     .bind(chat_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or_else(|| (StatusCode::NOT_FOUND, "message not found".to_string()))?;
 
     let chat = load_chat(&state.pool, chat_id)
@@ -274,14 +275,14 @@ pub async fn delete_message(
             // (a global moderator counts as a clan moderator here).
             permissions::effective_clan_role(&state.pool, auth.user_id, clan_id)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .map(|r| r.is_moderator())
                 .unwrap_or(false)
         } else {
             // Global chat / global modmail: a global moderator+ moderates it.
             permissions::global_role_of(&state.pool, auth.user_id)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .is_moderator()
         };
 
@@ -302,7 +303,7 @@ pub async fn delete_message(
     .bind(message_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(StatusCode::NO_CONTENT)
 }

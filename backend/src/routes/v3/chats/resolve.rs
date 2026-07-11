@@ -1,6 +1,7 @@
 //! Chat-resolution helpers and access-control predicate.
 
 use axum::http::StatusCode;
+use crate::http_error::ResultExt;
 use uuid::Uuid;
 
 use crate::{models::ChatV3, routes::v3::utils::permissions};
@@ -14,7 +15,7 @@ pub async fn global_chat_id(pool: &sqlx::PgPool) -> Result<Uuid, (StatusCode, St
     sqlx::query_scalar::<_, Uuid>("SELECT id FROM chats WHERE type = 'global'")
         .fetch_optional(pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or_else(|| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -52,7 +53,7 @@ pub async fn clan_chat_id(pool: &sqlx::PgPool, clan_id: Uuid) -> Result<Uuid, (S
     .bind(clan_id)
     .execute(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM chats WHERE type = 'clan' AND clan_id = $1",
@@ -60,7 +61,7 @@ pub async fn clan_chat_id(pool: &sqlx::PgPool, clan_id: Uuid) -> Result<Uuid, (S
     .bind(clan_id)
     .fetch_one(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .or_500()
 }
 
 /// Get-or-create a DM chat for the pair `(a, b)`.
@@ -76,7 +77,7 @@ pub async fn dm_chat_id(pool: &sqlx::PgPool, a: Uuid, b: Uuid) -> Result<Uuid, (
     .bind(&dm_key)
     .execute(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM chats WHERE type = 'dm' AND dm_key = $1",
@@ -84,7 +85,7 @@ pub async fn dm_chat_id(pool: &sqlx::PgPool, a: Uuid, b: Uuid) -> Result<Uuid, (
     .bind(&dm_key)
     .fetch_one(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .or_500()
 }
 
 /// Get-or-create the global modmail thread for `opener`.
@@ -97,7 +98,7 @@ pub async fn modmail_chat_id(pool: &sqlx::PgPool, opener: Uuid) -> Result<Uuid, 
     .bind(opener)
     .execute(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM chats WHERE type = 'modmail' AND opener_id = $1",
@@ -105,7 +106,7 @@ pub async fn modmail_chat_id(pool: &sqlx::PgPool, opener: Uuid) -> Result<Uuid, 
     .bind(opener)
     .fetch_one(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .or_500()
 }
 
 /// Canonical dm_key: `min(a,b):max(a,b)`.
@@ -137,7 +138,7 @@ pub async fn load_chat(pool: &sqlx::PgPool, chat_id: Uuid) -> Result<Option<Chat
     .bind(chat_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .or_500()
 }
 
 /// Return true iff `user_id` may access `chat`.
@@ -166,7 +167,7 @@ pub async fn can_access_chat(
             .bind(clan_id)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
             Ok(member.is_some())
         }
         "dm" => {
@@ -187,7 +188,7 @@ pub async fn can_access_chat(
             // Global moderator/admin/owner sees all modmail threads.
             if permissions::global_role_of(pool, user_id)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .is_moderator()
             {
                 return Ok(true);
@@ -196,7 +197,7 @@ pub async fn can_access_chat(
             if let Some(clan_id) = chat.clan_id {
                 if permissions::effective_clan_role(pool, user_id, clan_id)
                     .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                    .or_500()?
                     .map(|r| r.is_moderator())
                     .unwrap_or(false)
                 {

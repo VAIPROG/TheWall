@@ -6,6 +6,7 @@
 //!
 //! Supported providers: telegram, discord, github.
 //! Both `login` and `link` intents are handled here.
+use crate::http_error::ResultExt;
 
 mod providers;
 
@@ -91,7 +92,7 @@ pub async fn start(
     .bind(&redirect_uri)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // 8. Build the authorization URL.
     let authorize_url = providers::authorize_url(
@@ -133,7 +134,7 @@ pub async fn callback(
     .bind(provider.as_str())
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let (stored_user_id, purpose, code_verifier_opt, redirect_uri_opt) =
         row.ok_or((StatusCode::BAD_REQUEST, "state expired or unknown".to_string()))?;
@@ -173,7 +174,7 @@ pub async fn callback(
             .bind(&identity.uid)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             if let Some(owner) = existing_owner {
                 if owner != acct {
@@ -204,7 +205,7 @@ pub async fn callback(
             .bind(identity.username.as_deref())
             .execute(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             // Mirror to legacy users columns for v2 compatibility.
             // GitHub has no legacy column — skip.
@@ -223,7 +224,7 @@ pub async fn callback(
                     .bind(acct)
                     .execute(&state.pool)
                     .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                    .or_500()?;
                 }
                 "telegram" => {
                     sqlx::query(
@@ -239,7 +240,7 @@ pub async fn callback(
                     .bind(acct)
                     .execute(&state.pool)
                     .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                    .or_500()?;
                 }
                 _ => {} // github: no legacy column
             }
@@ -256,7 +257,7 @@ pub async fn callback(
             .bind(&identity.uid)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             found.ok_or((
                 StatusCode::NOT_FOUND,
@@ -285,7 +286,7 @@ pub async fn callback(
         .bind(account_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(crate::routes::v3::auth::v3_response(access, refresh, &user)))
 }

@@ -1,4 +1,5 @@
 //! POST /api/v3/clans/{id}/report — report a clan to global moderators.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -60,7 +61,7 @@ pub async fn report_clan(
     .bind(body.evidence.as_deref())
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok((
         StatusCode::CREATED,

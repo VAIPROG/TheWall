@@ -1,5 +1,6 @@
 //! POST /api/v3/clans/{id}/leave    — leave a clan (non-owners only)
 //! POST /api/v3/clans/{id}/disband  — disband a clan (owner or global admin+)
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -44,7 +45,7 @@ pub async fn leave_clan(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .rows_affected();
 
     if rows_updated == 0 {
@@ -73,7 +74,7 @@ pub async fn disband_clan(
     if !is_owner {
         let global_role = global_role_of(&state.pool, auth.user_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         if !global_role.is_admin() {
             return Err((StatusCode::FORBIDDEN, "only the clan owner or a global admin may disband this clan".to_string()));
         }
@@ -89,7 +90,7 @@ pub async fn disband_clan(
         .bind(clan_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(json!({"ok": true, "message": "clan disbanded"})))
 }

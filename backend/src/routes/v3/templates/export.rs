@@ -5,6 +5,7 @@
 //!
 //! Visibility for both mirrors `read::get`:
 //!   owner  OR  (public AND approved)  OR  (clan member of the template's clan).
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -51,7 +52,7 @@ pub async fn load_visible(
         .bind(user_id)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if let Some(row) = row {
         return Ok(row);
@@ -67,7 +68,7 @@ pub async fn load_visible(
                 .bind(template_id)
                 .fetch_optional(&state.pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
             return row.ok_or((StatusCode::NOT_FOUND, "not found".into()));
         }
     }

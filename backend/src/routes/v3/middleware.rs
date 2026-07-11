@@ -21,6 +21,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde_json::json;
+use crate::http_error::ResultExt;
 
 use crate::{AppState, auth::AuthUser};
 
@@ -85,7 +86,7 @@ async fn restriction_error_response(
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let (reason, expires_at) = row.unwrap_or_else(|| ("account restricted".to_string(), None));
 
@@ -123,7 +124,7 @@ async fn validate_token_session(
         &claims.token_hash,
     )
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     state
         .session_cache
@@ -172,7 +173,7 @@ pub async fn auth_and_ban_middleware(
             None,
         )
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         if banned {
             if let Some(path) = matched_path.as_ref().map(|m| m.as_str()) {

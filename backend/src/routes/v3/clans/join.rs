@@ -1,5 +1,6 @@
 //! POST /api/v3/clans/{id}/join            — join a clan (open/invite/approval flows)
 //! POST /api/v3/clans/{cid}/apply/{role}  — apply for a staff role (admin/moderator)
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -36,7 +37,7 @@ async fn add_membership(
     .bind(clan_id)
     .execute(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(())
 }
 
@@ -64,7 +65,7 @@ pub async fn join_clan(
     .bind(clan_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let is_owner = clan.owner_id == Some(auth.user_id);
 
@@ -80,7 +81,7 @@ pub async fn join_clan(
         .bind(clan_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
         if count >= max as i64 {
             return Err((StatusCode::CONFLICT, "clan is full".to_string()));
         }
@@ -104,7 +105,7 @@ pub async fn join_clan(
         .bind(code)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         match row {
             None => {
@@ -163,7 +164,7 @@ pub async fn join_clan(
             .bind(auth.user_id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             if already_pending.is_some() {
                 return Err((StatusCode::CONFLICT, "application already pending".to_string()));
@@ -176,7 +177,7 @@ pub async fn join_clan(
             .bind(auth.user_id)
             .execute(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             Ok(Json(json!({"ok": true, "message": "application submitted"})))
         }
@@ -200,7 +201,7 @@ async fn increment_invite_use(
         .bind(invite_id)
         .execute(pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(())
 }
 
@@ -228,7 +229,7 @@ pub async fn apply_for_role(
     // Caller must be an active member
     let effective = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if effective.is_none() {
         return Err((StatusCode::FORBIDDEN, "must be a member".to_string()));

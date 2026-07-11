@@ -1,4 +1,5 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use crate::http_error::ResultExt;
 use serde::Deserialize;
 
 use crate::{AppState, auth::AuthUser};
@@ -22,10 +23,10 @@ pub async fn delete_account(
         .pool
         .begin()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     sqlx::query("INSERT INTO account_deletions (id, user_id, reason, requested_at, executed_at) VALUES (gen_random_uuid(), $1, $2, NOW(), NOW())")
         .bind(auth.user_id).bind(&body.reason).execute(&mut *tx).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     sqlx::query("DELETE FROM sessions WHERE user_id = $1")
         .bind(auth.user_id)
         .execute(&mut *tx)
@@ -65,10 +66,10 @@ pub async fn delete_account(
         .bind(auth.user_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     tx.commit()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok((
         StatusCode::OK,
         Json(serde_json::json!({"ok": true, "deleted": true})),
@@ -95,7 +96,7 @@ pub async fn update_lang(
         .bind(auth.user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok((
         StatusCode::OK,
         Json(serde_json::json!({"ok": true, "lang": lang})),

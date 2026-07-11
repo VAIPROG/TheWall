@@ -1,5 +1,6 @@
 //! GET  /api/v3/clans/{id}/applications                — list pending join applications (mod+)
 //! POST /api/v3/clans/{cid}/applications/{aid}/review  — approve or reject (mod+)
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -80,7 +81,7 @@ pub async fn list_applications(
 
     let actor_role = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if !actor_role.map(|r| r.is_moderator()).unwrap_or(false) {
         return Err((StatusCode::FORBIDDEN, "clan moderator required".to_string()));
@@ -92,7 +93,7 @@ pub async fn list_applications(
         .bind(clan_id)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(rows.into_iter().map(row_to_view).collect()))
 }
@@ -113,7 +114,7 @@ pub async fn review_application(
 
     let actor_role = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if !actor_role.map(|r| r.is_moderator()).unwrap_or(false) {
         return Err((StatusCode::FORBIDDEN, "clan moderator required".to_string()));
@@ -132,7 +133,7 @@ pub async fn review_application(
     .bind(clan_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let (_, applicant_id, status) = app
         .ok_or_else(|| (StatusCode::NOT_FOUND, "application not found".to_string()))?;
@@ -155,7 +156,7 @@ pub async fn review_application(
         .bind(clan_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     }
 
     // Update application status
@@ -170,7 +171,7 @@ pub async fn review_application(
     .bind(app_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // Reload and return
     let reload_query = format!("{} WHERE a.id = $1", APP_SELECT);
@@ -178,7 +179,7 @@ pub async fn review_application(
         .bind(app_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(row_to_view(row)))
 }

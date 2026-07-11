@@ -6,6 +6,7 @@
 //!   DELETE /api/v3/notifications/{id}
 //!   GET    /api/v3/notifications/settings
 //!   PATCH  /api/v3/notifications/settings
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -63,7 +64,7 @@ pub async fn list_notifications(
         .bind(auth.user_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let rows = sqlx::query_as::<_, crate::models::Notification>(&rows_sql)
         .bind(auth.user_id)
@@ -71,7 +72,7 @@ pub async fn list_notifications(
         .bind(offset)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let items = rows.into_iter().map(into_view).collect();
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };
@@ -97,7 +98,7 @@ pub async fn get_notification(
     .bind(auth.user_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let row = row.ok_or_else(|| (StatusCode::NOT_FOUND, "notification not found".to_string()))?;
     Ok(Json(into_view(row)))
@@ -119,7 +120,7 @@ pub async fn dismiss_notification(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "notification not found".to_string()));
@@ -148,7 +149,7 @@ pub async fn ack_notifications(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(json!({"ok": true, "message": "acknowledged"})))
 }
@@ -167,7 +168,7 @@ pub async fn ack_all_notifications(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(json!({"ok": true, "message": "all acknowledged"})))
 }
@@ -191,7 +192,7 @@ pub async fn get_settings(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(row))
 }
@@ -232,7 +233,7 @@ pub async fn update_settings(
     .bind(body.mentions)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let row = row.ok_or_else(|| {
         // Create default row if missing for some reason.

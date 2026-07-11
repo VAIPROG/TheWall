@@ -14,6 +14,7 @@
 //! The JWT is the same format as the Wall JWT but issued with `aud=vai` and
 //! carrying `vai_account_id` as the subject. We don't accept it as a Wall
 //! auth token — that part comes when SSO is fully wired up.
+use crate::http_error::ResultExt;
 
 use axum::{Json, extract::State, http::StatusCode};
 use chrono::Utc;
@@ -177,7 +178,7 @@ pub async fn login(
     .bind(&email_lc)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let row = row.ok_or((StatusCode::UNAUTHORIZED, "invalid credentials".into()))?;
     if !verify_password(&b.password, &row.2) {
         return Err((StatusCode::UNAUTHORIZED, "invalid credentials".into()));
@@ -217,7 +218,7 @@ pub async fn link_to_wall(
         .bind(auth.user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     sqlx::query(
         r#"INSERT INTO vai_links (vai_account_id, service, user_id)
            VALUES ($1, 'the-wall', $2) ON CONFLICT DO NOTHING"#,
@@ -226,7 +227,7 @@ pub async fn link_to_wall(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     // Kick the achievement evaluator so "vai_linked" pops.
     let _ = super::achievements::evaluate(&state.pool, auth.user_id).await;
     Ok(StatusCode::OK)

@@ -8,6 +8,7 @@
 //! spends paint again).
 
 use axum::{Json, extract::State, http::StatusCode};
+use crate::http_error::ResultExt;
 use serde::{Deserialize, Serialize};
 
 use crate::{AppState, auth::AuthUser};
@@ -53,7 +54,7 @@ pub async fn create(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let deliverable = match channel {
         "telegram" => has_tg,
         "discord" => has_dc,
@@ -73,7 +74,7 @@ pub async fn create(
         .bind(auth.user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     let row: (uuid::Uuid, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
         r#"INSERT INTO paint_reminders (user_id, due_at, note, channel)
            VALUES ($1, NOW() + ($2 || ' seconds')::interval, $3, $4)
@@ -85,7 +86,7 @@ pub async fn create(
     .bind(channel)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(CreateResponse {
         id: row.0,
         due_at: row.1,
@@ -102,6 +103,6 @@ pub async fn cancel(
         .bind(auth.user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }

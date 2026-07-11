@@ -10,6 +10,7 @@
 //!   PATCH /api/v3/moderation/reports/{id}
 //!   POST  /api/v3/moderation/reports/{id}/resolve
 //!   POST  /api/v3/moderation/reports/{id}/dismiss
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -53,7 +54,7 @@ async fn load_report(
         .bind(id)
         .fetch_optional(pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "report not found".to_string()))
 }
 
@@ -78,7 +79,7 @@ async fn resolve_restriction_target(
             .bind(target_id)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .flatten()
         }
         "template" => {
@@ -88,7 +89,7 @@ async fn resolve_restriction_target(
             .bind(target_id)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .flatten()
         }
         _ => None, // clan — no user restriction
@@ -132,7 +133,7 @@ pub async fn list_reports(
         .bind(q.report_type.as_deref())
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let rows_sql = format!(
         r#"SELECT {REPORT_COLS}
@@ -150,7 +151,7 @@ pub async fn list_reports(
         .bind(offset)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let items = rows.into_iter().map(ReportView::from_row).collect();
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };
@@ -218,7 +219,7 @@ pub async fn update_report(
     qb.build()
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let row = load_report(&state.pool, id).await?;
     let _ = audit::log_action(
@@ -282,7 +283,7 @@ pub async fn resolve_report(
             .bind(reason_text)
             .fetch_one(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
             restriction_id = Some(new_id);
         }
         // clan reports: no user restriction — takedown is the clan path.
@@ -304,7 +305,7 @@ pub async fn resolve_report(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let row = load_report(&state.pool, id).await?;
     let _ = audit::log_action(
@@ -359,7 +360,7 @@ pub async fn dismiss_report(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let row = load_report(&state.pool, id).await?;
     let _ = audit::log_action(

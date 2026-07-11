@@ -19,6 +19,7 @@
 //!    gets a template email body, mails it to support@. An admin sees the
 //!    request in the admin panel and approves, which stamps the email onto
 //!    users.notifications_email.
+use crate::http_error::ResultExt;
 
 use std::time::Duration;
 
@@ -72,14 +73,14 @@ pub async fn get_status(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let last_request: Option<String> = sqlx::query_scalar(
         "SELECT status FROM email_link_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
     )
     .bind(auth.user_id)
     .fetch_optional(&state.pool).await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(LinkStatus {
         discord_id: row.0,
@@ -125,7 +126,7 @@ pub async fn telegram_oauth_url(
     )
     .bind(&s).bind(auth.user_id).bind(&verifier)
     .execute(&state.pool).await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // `telegram:bot_access` asks the user's permission for our bot to DM them
     // after login — needed for grief alerts / snapshot pushes / etc.
@@ -195,7 +196,7 @@ pub async fn telegram_exchange(
     .bind(&body.state)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let (st_uid, verifier) = st.ok_or((
         StatusCode::BAD_REQUEST,
         "state expired or unknown".to_string(),
@@ -229,7 +230,7 @@ pub async fn telegram_exchange(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let _ = achievements::evaluate(&state.pool, auth.user_id).await;
     Ok(StatusCode::OK)
 }
@@ -252,7 +253,7 @@ async fn telegram_code_to_identity(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     let basic = format!(
         "Basic {}",
         BASE64.encode(format!("{client_id}:{client_secret}"))
@@ -317,7 +318,7 @@ pub async fn unlink_telegram(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -415,7 +416,7 @@ pub async fn discord_oauth_url(
         .bind(auth.user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     // `identify` gives us the user id and tag. Bot-DM permission is not a
     // separate OAuth scope on Discord — the bot can only DM users who share
@@ -472,7 +473,7 @@ pub async fn discord_exchange(
     )
     .bind(&body.state)
     .fetch_optional(&state.pool).await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let st_uid = st.ok_or((
         StatusCode::BAD_REQUEST,
         "state expired or unknown".to_string(),
@@ -499,7 +500,7 @@ pub async fn discord_exchange(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = achievements::evaluate(&state.pool, auth.user_id).await;
     Ok(StatusCode::OK)
@@ -519,7 +520,7 @@ pub async fn unlink_discord(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -565,13 +566,13 @@ pub async fn request_email_link(
     .bind(&code)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let username: String = sqlx::query_scalar("SELECT username FROM users WHERE id = $1")
         .bind(auth.user_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let body = format!(
         "Hi VAI,\n\nPlease link the email address {proposed} to my The Wall Dev account.\n\n\
@@ -642,7 +643,7 @@ async fn discord_code_to_identity(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     let form = build_form(&[
         ("client_id", client_id.as_str()),
         ("client_secret", client_secret.as_str()),
@@ -727,7 +728,7 @@ pub async fn telegram_login_url(
     .bind(&verifier)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let url = format!(
         "{TG_AUTH_URL}?client_id={cid}&redirect_uri={uri}&response_type=code&scope={scope}&state={st}&code_challenge={ch}&code_challenge_method=S256",
         cid = url_encode(&client_id),
@@ -755,7 +756,7 @@ pub async fn discord_login_url(
     .bind(&s)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let url = format!(
         "https://discord.com/api/oauth2/authorize?client_id={cid}&redirect_uri={uri}&response_type=code&scope=identify&state={st}&prompt=consent",
         cid = url_encode(&client_id),
@@ -778,7 +779,7 @@ pub async fn telegram_login_exchange(
     .bind(&body.state)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let (_, verifier) =
         st.ok_or((StatusCode::BAD_REQUEST, "state expired or unknown".to_string()))?;
     let verifier = verifier.ok_or((
@@ -793,7 +794,7 @@ pub async fn telegram_login_exchange(
             .bind(&tg_id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let (uid, username) = user.ok_or((
         StatusCode::NOT_FOUND,
         "no Wall account is linked to this Telegram — link it first from the extension"
@@ -823,7 +824,7 @@ pub async fn discord_login_exchange(
     .bind(&body.state)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     if st.is_none() {
         return Err((StatusCode::BAD_REQUEST, "state expired or unknown".to_string()));
     }
@@ -835,7 +836,7 @@ pub async fn discord_login_exchange(
             .bind(&u.id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let (uid, username) = user.ok_or((
         StatusCode::NOT_FOUND,
         "no Wall account is linked to this Discord — link it first from the extension"

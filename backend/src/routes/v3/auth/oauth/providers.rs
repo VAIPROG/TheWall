@@ -9,6 +9,7 @@
 //! GitHub uses OAuth2 authorization-code + PKCE + /user (REST).
 //!
 //! PKCE is mandatory for all three.
+use crate::http_error::ResultExt;
 
 use std::time::Duration;
 
@@ -186,7 +187,7 @@ async fn telegram_code_to_identity(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     // Token endpoint: Basic auth (client_id:client_secret), form body with PKCE.
     let basic = format!(
@@ -338,7 +339,7 @@ async fn discord_code_to_identity(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let form = build_form(&[
         ("client_id", client_id.as_str()),
@@ -437,7 +438,7 @@ async fn github_code_to_identity(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     // GitHub token exchange — must send Accept: application/json to get JSON back.
     let form = build_form(&[

@@ -1,6 +1,7 @@
 //! GET    /api/v3/clans/{id}/invites         — list invites (mod+)
 //! POST   /api/v3/clans/{id}/invites         — create invite (who_can_invite rank+)
 //! DELETE /api/v3/clans/{cid}/invites/{iid}  — revoke invite (mod+ or creator)
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -72,7 +73,7 @@ pub async fn list_invites(
 
     let actor_role = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if !actor_role.map(|r| r.is_moderator()).unwrap_or(false) {
         return Err((StatusCode::FORBIDDEN, "clan moderator required".to_string()));
@@ -88,7 +89,7 @@ pub async fn list_invites(
         .bind(clan_id)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let invites = rows
         .into_iter()
@@ -135,7 +136,7 @@ pub async fn create_invite(
 
     let actor_role = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let actor_role = actor_role.ok_or_else(|| (StatusCode::FORBIDDEN, "not a clan member".to_string()))?;
 
@@ -149,7 +150,7 @@ pub async fn create_invite(
             .bind(target_uid)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         if exists.is_none() {
             return Err((StatusCode::BAD_REQUEST, "target user not found".to_string()));
         }
@@ -223,7 +224,7 @@ pub async fn revoke_invite(
     .bind(clan_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let (_id, created_by) = invite
         .ok_or_else(|| (StatusCode::NOT_FOUND, "invite not found".to_string()))?;
@@ -231,7 +232,7 @@ pub async fn revoke_invite(
     // Allowed if actor is moderator+ OR is the invite creator
     let actor_role = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let is_mod = actor_role.map(|r| r.is_moderator()).unwrap_or(false);
     let is_creator = created_by == Some(auth.user_id);
@@ -244,7 +245,7 @@ pub async fn revoke_invite(
         .bind(invite_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(json!({"ok": true, "message": "invite revoked"})))
 }

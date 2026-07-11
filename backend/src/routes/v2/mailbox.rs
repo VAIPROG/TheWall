@@ -5,6 +5,7 @@
 //! recipients — read state lives in mailbox_reads(item_id, user_id). Direct
 //! kinds (dm, template_event, modmail reply) target one user — read_at lives
 //! on the item itself.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -98,7 +99,7 @@ pub async fn list(
     .bind(limit)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows))
 }
@@ -117,7 +118,7 @@ pub async fn mark_read(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // Broadcast target — upsert a row in mailbox_reads.
     sqlx::query(
@@ -127,7 +128,7 @@ pub async fn mark_read(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -156,7 +157,7 @@ pub async fn mark_all_read(
     .bind(kind)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // Broadcast mail: insert a read marker for every item the user is
     // entitled to see but hasn't acked yet. Mirrors the visibility logic
@@ -188,7 +189,7 @@ pub async fn mark_all_read(
     .bind(kind)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(axum::Json(serde_json::json!({
         "direct_marked":    direct.rows_affected(),
@@ -229,7 +230,7 @@ pub async fn send_dm(
     .bind(&body.body)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::CREATED)
 }
 
@@ -256,7 +257,7 @@ pub async fn reply(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let parent = parent.ok_or((StatusCode::NOT_FOUND, "thread root not found".into()))?;
 
     let (kind, sender_id, recipient_user_id, recipient_clan_id) = parent;
@@ -285,7 +286,7 @@ pub async fn reply(
             let is_opener = Some(auth.user_id) == sender_id;
             let mod_ok = permissions::effective_clan_role(&state.pool, auth.user_id, clan)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .map(|r| r.is_mod())
                 .unwrap_or(false);
             if !is_opener && !mod_ok {
@@ -314,7 +315,7 @@ pub async fn reply(
     .bind(&body.body)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     sqlx::query(
         "UPDATE clan_modmail_threads SET last_activity = NOW() WHERE id IN (SELECT thread_id FROM mailbox_items WHERE id = $1)",

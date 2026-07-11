@@ -11,6 +11,7 @@
 //! Defaults for kinds that don't have an explicit row: in_app + os_push only.
 
 use std::collections::HashMap;
+use crate::http_error::ResultExt;
 
 use axum::{Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
@@ -56,7 +57,7 @@ pub async fn get_me(
             .bind(auth.user_id)
             .fetch_all(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
     let stored: HashMap<String, Vec<String>> = rows.into_iter().collect();
     let mut out = Vec::with_capacity(ALL_KINDS.len());
@@ -111,6 +112,6 @@ pub async fn update_me(
     .bind(&body.channels)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::OK)
 }

@@ -5,6 +5,7 @@
 //! individual route files stay focused on HTTP semantics.
 
 use chrono::{DateTime, Utc};
+use crate::http_error::ResultExt;
 use uuid::Uuid;
 
 use crate::{AppState, auth::AuthUser, models::MessageJoinRow};
@@ -56,7 +57,7 @@ pub async fn ensure_reply_in_chat(
     .bind(chat_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if exists.is_none() {
         return Err((axum::http::StatusCode::BAD_REQUEST, "invalid reply_to_id".to_string()));
@@ -95,7 +96,7 @@ pub async fn insert_message(
     .bind(is_system)
     .fetch_one(pool)
     .await
-    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(row)
 }
@@ -115,7 +116,7 @@ pub async fn chat_unread_and_last_message(
     .bind(viewer_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .flatten();
 
     let unread: Option<i64> = sqlx::query_scalar(
@@ -131,7 +132,7 @@ pub async fn chat_unread_and_last_message(
     .bind(last_read)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // `MAX(...)` always returns exactly one row whose value is NULL when the
     // chat has no messages (e.g. a freshly seeded global chat). Decode column 0
@@ -143,7 +144,7 @@ pub async fn chat_unread_and_last_message(
     .bind(chat_id)
     .fetch_one(pool)
     .await
-    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok((unread.unwrap_or(0), last_at))
 }
@@ -180,7 +181,7 @@ pub async fn batch_chat_unread_and_last_message(
     .bind(chat_ids)
     .fetch_all(pool)
     .await
-    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     for (chat_id, unread, last_at) in rows {
         map.insert(chat_id, (unread.unwrap_or(0), last_at));
@@ -215,7 +216,7 @@ pub async fn require_can_post(
         chat.clan_id,
     )
     .await
-    .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if muted && chat.chat_type != "modmail" {
         return Err((axum::http::StatusCode::FORBIDDEN, "you are muted".to_string()));

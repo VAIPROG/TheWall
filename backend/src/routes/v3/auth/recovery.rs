@@ -1,3 +1,4 @@
+use crate::http_error::ResultExt;
 use axum::{
     extract::{Json, State},
     http::StatusCode,
@@ -74,7 +75,7 @@ pub async fn generate_phrase(
     .bind(&phrase_hash)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(RecoveryPhraseResponse {
         phrase,
@@ -102,14 +103,14 @@ pub async fn recover(
     .bind(&phrase_hash)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid recovery phrase".to_string()))?;
 
     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
         .bind(account_id)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or_else(|| (StatusCode::UNAUTHORIZED, "account not found".to_string()))?;
 
     let (access, refresh, _session_id) = issue_session_pair(&state.pool, &state.config.jwt_secret, user.id)

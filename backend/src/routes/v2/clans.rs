@@ -6,6 +6,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
+use crate::http_error::ResultExt;
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -37,7 +38,7 @@ pub async fn list_mine(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -61,7 +62,7 @@ pub async fn members(
     // Must at least be a member of the clan, or a global admin.
     permissions::effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or((StatusCode::FORBIDDEN, "not in clan".into()))?;
 
     let rows = sqlx::query_as::<_, ClanMemberView>(
@@ -77,7 +78,7 @@ pub async fn members(
     .bind(clan_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -107,7 +108,7 @@ pub async fn post_announcement(
     .bind(&b.body)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::CREATED)
 }
 
@@ -137,7 +138,7 @@ pub async fn post_alert(
     .bind(&b.body)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::CREATED)
 }
 
@@ -157,7 +158,7 @@ pub async fn mod_dm(
     // Anyone in the clan can ping the mods.
     let me_role = permissions::effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or((StatusCode::FORBIDDEN, "not in clan".into()))?;
     let _ = me_role; // any clan role is fine
     if b.body.trim().is_empty() {
@@ -174,7 +175,7 @@ pub async fn mod_dm(
     )
     .bind(auth.user_id).bind(clan_id).bind(&b.body)
     .execute(&state.pool).await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::CREATED)
 }
 
@@ -195,14 +196,14 @@ pub async fn open_modmail(
     // Opener must be a member of the clan (any role).
     permissions::effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or((StatusCode::FORBIDDEN, "not in clan".into()))?;
 
     let mut tx = state
         .pool
         .begin()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let thread_id: Uuid = sqlx::query_scalar(
         r#"INSERT INTO clan_modmail_threads (id, clan_id, opener_user_id, subject)
@@ -214,7 +215,7 @@ pub async fn open_modmail(
     .bind(&b.subject)
     .fetch_one(&mut *tx)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // Root mailbox item — addressed to the clan (so all mods see it).
     let root_id: Uuid = sqlx::query_scalar(
@@ -231,11 +232,11 @@ pub async fn open_modmail(
     .bind(&b.body)
     .fetch_one(&mut *tx)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     tx.commit()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(serde_json::json!({
         "thread_id": thread_id,
@@ -270,7 +271,7 @@ pub async fn list_modmail(
     .bind(clan_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -295,6 +296,6 @@ pub async fn set_member_role(
         .bind(user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::OK)
 }

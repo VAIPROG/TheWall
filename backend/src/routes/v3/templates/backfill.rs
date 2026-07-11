@@ -9,6 +9,7 @@
 //! many still remain (NULL document) after the batch completes.
 //!
 //! Admin-only (global admin or owner). Processes up to 1 000 rows per call.
+use crate::http_error::ResultExt;
 
 use axum::{Json, extract::State, http::StatusCode};
 use chrono::{DateTime, Utc};
@@ -32,7 +33,7 @@ pub async fn backfill(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let scanned = rows.len();
     let mut migrated: usize = 0;
@@ -73,7 +74,7 @@ pub async fn backfill(
     )
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     tracing::info!(
         "backfill-documents complete: scanned={scanned} migrated={migrated} \

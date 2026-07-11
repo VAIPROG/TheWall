@@ -7,6 +7,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Deserialize;
+use crate::http_error::ResultExt;
 
 use crate::{
     AppState,
@@ -40,7 +41,7 @@ pub async fn list_chats(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     chats.extend(global);
 
     // Clan chats the user is a member of.
@@ -56,7 +57,7 @@ pub async fn list_chats(
         .bind(auth.user_id)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     } else {
         sqlx::query_as(
             "SELECT c.id, c.type, c.clan_id, c.dm_key, c.topic, c.slowmode_seconds, c.created_at, c.opener_id \
@@ -67,7 +68,7 @@ pub async fn list_chats(
         .bind(auth.user_id)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     };
     chats.extend(clan_chats);
 
@@ -84,7 +85,7 @@ pub async fn list_chats(
     .bind(&dm_key_2)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     chats.extend(dm_chats);
 
     // Modmail thread for the caller.
@@ -95,7 +96,7 @@ pub async fn list_chats(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     chats.extend(modmail);
 
     // Filter to chats the caller can actually access.

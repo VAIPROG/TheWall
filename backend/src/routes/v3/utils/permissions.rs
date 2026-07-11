@@ -17,6 +17,7 @@
 //! tier and the clan Owner tier. V3 code must use this module.
 
 use axum::http::StatusCode;
+use crate::http_error::ResultExt;
 use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -190,7 +191,7 @@ pub async fn require_moderator(
 ) -> Result<(), (StatusCode, String)> {
     let g = global_role_of(pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if !g.is_moderator() {
         return Err((StatusCode::FORBIDDEN, "moderator only".into()));
     }
@@ -200,7 +201,7 @@ pub async fn require_moderator(
 pub async fn require_admin(auth: &AuthUser, pool: &PgPool) -> Result<(), (StatusCode, String)> {
     let g = global_role_of(pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if !g.is_admin() {
         return Err((StatusCode::FORBIDDEN, "admin only".into()));
     }
@@ -215,7 +216,7 @@ pub async fn require_clan_mod(
 ) -> Result<ClanRole, (StatusCode, String)> {
     let r = effective_clan_role(pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or((StatusCode::FORBIDDEN, "not in clan".into()))?;
     if !r.is_moderator() {
         return Err((StatusCode::FORBIDDEN, "clan moderator required".into()));
@@ -231,7 +232,7 @@ pub async fn require_clan_admin(
 ) -> Result<(), (StatusCode, String)> {
     let r = effective_clan_role(pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or((StatusCode::FORBIDDEN, "not in clan".into()))?;
     if !r.is_admin() {
         return Err((StatusCode::FORBIDDEN, "clan admin required".into()));

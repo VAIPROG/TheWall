@@ -5,6 +5,7 @@
 //! `feed_event_notes`. These endpoints keep the original V2 API shape.
 
 use std::collections::HashMap;
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -104,7 +105,7 @@ pub async fn list(
     .bind(limit)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let ids: Vec<Uuid> = rows.iter().map(|r| r.id).collect();
     let notes_rows: Vec<(Uuid, String, String)> = if ids.is_empty() {
@@ -114,7 +115,7 @@ pub async fn list(
             .bind(&ids[..])
             .fetch_all(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
     };
 
     let mut by_id: HashMap<Uuid, HashMap<String, String>> = HashMap::new();
@@ -144,7 +145,7 @@ pub async fn get_one(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or((StatusCode::NOT_FOUND, "signal not found".into()))?;
 
     let notes_rows: Vec<(String, String)> =
@@ -152,7 +153,7 @@ pub async fn get_one(
             .bind(id)
             .fetch_all(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let notes: HashMap<String, String> = notes_rows.into_iter().collect();
     Ok(Json(build_view(r, notes)))
 }
@@ -178,7 +179,7 @@ pub async fn upsert_note(
     .bind(id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     if !exists {
         return Err((StatusCode::NOT_FOUND, "signal not found".into()));
     }
@@ -193,7 +194,7 @@ pub async fn upsert_note(
             .bind(&lang)
             .execute(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         return Ok(StatusCode::NO_CONTENT);
     }
     if b.note.chars().count() > 2000 {
@@ -212,6 +213,6 @@ pub async fn upsert_note(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::OK)
 }

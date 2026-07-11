@@ -4,6 +4,7 @@
 //!
 //! Reuses the existing `avatars` table. The stored `image` field holds a URL
 //! or base64 data URI that the frontend renders.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -71,7 +72,7 @@ pub async fn upload_avatar(
     .bind(&image_url)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -94,7 +95,7 @@ pub async fn delete_avatar(
         .bind(auth.user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,

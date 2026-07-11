@@ -18,6 +18,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde_json::json;
+use crate::http_error::ResultExt;
 
 use crate::AppState;
 
@@ -32,6 +33,14 @@ pub async fn v1_v2_deprecation_middleware(
     request: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, String)> {
+    // `/api/v3/*` routes are current, not legacy — even the few that are mounted
+    // on the legacy router for convenience (e.g. `/api/v3/meta`). Never annotate
+    // them with a deprecation notice or `_deprecation` body field, otherwise
+    // strict V3 clients choke on the unexpected field.
+    if request.uri().path().starts_with("/api/v3") {
+        return Ok(next.run(request).await);
+    }
+
     // Hard deprecation gate.
     let hard_deprecate = state.config.runtime.read().await.feature_flags
         .get("hard_deprecate_legacy_api")
@@ -70,7 +79,7 @@ pub async fn v1_v2_deprecation_middleware(
                     &claims.token_hash,
                 )
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
 
                 if valid {
                     let banned = crate::routes::v3::utils::sanctions::has_sanction(
@@ -80,7 +89,7 @@ pub async fn v1_v2_deprecation_middleware(
                         None,
                     )
                     .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                    .or_500()?;
 
                     if banned {
                         let body = json!({

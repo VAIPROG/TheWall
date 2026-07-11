@@ -7,6 +7,7 @@
 //!   - plain text    → username lookup (case-insensitive)
 
 use axum::http::StatusCode;
+use crate::http_error::ResultExt;
 use uuid::Uuid;
 
 /// Resolve a `user_ref` path segment to a user UUID.
@@ -34,7 +35,7 @@ pub async fn resolve_user_ref(
             .bind(uid)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         if exists.is_some() {
             return Ok(uid);
         }
@@ -46,7 +47,7 @@ pub async fn resolve_user_ref(
     .bind(lookup)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     row.map(|(id,)| id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))
@@ -68,7 +69,7 @@ pub async fn resolve_user_ref_opt(
             .bind(uid)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         if exists.is_some() {
             return Ok(Some(uid));
         }
@@ -78,7 +79,7 @@ pub async fn resolve_user_ref_opt(
         .bind(lookup)
         .fetch_optional(pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .or_500()
         .map(|opt| opt.map(|(id,)| id))
 }
 

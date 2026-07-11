@@ -18,6 +18,7 @@ use axum::{
     http::StatusCode,
 };
 use chrono::{DateTime, Utc};
+use crate::http_error::ResultExt;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::FromRow;
@@ -158,7 +159,7 @@ async fn list_user_achievements_inner(
     .bind(target_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let mut grants = Vec::new();
     for row in rows {
@@ -166,7 +167,7 @@ async fn list_user_achievements_inner(
         if row.secret && !is_self {
             let viewer_global = permissions::global_role_of(pool, viewer_id)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
             if !viewer_global.is_moderator() {
                 continue;
             }
@@ -187,7 +188,7 @@ pub async fn recheck_my_achievements(
 ) -> Result<Json<AchievementRecheckResponse>, (StatusCode, String)> {
     let newly = evaluate_and_grant(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(Json(AchievementRecheckResponse { newly_unlocked: newly }))
 }
 
@@ -229,11 +230,11 @@ pub async fn record_event(
     .bind(body.metadata.clone())
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let catalog = grant_by_event(&state.pool, auth.user_id, &body.event)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(AchievementEventResponse {
         new: catalog.is_some(),
@@ -258,7 +259,7 @@ pub async fn admin_catalog(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows.into_iter().map(|r| r.into_catalog()).collect()))
 }
@@ -311,7 +312,7 @@ pub async fn admin_grants(
         .fetch_all(&state.pool)
         .await
     }
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let grants = rows.into_iter().map(|r| r.into_grant()).collect();
     Ok(Json(grants))
@@ -358,7 +359,7 @@ pub async fn admin_grant(
     .bind(body.metadata.as_ref())
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(row.into_grant()))
 }
@@ -381,7 +382,7 @@ pub async fn admin_revoke(
     .bind(&achievement_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -432,7 +433,7 @@ async fn load_catalog(
     .bind(achievement_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or_else(|| (StatusCode::NOT_FOUND, "achievement not found".to_string()))
 }
 

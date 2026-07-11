@@ -1,3 +1,4 @@
+use crate::http_error::ResultExt;
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
@@ -26,7 +27,7 @@ pub async fn list_site_identities(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows))
 }
@@ -53,7 +54,7 @@ pub async fn unlink_site_identity(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let provider_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM provider_links WHERE account_id = $1",
@@ -61,7 +62,7 @@ pub async fn unlink_site_identity(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if site_count + provider_count <= 1 {
         return Err((
@@ -77,7 +78,7 @@ pub async fn unlink_site_identity(
     .bind(&source)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "site identity not found".to_string()));

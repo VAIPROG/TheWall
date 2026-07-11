@@ -8,6 +8,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Deserialize;
+use crate::http_error::ResultExt;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -51,7 +52,7 @@ pub async fn attach_reactions(
     .bind(&ids)
     .fetch_all(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     for (message_id, emoji, count, reacted_by_me) in rows {
         if let Some(msg) = messages.iter_mut().find(|m| m.id == message_id) {
@@ -99,7 +100,7 @@ pub async fn add_reaction(
     .bind(chat_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     if message_exists.is_none() {
         return Err((StatusCode::NOT_FOUND, "message not found".to_string()));
     }
@@ -119,7 +120,7 @@ pub async fn add_reaction(
     .bind(emoji)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok((StatusCode::CREATED, Json(json!({"ok": true}))))
 }
@@ -150,7 +151,7 @@ pub async fn remove_reaction(
     .bind(emoji)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(json!({"ok": true})))
 }
@@ -175,7 +176,7 @@ pub async fn load_message_with_reactions(
     .bind(message_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .into_iter()
     .map(|r| r.into_view())
     .collect();

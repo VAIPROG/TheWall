@@ -2,6 +2,7 @@
 //!
 //!   POST   /api/v3/chats/{cid}/messages/{mid}/pin
 //!   DELETE /api/v3/chats/{cid}/messages/{mid}/pin
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -29,7 +30,7 @@ async fn can_moderate_chat(
     let global_ok = if chat.chat_type == "global" || chat.chat_type == "modmail" {
         crate::routes::v3::utils::permissions::global_role_of(pool, user_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .is_moderator()
     } else {
         false
@@ -39,7 +40,7 @@ async fn can_moderate_chat(
     let clan_ok = if let Some(cid) = chat.clan_id {
         effective_clan_role(pool, user_id, cid)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .map(|r| r.is_moderator())
             .unwrap_or(false)
     } else {
@@ -81,7 +82,7 @@ pub async fn pin_message(
         return Err((StatusCode::FORBIDDEN, "moderator required".to_string()));
     }
 
-    if !message_exists_in_chat(&state.pool, chat_id, message_id).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))? {
+    if !message_exists_in_chat(&state.pool, chat_id, message_id).await.or_500()? {
         return Err((StatusCode::NOT_FOUND, "message not found".to_string()));
     }
 
@@ -95,7 +96,7 @@ pub async fn pin_message(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -134,7 +135,7 @@ pub async fn unpin_message(
     .bind(message_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "message not pinned".to_string()));

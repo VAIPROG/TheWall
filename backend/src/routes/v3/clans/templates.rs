@@ -1,4 +1,5 @@
 //! GET /api/v3/clans/{id}/templates — paginated list of clan-scoped templates.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -79,7 +80,7 @@ pub async fn list_clan_templates(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };
 
@@ -108,7 +109,7 @@ pub async fn list_clan_templates(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(TemplatePage {
         items,

@@ -7,6 +7,7 @@
 //! Admin-only — heavy job, can spin for a while on large catalogues.
 
 use axum::{Json, extract::State, http::StatusCode};
+use crate::http_error::ResultExt;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use image::ImageReader;
 use serde::Serialize;
@@ -72,7 +73,7 @@ pub async fn backfill_previews(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let mut summary = BackfillSummary {
         scanned: rows.len(),

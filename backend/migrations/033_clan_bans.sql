@@ -15,9 +15,6 @@ CREATE TABLE IF NOT EXISTS clan_bans (
     expires_at  TIMESTAMPTZ,                   -- mirrors restrictions.expires_at
     removed_at  TIMESTAMPTZ,
     removed_by  UUID REFERENCES users(id) ON DELETE SET NULL
-    -- (partial uniqueness "one active ban per (clan,user)" is enforced by the
-    --  partial UNIQUE INDEX below — a table-level UNIQUE constraint cannot carry
-    --  a WHERE clause in Postgres.)
 );
 
 CREATE INDEX IF NOT EXISTS idx_clan_bans_user_clan ON clan_bans(user_id, clan_id);

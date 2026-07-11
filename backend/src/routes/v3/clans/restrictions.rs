@@ -1,4 +1,5 @@
 //! GET /api/v3/clans/{id}/restrictions — list clan-scoped restrictions.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -42,7 +43,7 @@ pub async fn list_clan_restrictions(
     // ── require clan moderator or higher ─────────────────────────────────────
     let effective = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if !effective.map(|r| r.is_moderator()).unwrap_or(false) {
         return Err((StatusCode::FORBIDDEN, "clan moderator required".to_string()));
@@ -58,7 +59,7 @@ pub async fn list_clan_restrictions(
     .bind(clan_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let rows = sqlx::query_as::<_, RestrictionRow>(
         r#"SELECT id, user_id, scope, clan_id, applied_by, applied_at, expires_at,
@@ -74,7 +75,7 @@ pub async fn list_clan_restrictions(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let items = rows.into_iter().map(RestrictionView::from_row).collect();
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };

@@ -1,4 +1,5 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use crate::http_error::ResultExt;
 use serde::Serialize;
 
 use crate::AppState;
@@ -24,7 +25,7 @@ pub async fn leaderboard(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows))
 }

@@ -2,6 +2,7 @@
 //!
 //! These functions are the enforcement layer for the V3 sanctions system.
 //! Call `ensure_not_sanctioned` in any handler that should respect restrictions.
+use crate::http_error::ResultExt;
 
 use axum::http::StatusCode;
 use sqlx::PgPool;
@@ -139,7 +140,7 @@ pub async fn ensure_not_sanctioned(
     let label = sanction.label();
     let sanctioned = has_sanction(pool, user_id, &sanction, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if sanctioned {
         return Err((
             StatusCode::FORBIDDEN,
@@ -165,7 +166,7 @@ pub async fn check_sanctions(
 ) -> Result<(), (StatusCode, String)> {
     let rows = active_restrictions(pool, user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     check_sanctions_with_rows(&rows, checks)
 }
 
@@ -230,7 +231,7 @@ pub async fn ensure_not_clan_banned(
     user_id: Uuid,
     clan_id: Uuid,
 ) -> Result<(), (StatusCode, String)> {
-    if is_clan_banned(pool, user_id, clan_id).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))? {
+    if is_clan_banned(pool, user_id, clan_id).await.or_500()? {
         return Err((StatusCode::FORBIDDEN, "you are banned from this clan".to_string()));
     }
     Ok(())

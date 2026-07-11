@@ -3,6 +3,7 @@
 //!   POST   /api/v3/templates/{id}/pin
 //!   DELETE /api/v3/templates/{id}/pin
 //!   GET    /api/v3/templates/pinned
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -54,7 +55,7 @@ pub async fn pin(
     .bind(auth.user_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if visible.is_none() {
         return Err((StatusCode::NOT_FOUND, "template not found".to_string()));
@@ -67,7 +68,7 @@ pub async fn pin(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let result = sqlx::query(
         r#"INSERT INTO pinned_templates (user_id, template_id, slot)
@@ -79,7 +80,7 @@ pub async fn pin(
     .bind(slot)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::CONFLICT, "already pinned".to_string()));
@@ -110,7 +111,7 @@ pub async fn unpin(
     .bind(id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "not pinned".to_string()));
@@ -144,7 +145,7 @@ pub async fn list_pinned(
     .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let rows = sqlx::query_as::<_, TemplateSummary>(
         &format!(
@@ -161,7 +162,7 @@ pub async fn list_pinned(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };
 

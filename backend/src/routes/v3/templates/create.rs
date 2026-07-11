@@ -8,6 +8,7 @@
 //! Mirrors v2 create logic: scope validation, clan_id resolution, membership
 //! check, auto-approval via permissions::publish_auto_approved, scale
 //! validation, and the allow_public_template_publishing server_config gate.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -93,7 +94,7 @@ pub async fn create(
     // ── 4. Resolve clan_id (mirrors v2 create) ───────────────────────────────
     let is_global_admin = permissions::global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .is_admin();
 
     let clan_id: Option<Uuid> = if body.scope == "clan" {
@@ -109,7 +110,7 @@ pub async fn create(
             .bind(auth.user_id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
         };
 
         let cid = resolved.ok_or_else(|| {
@@ -129,7 +130,7 @@ pub async fn create(
             .bind(cid)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             if member.is_none() {
                 return Err((
@@ -151,7 +152,7 @@ pub async fn create(
         )
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         // Default is 'true' — only block when explicitly set to 'false'
         if flag.as_deref() == Some("false") {
@@ -166,7 +167,7 @@ pub async fn create(
     let auto_approve = body.scope == "private"
         || permissions::publish_auto_approved(&state.pool, auth.user_id, &body.scope, clan_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let status = if auto_approve { "approved" } else { "pending" };
 
     // ── 6. Validate scale ────────────────────────────────────────────────────
@@ -178,7 +179,7 @@ pub async fn create(
         .bind(auth.user_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     // ── 8. INSERT ────────────────────────────────────────────────────────────
     // `share` is NOT NULL in the schema (legacy column); v3 stores truth in
@@ -215,7 +216,7 @@ pub async fn create(
     .bind(doc)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(TemplateCreated { template: row, warnings }))
 }

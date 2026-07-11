@@ -3,6 +3,7 @@
 //! single response. Clients use this to drive their entire permission UI.
 
 use axum::{Json, extract::State, http::StatusCode};
+use crate::http_error::ResultExt;
 use serde::Serialize;
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -60,7 +61,7 @@ pub async fn me_v2(
     .bind(auth.user_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let row = row.ok_or((StatusCode::UNAUTHORIZED, "user gone".into()))?;
 
@@ -74,7 +75,7 @@ pub async fn me_v2(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let has_custom_avatar: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM avatars WHERE user_id = $1)")

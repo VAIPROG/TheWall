@@ -5,6 +5,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
+use crate::http_error::ResultExt;
 use uuid::Uuid;
 
 use crate::{AppState, auth::AuthUser};
@@ -52,7 +53,7 @@ pub async fn list_dms(
         .fetch_all(&state.pool)
         .await
     }
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -76,7 +77,7 @@ pub async fn send_dm(
     .bind(&body.text)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok((StatusCode::CREATED, Json(serde_json::json!({"ok": true}))))
 }
 
@@ -97,7 +98,7 @@ pub async fn mark_dm_read(
     .bind(body.peer)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -112,6 +113,6 @@ pub async fn delete_dm(
         .bind(auth.user_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }

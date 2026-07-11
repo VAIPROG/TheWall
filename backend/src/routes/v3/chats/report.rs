@@ -1,5 +1,6 @@
 //! Message report handler:
 //!   POST /api/v3/chats/{cid}/messages/{mid}/report
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -55,7 +56,7 @@ pub async fn report_message(
     .bind(chat_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if msg_exists.is_none() {
         return Err((StatusCode::NOT_FOUND, "message not found".to_string()));
@@ -91,7 +92,7 @@ pub async fn report_message(
     .bind(&body.evidence)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok((
         StatusCode::CREATED,

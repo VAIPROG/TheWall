@@ -1,5 +1,6 @@
 //! GET /api/v3/templates        — paginated list with visibility filtering
 //! GET /api/v3/templates/{id}   — single template with visibility check
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -54,7 +55,7 @@ pub async fn get(
     .bind(user_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let template = if let Some(row) = row {
         row
@@ -65,7 +66,7 @@ pub async fn get(
                 .bind(id)
                 .fetch_optional(&state.pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .ok_or((StatusCode::NOT_FOUND, "not found".into()))?
         } else {
             return Err((StatusCode::NOT_FOUND, "not found".into()));
@@ -144,7 +145,7 @@ pub async fn list(
     .bind(user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows))
 }

@@ -3,6 +3,7 @@
 //! Returns a paginated list of discoverable clans (or all clans for global mods+).
 //! Supports search by name (ILIKE), sort by name/memberCount/createdAt/activity,
 //! and asc/desc ordering.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -32,7 +33,7 @@ pub async fn list_clans(
     // ── visibility: global mod+ sees non-discoverable too ────────────────────
     let caller_role = global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     let see_all = caller_role.is_moderator();
 
     // ── sort clause ───────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ pub async fn list_clans(
         .bind(pattern)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         let rows = sqlx::query_as::<_, ClanV3>(&format!(
             r#"SELECT c.id, c.source, c.external_id, c.name, c.display_name, c.discord_id,
@@ -81,7 +82,7 @@ pub async fn list_clans(
         .bind(offset)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         (rows, count)
     } else {
@@ -91,7 +92,7 @@ pub async fn list_clans(
         .bind(see_all)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         let rows = sqlx::query_as::<_, ClanV3>(&format!(
             r#"SELECT c.id, c.source, c.external_id, c.name, c.display_name, c.discord_id,
@@ -109,7 +110,7 @@ pub async fn list_clans(
         .bind(offset)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         (rows, count)
     };

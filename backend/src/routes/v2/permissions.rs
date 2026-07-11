@@ -9,6 +9,7 @@
 //! one exists per install).
 
 use serde::Serialize;
+use crate::http_error::ResultExt;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -125,7 +126,7 @@ pub async fn require_admin(
 ) -> Result<(), (axum::http::StatusCode, String)> {
     let g = global_role_of(pool, auth.user_id)
         .await
-        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if !g.is_admin() {
         return Err((axum::http::StatusCode::FORBIDDEN, "admin only".into()));
     }
@@ -140,7 +141,7 @@ pub async fn require_clan_mod(
 ) -> Result<ClanRole, (axum::http::StatusCode, String)> {
     let r = effective_clan_role(pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or((axum::http::StatusCode::FORBIDDEN, "not in clan".into()))?;
     if !r.is_mod() {
         return Err((
@@ -159,7 +160,7 @@ pub async fn require_clan_admin(
 ) -> Result<(), (axum::http::StatusCode, String)> {
     let r = effective_clan_role(pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .ok_or((axum::http::StatusCode::FORBIDDEN, "not in clan".into()))?;
     if !r.is_admin() {
         return Err((

@@ -14,6 +14,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Deserialize;
+use crate::http_error::ResultExt;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -55,7 +56,7 @@ pub async fn get_queue(
     let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM templates WHERE status = 'pending'")
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let rows = sqlx::query_as::<_, TemplateSummary>(
         r#"SELECT id, user_id, name, x, y, scale, scope, status,
@@ -70,7 +71,7 @@ pub async fn get_queue(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };
 
@@ -123,7 +124,7 @@ async fn set_template_decision(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let (owner_id, prev_status) =
         row.ok_or_else(|| (StatusCode::NOT_FOUND, "template not found".to_string()))?;
 
@@ -141,7 +142,7 @@ async fn set_template_decision(
         .bind(mod_id)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     } else {
         sqlx::query_as::<_, TemplateV3>(&format!(
             r#"UPDATE templates
@@ -157,7 +158,7 @@ async fn set_template_decision(
         .bind(notes)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     };
 
     let template = updated.ok_or_else(|| (StatusCode::NOT_FOUND, "template not found".to_string()))?;

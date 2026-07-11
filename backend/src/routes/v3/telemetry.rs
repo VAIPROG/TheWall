@@ -5,6 +5,7 @@
 //!   GET   /api/v3/telemetry/logs/export
 //!   GET   /api/v3/telemetry/health
 //!   GET   /api/v3/telemetry/metrics
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -40,7 +41,7 @@ pub async fn submit_events(
     .bind(auth.user_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if !opted_in.unwrap_or(false) {
         return Err((StatusCode::FORBIDDEN, "telemetry opt-in required".to_string()));
@@ -64,7 +65,7 @@ pub async fn submit_events(
         .bind(e.page_url)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     }
 
     Ok(Json(json!({"ok": true, "message": "events accepted"})))
@@ -86,7 +87,7 @@ pub async fn upload_logs(
     .bind(auth.user_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if !opted_in.unwrap_or(false) {
         return Ok(Json(LogIngestResult { accepted: 0, rejected: body.logs.len() as i64 }));
@@ -103,7 +104,7 @@ pub async fn upload_logs(
     .bind(auth.user_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     if recent.is_some() {
         return Err((StatusCode::TOO_MANY_REQUESTS, "rate limited".to_string()));
     }
@@ -135,7 +136,7 @@ pub async fn upload_logs(
         .bind(&ip)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
         accepted += 1;
     }
 
@@ -147,7 +148,7 @@ pub async fn upload_logs(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(LogIngestResult {
         accepted,
@@ -179,7 +180,7 @@ pub async fn query_logs(
 ) -> Result<Json<Vec<LogRecord>>, (StatusCode, String)> {
     let role = global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if !role.is_admin() {
         return Err((StatusCode::FORBIDDEN, "admin required".to_string()));
     }
@@ -235,7 +236,7 @@ pub async fn query_logs(
     let rows = sqlx::query_as::<_, LogRecord>(&sql)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(rows))
 }
@@ -310,7 +311,7 @@ pub async fn get_metrics(
 ) -> Result<Json<MetricsSnapshot>, (StatusCode, String)> {
     let role = global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if !role.is_admin() {
         return Err((StatusCode::FORBIDDEN, "admin required".to_string()));
     }

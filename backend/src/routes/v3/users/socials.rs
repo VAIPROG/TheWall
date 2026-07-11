@@ -5,6 +5,7 @@
 //!   PATCH  /api/v3/users/me/socials/{provider}
 //!   DELETE /api/v3/users/me/socials/{provider}
 //!   GET    /api/v3/users/{userRef}/socials
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -49,7 +50,7 @@ pub async fn get_my_socials(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows))
 }
@@ -82,7 +83,7 @@ pub async fn add_my_social(
     .bind(body.is_public.unwrap_or(false))
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -117,7 +118,7 @@ pub async fn update_my_social(
     .bind(body.username.as_deref())
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let row = row.ok_or_else(|| (StatusCode::NOT_FOUND, "social link not found".to_string()))?;
 
@@ -136,7 +137,7 @@ pub async fn delete_my_social(
     .bind(&provider)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "social link not found".to_string()));
@@ -161,7 +162,7 @@ pub async fn get_user_socials(
     .bind(target_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows))
 }

@@ -7,6 +7,7 @@
 //!
 //! On success the updated TemplateV3 row is returned and a best-effort mailbox
 //! `template_event` is inserted to notify the template owner.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -50,21 +51,21 @@ pub async fn verify(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let (owner_id, scope, clan_id) = row.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
 
     // ── 3. Authorise ─────────────────────────────────────────────────────────
     let global_role = permissions::global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     let is_global_admin = global_role.is_admin();
 
     let is_clan_mod = if !is_global_admin && scope == "clan" {
         if let Some(cid) = clan_id {
             permissions::effective_clan_role(&state.pool, auth.user_id, cid)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .map(|r| r.is_moderator())
                 .unwrap_or(false)
         } else {
@@ -93,7 +94,7 @@ pub async fn verify(
         .bind(auth.user_id)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     } else {
         // "reject"
         sqlx::query_as::<_, TemplateV3>(&format!(
@@ -110,7 +111,7 @@ pub async fn verify(
         .bind(body.reason.as_deref())
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     };
 
     let template = updated.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;

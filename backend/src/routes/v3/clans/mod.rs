@@ -1,4 +1,5 @@
 //! V3 Clan CRUD — list, create, get, update, members, lifecycle, join flows.
+use crate::http_error::ResultExt;
 
 mod applications;
 mod create;
@@ -52,7 +53,7 @@ pub(crate) async fn load_clan(
     .bind(id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .or_500()
 }
 
 /// Build the full `ClanView` wire shape from a raw `ClanV3` row.
@@ -68,7 +69,7 @@ pub(crate) async fn build_clan_view(
     .bind(clan.id)
     .fetch_one(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // ── template count ────────────────────────────────────────────────────────
     let template_count: i64 = sqlx::query_scalar(
@@ -77,7 +78,7 @@ pub(crate) async fn build_clan_view(
     .bind(clan.id)
     .fetch_one(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // ── chat_id (do NOT create; None if absent) ───────────────────────────────
     let chat_id: Option<Uuid> = sqlx::query_scalar(
@@ -86,7 +87,7 @@ pub(crate) async fn build_clan_view(
     .bind(clan.id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // ── moderation (parse jsonb) ──────────────────────────────────────────────
     let moderation: Option<ClanModerationState> = {
@@ -140,11 +141,11 @@ pub(crate) async fn build_clan_view(
     let viewer: Option<ClanViewerContext> = if let Some(uid) = viewer_id {
         let actual_role = clan_role_of(pool, uid, clan.id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
         let effective = effective_clan_role(pool, uid, clan.id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
         let is_active_member: Option<bool> = sqlx::query_scalar(
             "SELECT TRUE FROM clan_memberships WHERE user_id = $1 AND clan_id = $2 AND active = TRUE",
@@ -153,7 +154,7 @@ pub(crate) async fn build_clan_view(
         .bind(clan.id)
         .fetch_optional(pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         let is_owner = clan.owner_id == Some(uid);
 
@@ -168,7 +169,7 @@ pub(crate) async fn build_clan_view(
             .bind(uid)
             .fetch_optional(pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
 
             if is_pending.is_some() {
                 "pending".to_string()
@@ -185,7 +186,7 @@ pub(crate) async fn build_clan_view(
                 .bind(uid)
                 .fetch_optional(pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
 
                 if is_invited.is_some() {
                     "invited".to_string()

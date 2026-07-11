@@ -5,6 +5,7 @@ mod bot_core;
 mod discord_commands;
 mod discord_gateway;
 mod formats;
+mod http_error;
 mod models;
 mod owner_seed;
 mod region_guard;

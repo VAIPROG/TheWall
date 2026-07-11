@@ -10,6 +10,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Deserialize;
+use crate::http_error::ResultExt;
 use uuid::Uuid;
 
 use crate::{
@@ -39,7 +40,7 @@ pub async fn get_audit_log(
     let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM mod_audit_log")
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let rows = sqlx::query_as::<_, AuditLogRow>(
         r#"SELECT a.id, a.moderator_id, a.action, a.target_type, a.target_id,
@@ -53,7 +54,7 @@ pub async fn get_audit_log(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let items = rows.into_iter().map(AuditLogEntry::from_row).collect();
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };

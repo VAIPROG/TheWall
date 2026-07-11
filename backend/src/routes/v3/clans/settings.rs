@@ -1,5 +1,6 @@
 //! GET  /api/v3/clans/{id}/settings  — read clan settings
 //! PATCH /api/v3/clans/{id}/settings — update clan settings (lock-aware)
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -75,7 +76,7 @@ pub async fn get_settings(
     .bind(clan_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let is_owner = clan.owner_id == Some(auth.user_id);
 
@@ -83,7 +84,7 @@ pub async fn get_settings(
         // Check global moderator fallback.
         let global = global_role_of(&state.pool, auth.user_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         if !global.is_moderator() {
             return Err((StatusCode::FORBIDDEN, "must be a clan member to view settings".to_string()));
         }
@@ -109,7 +110,7 @@ pub async fn update_settings(
     // Must be a clan admin or higher (effective role).
     let effective = effective_clan_role(&state.pool, auth.user_id, clan_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if !effective.map(|r| r.is_admin()).unwrap_or(false) {
         return Err((StatusCode::FORBIDDEN, "clan admin required".to_string()));
@@ -131,7 +132,7 @@ pub async fn update_settings(
         if locked_fields.contains(&"discoverable".to_string()) {
             let caller_global = global_role_of(&state.pool, auth.user_id)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
             if !caller_global.is_moderator() {
                 return Err((
                     StatusCode::from_u16(423).unwrap(),
@@ -240,7 +241,7 @@ pub async fn update_settings(
         .bind(clan_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     } else {
         let patch_value = serde_json::Value::Object(settings_patch);
         sqlx::query(
@@ -259,7 +260,7 @@ pub async fn update_settings(
         .bind(clan_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     }
 
     // ── reload + return ───────────────────────────────────────────────────────

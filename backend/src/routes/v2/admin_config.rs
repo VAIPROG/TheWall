@@ -6,6 +6,7 @@ use axum::{
     http::StatusCode,
 };
 use chrono::{DateTime, Utc};
+use crate::http_error::ResultExt;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -34,7 +35,7 @@ pub async fn list_config(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -53,7 +54,7 @@ pub async fn update_config(
         .bind(&key)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, format!("config key '{}' not found", key)));
     }

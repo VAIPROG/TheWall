@@ -1,5 +1,6 @@
 //! Read-state endpoint:
 //!   POST /api/v3/chats/{cid}/read
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -46,7 +47,7 @@ pub async fn mark_read(
         .bind(chat_id)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
         if exists.is_none() {
             return Err((StatusCode::BAD_REQUEST, "message not found in this chat".to_string()));
@@ -63,7 +64,7 @@ pub async fn mark_read(
         .bind(chat_id)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
     };
 
     // Upsert the read state (even if target_id is None — empty chat is still "read").
@@ -79,7 +80,7 @@ pub async fn mark_read(
     .bind(target_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(json!({"ok": true})))
 }

@@ -1,4 +1,5 @@
 //! POST /api/v3/templates/{id}/report — report a template to global moderators.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -43,7 +44,7 @@ pub async fn report_template(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if template_exists.is_none() {
         return Err((StatusCode::NOT_FOUND, "template not found".to_string()));
@@ -59,7 +60,7 @@ pub async fn report_template(
     .bind(body.evidence.as_deref())
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,

@@ -17,6 +17,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Deserialize;
+use crate::http_error::ResultExt;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -45,7 +46,7 @@ async fn load_restriction(
     .bind(id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or_else(|| (StatusCode::NOT_FOUND, "restriction not found".to_string()))
 }
 
@@ -60,7 +61,7 @@ async fn authorize_restriction(
 ) -> Result<(), (StatusCode, String)> {
     let global = permissions::global_role_of(pool, caller_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     if global.is_moderator() {
         return Ok(());
@@ -70,7 +71,7 @@ async fn authorize_restriction(
         if let Some(cid) = clan_id {
             let effective = permissions::effective_clan_role(pool, caller_id, cid)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
             if effective.map(|r| r.is_moderator()).unwrap_or(false) {
                 return Ok(());
             }
@@ -115,7 +116,7 @@ async fn apply_clan_ban(
     .bind(expires_at)
     .execute(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     sqlx::query(
         "DELETE FROM clan_memberships WHERE clan_id = $1 AND user_id = $2",
@@ -124,7 +125,7 @@ async fn apply_clan_ban(
     .bind(user_id)
     .execute(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(())
 }
@@ -145,7 +146,7 @@ async fn remove_clan_ban(
     .bind(user_id)
     .execute(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(())
 }
 
@@ -179,7 +180,7 @@ pub async fn list_restrictions(
 ) -> Result<Json<RestrictionPage>, (StatusCode, String)> {
     let global = permissions::global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if !global.is_moderator() {
         return Err((StatusCode::FORBIDDEN, "moderator required".to_string()));
     }
@@ -208,7 +209,7 @@ pub async fn list_restrictions(
         .bind(user_filter)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let rows_sql = format!(
         r#"SELECT id, user_id, scope, clan_id, applied_by, applied_at, expires_at,
@@ -228,7 +229,7 @@ pub async fn list_restrictions(
         .bind(offset)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let items = rows.into_iter().map(RestrictionView::from_row).collect();
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };
@@ -294,7 +295,7 @@ pub async fn create_restriction(
     .bind(body.sanctions.send_modmail)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if body.scope == "clan" && body.sanctions.ban {
         if let Some(cid) = body.clan_id {
@@ -407,7 +408,7 @@ pub async fn update_restriction(
         qb.build()
             .execute(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     }
 
     let updated = load_restriction(&state.pool, id).await?;
@@ -460,7 +461,7 @@ pub async fn delete_restriction(
     .bind(id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if existing.scope == "clan" && existing.s_ban {
         if let Some(cid) = existing.clan_id {
@@ -496,7 +497,7 @@ pub async fn user_restrictions(
     if target_id != auth.user_id {
         let global = permissions::global_role_of(&state.pool, auth.user_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         if !global.is_moderator() {
             return Err((StatusCode::FORBIDDEN, "moderator required to view another user's restrictions".to_string()));
         }
@@ -512,7 +513,7 @@ pub async fn user_restrictions(
     .bind(target_id)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let rows = sqlx::query_as::<_, RestrictionRow>(
         r#"SELECT id, user_id, scope, clan_id, applied_by, applied_at, expires_at,
@@ -528,7 +529,7 @@ pub async fn user_restrictions(
     .bind(offset)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let items = rows.into_iter().map(RestrictionView::from_row).collect();
     let total_pages = if per_page > 0 { (total + per_page - 1) / per_page } else { 0 };

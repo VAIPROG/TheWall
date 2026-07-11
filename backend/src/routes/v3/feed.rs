@@ -14,6 +14,7 @@ use axum::{
     http::StatusCode,
 };
 use chrono::{DateTime, Utc};
+use crate::http_error::ResultExt;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -57,7 +58,7 @@ pub async fn list(
     .bind(limit)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows.into_iter().map(FeedEventRow::into_model).collect()))
 }
@@ -75,7 +76,7 @@ pub async fn get_one(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or((StatusCode::NOT_FOUND, "event not found".into()))?;
 
     Ok(Json(row.into_model()))
@@ -91,7 +92,7 @@ pub async fn list_notes(
     .bind(id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows.into_iter().map(Into::into).collect()))
 }
@@ -148,7 +149,7 @@ pub async fn create(
     .bind(b.occurred_at)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(row.into_model()))
 }
@@ -172,7 +173,7 @@ pub async fn upsert_note(
             .bind(&lang)
             .execute(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         return Ok(StatusCode::NO_CONTENT);
     }
 
@@ -192,7 +193,7 @@ pub async fn upsert_note(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(StatusCode::OK)
 }
@@ -209,7 +210,7 @@ pub async fn delete_note(
         .bind(lang.trim().to_ascii_lowercase())
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(StatusCode::NO_CONTENT)
 }

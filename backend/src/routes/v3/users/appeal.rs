@@ -3,6 +3,7 @@
 //! This endpoint is intentionally reachable even when the caller is globally
 //! banned (it is listed in the ban allow-list). It lets the user explain their
 //! side and request a review.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -38,7 +39,7 @@ pub async fn submit_appeal(
     .bind(auth.user_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if pending.is_some() {
         return Err((StatusCode::CONFLICT, "you already have a pending appeal".to_string()));
@@ -53,7 +54,7 @@ pub async fn submit_appeal(
     .bind(&reason)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,

@@ -1,5 +1,6 @@
 //! V2 templates: unified list with filtering, deletion, approval workflow,
 //! pin slots, and mailbox events on status changes.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -76,7 +77,7 @@ pub async fn list(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -109,7 +110,7 @@ pub async fn shared(
         .bind(hash_token(pass))
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
         if let Some(row) = row {
             return Ok(Json(row));
         }
@@ -140,7 +141,7 @@ pub async fn shared(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     row.map(Json)
         .ok_or((StatusCode::NOT_FOUND, "not found".into()))
 }
@@ -171,7 +172,7 @@ pub async fn create(
             .bind(auth.user_id)
             .fetch_one(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let (username, global_role) = user_row;
     if !matches!(body.scope.as_str(), "private" | "clan" | "public") {
         return Err((
@@ -198,7 +199,7 @@ pub async fn create(
             .bind(auth.user_id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
         };
         let cid = resolved.ok_or_else(|| {
             (
@@ -215,7 +216,7 @@ pub async fn create(
         .bind(cid)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
         if member.is_none() && !is_admin {
             return Err((
                 StatusCode::FORBIDDEN,
@@ -232,7 +233,7 @@ pub async fn create(
     let auto_approve = body.scope == "private" // owner-only — nothing to moderate
         || permissions::publish_auto_approved(&state.pool, auth.user_id, &body.scope, clan_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let status = if auto_approve { "approved" } else { "pending" };
 
     let scale = validate_template_scale(body.scale.unwrap_or(1.0))
@@ -263,7 +264,7 @@ pub async fn create(
     .bind(pass_hash)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(row))
 }
 
@@ -274,7 +275,7 @@ pub async fn approve(
 ) -> Result<StatusCode, (StatusCode, String)> {
     let g = permissions::global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if !g.is_admin() {
         // Clan templates: caller must be at least clan_mod in the template's
         // scope. For simplicity we use the clan-templates-only check.
@@ -282,7 +283,7 @@ pub async fn approve(
             .bind(id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         if scope.as_deref() != Some("public") {
             return Err((
                 StatusCode::FORBIDDEN,
@@ -298,7 +299,7 @@ pub async fn approve(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     if let Some(uid) = owner {
         // Mailbox event: template approved.
         sqlx::query(
@@ -324,7 +325,7 @@ pub async fn reject(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     if let Some(uid) = owner {
         sqlx::query(
             r#"INSERT INTO mailbox_items (id, kind, sender_id, recipient_user_id, title, body, payload)
@@ -358,7 +359,7 @@ pub async fn pin(
     )
     .bind(auth.user_id).bind(id).bind(b.slot)
     .execute(&state.pool).await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::OK)
 }
 
@@ -372,6 +373,6 @@ pub async fn unpin(
         .bind(id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }

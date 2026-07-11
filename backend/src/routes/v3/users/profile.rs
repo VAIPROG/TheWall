@@ -9,6 +9,7 @@ use axum::{
     http::StatusCode,
 };
 use serde_json::json;
+use crate::http_error::ResultExt;
 use uuid::Uuid;
 
 use crate::{
@@ -41,7 +42,7 @@ pub async fn get_me(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let linked_accounts: Vec<ProviderLink> = sqlx::query_as(
         "SELECT id, account_id, provider, provider_uid, username, is_verified, is_public, linked_at
@@ -52,19 +53,19 @@ pub async fn get_me(
     .bind(auth.user_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let api_key_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_keys WHERE user_id = $1")
         .bind(auth.user_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let block_list_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM user_blocks WHERE blocker_id = $1")
         .bind(auth.user_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(Json(UserSelf {
         id: user.id,
@@ -116,7 +117,7 @@ pub async fn update_me(
             .bind(auth.user_id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
             if exists.is_some() {
                 return Err((StatusCode::CONFLICT, "username already taken".to_string()));
             }
@@ -151,7 +152,7 @@ pub async fn update_me(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -205,7 +206,7 @@ pub async fn get_user_by_ref(
     .bind(target_id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let social_accounts: Vec<SocialAccountPublic> = sqlx::query_as(
         "SELECT provider, username, is_verified, linked_at
@@ -216,7 +217,7 @@ pub async fn get_user_by_ref(
     .bind(target_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(UserProfilePublic {
         id: user.id,
@@ -249,7 +250,7 @@ pub(crate) async fn load_user(
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .or_500()
 }
 
 pub(crate) async fn avatar_url_for(
@@ -262,7 +263,7 @@ pub(crate) async fn avatar_url_for(
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(url)
 }
 

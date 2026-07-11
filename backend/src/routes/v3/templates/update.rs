@@ -10,6 +10,7 @@
 //!   - Owner (user_id == auth.user_id) always allowed.
 //!   - Global admin/owner (global_role_of().is_admin()) always allowed.
 //!   - Anyone else → 403.
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -50,7 +51,7 @@ pub async fn update(
         .bind(id)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let (owner_id, version, document_opt, row_scope, row_clan_id, row_x, row_y, row_scale, row_name) =
         row.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
@@ -59,7 +60,7 @@ pub async fn update(
     let is_owner = owner_id == auth.user_id;
     let is_global_admin = permissions::global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .or_500()?
         .is_admin();
 
     if !is_owner && !is_global_admin {
@@ -154,7 +155,7 @@ pub async fn update(
                 .bind(auth.user_id)
                 .fetch_optional(&state.pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
             };
 
             let cid = resolved.ok_or_else(|| {
@@ -174,7 +175,7 @@ pub async fn update(
                 .bind(cid)
                 .fetch_optional(&state.pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
 
                 if member.is_none() {
                     return Err((
@@ -232,7 +233,7 @@ pub async fn update(
     .bind(pass_hash)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let template = updated.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
 

@@ -13,6 +13,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
+use crate::http_error::ResultExt;
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -113,7 +114,7 @@ pub async fn list(
     .bind(q.clan_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -138,7 +139,7 @@ pub async fn get_one(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .or_500()?
     .ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
     Ok(Json(row))
 }
@@ -168,7 +169,7 @@ pub async fn create(
     if scope == "clan" {
         let role = permissions::effective_clan_role(&state.pool, auth.user_id, b.clan_id.unwrap())
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         if role.is_none() {
             return Err((StatusCode::FORBIDDEN, "not a member of that clan".into()));
         }
@@ -176,7 +177,7 @@ pub async fn create(
     let status = if scope == "private"
         || permissions::publish_auto_approved(&state.pool, auth.user_id, scope, b.clan_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
     {
         "approved"
     } else {
@@ -186,7 +187,7 @@ pub async fn create(
         .bind(auth.user_id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if count >= MAX_REGIONS_PER_USER {
         return Err((StatusCode::TOO_MANY_REQUESTS, "region limit reached".into()));
     }
@@ -213,7 +214,7 @@ pub async fn create(
     .bind(interval)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(row))
 }
 
@@ -232,7 +233,7 @@ async fn set_status(
             .bind(id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let (scope, clan) = existing.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
 
     let allowed = match scope.as_str() {
@@ -242,16 +243,16 @@ async fn set_status(
             };
             let role = permissions::effective_clan_role(&state.pool, auth.user_id, cid)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                .or_500()?;
             role.map(|r| r.is_mod()).unwrap_or(false)
                 || permissions::global_role_of(&state.pool, auth.user_id)
                     .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                    .or_500()?
                     .is_admin()
         }
         "public" => permissions::global_role_of(&state.pool, auth.user_id)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .or_500()?
             .is_admin(),
         _ => return Err((StatusCode::BAD_REQUEST, "private regions need no approval".into())),
     };
@@ -266,7 +267,7 @@ async fn set_status(
     .bind(new_status)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(row))
 }
 
@@ -302,14 +303,14 @@ async fn can_mutate(
     }
     let g = permissions::global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if g.is_admin() {
         return Ok(true);
     }
     if let Some(cid) = row_clan {
         let role = permissions::effective_clan_role(&state.pool, auth.user_id, cid)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
         return Ok(role.map(|r| r.is_admin()).unwrap_or(false));
     }
     Ok(false)
@@ -338,7 +339,7 @@ pub async fn update(
             .bind(id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let (owner, clan) = existing.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
     if !can_mutate(&state, &auth, owner, clan).await? {
         return Err((StatusCode::FORBIDDEN, "owner / clan admin required".into()));
@@ -375,7 +376,7 @@ pub async fn update(
     .bind(&b.ref_png)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(row))
 }
 
@@ -389,7 +390,7 @@ pub async fn remove(
             .bind(id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     let (owner, clan) = existing.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
     if !can_mutate(&state, &auth, owner, clan).await? {
         return Err((StatusCode::FORBIDDEN, "owner / clan admin required".into()));
@@ -398,7 +399,7 @@ pub async fn remove(
         .bind(id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -433,7 +434,7 @@ pub async fn report(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     if visible.is_none() {
         return Err((StatusCode::NOT_FOUND, "not found".into()));
     }
@@ -449,6 +450,6 @@ pub async fn report(
     .bind(b.ok)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::NO_CONTENT)
 }

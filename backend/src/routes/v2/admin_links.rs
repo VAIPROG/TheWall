@@ -7,6 +7,7 @@ use axum::{
     http::StatusCode,
 };
 use chrono::{DateTime, Utc};
+use crate::http_error::ResultExt;
 use serde::Serialize;
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -42,7 +43,7 @@ pub async fn list_email_requests(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(Json(rows))
 }
 
@@ -58,7 +59,7 @@ pub async fn approve_email_request(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     let row = row.ok_or((StatusCode::NOT_FOUND, "request not found".into()))?;
     if row.2 != "pending" {
         return Err((StatusCode::CONFLICT, "request already decided".into()));
@@ -68,23 +69,23 @@ pub async fn approve_email_request(
         .pool
         .begin()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     sqlx::query("UPDATE users SET notifications_email = $1 WHERE id = $2")
         .bind(&row.1)
         .bind(row.0)
         .execute(&mut *tx)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     sqlx::query(
         "UPDATE email_link_requests SET status = 'approved', decided_at = NOW() WHERE id = $1",
     )
     .bind(id)
     .execute(&mut *tx)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     tx.commit()
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     Ok(StatusCode::OK)
 }
 
@@ -98,6 +99,6 @@ pub async fn reject_email_request(
         "UPDATE email_link_requests SET status = 'rejected', decided_at = NOW() WHERE id = $1 AND status = 'pending'",
     )
     .bind(id).execute(&state.pool).await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
     Ok(StatusCode::OK)
 }

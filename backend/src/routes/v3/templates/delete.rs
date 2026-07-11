@@ -8,6 +8,7 @@
 //!
 //! Note: the "membersCanDeleteOwnTemplates" clan setting is deferred to a
 //! later slice. For this slice, the owner may always delete their own template.
+use crate::http_error::ResultExt;
 
 use axum::{
     extract::{Path, State},
@@ -33,7 +34,7 @@ pub async fn delete(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let (owner_id, scope, clan_id) = row.ok_or((StatusCode::NOT_FOUND, "not found".into()))?;
 
@@ -42,14 +43,14 @@ pub async fn delete(
 
     let global_role = permissions::global_role_of(&state.pool, auth.user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     let is_global_admin = global_role.is_admin();
 
     let is_clan_mod = if scope == "clan" {
         if let Some(cid) = clan_id {
             permissions::effective_clan_role(&state.pool, auth.user_id, cid)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
                 .map(|r| r.is_moderator())
                 .unwrap_or(false)
         } else {
@@ -68,7 +69,7 @@ pub async fn delete(
         .bind(id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     Ok(StatusCode::NO_CONTENT)
 }

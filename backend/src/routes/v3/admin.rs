@@ -5,6 +5,7 @@
 //!     remove-from-clan, admin audit log
 //!   - global admin+ for admin user view/update and promote to moderator
 //!   - global owner for promote to admin/owner and wipeout
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -38,7 +39,7 @@ async fn require_role(
 ) -> Result<GlobalRole, (StatusCode, String)> {
     let role = global_role_of(pool, user_id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     if role < min {
         return Err((StatusCode::FORBIDDEN, "insufficient role".to_string()));
     }
@@ -59,7 +60,7 @@ async fn load_user(
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    .or_500()
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +130,7 @@ pub async fn admin_update_user(
     .bind(target_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -189,7 +190,7 @@ pub async fn admin_ban_user(
     .bind(expires_at)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -220,7 +221,7 @@ pub async fn admin_unban_user(
     .bind(target_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "active ban not found".to_string()));
@@ -281,7 +282,7 @@ pub async fn admin_mute_user(
     .bind(expires_at)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -312,7 +313,7 @@ pub async fn admin_unmute_user(
     .bind(target_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "active mute not found".to_string()));
@@ -367,7 +368,7 @@ pub async fn admin_promote_user(
         .bind(target_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -412,17 +413,17 @@ pub async fn admin_wipeout_user(
         .bind(target_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     sqlx::query("DELETE FROM messages WHERE author_id = $1")
         .bind(target_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
     sqlx::query("DELETE FROM avatars WHERE user_id = $1")
         .bind(target_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -453,7 +454,7 @@ pub async fn admin_remove_from_clan(
         .bind(target_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -484,7 +485,7 @@ pub async fn admin_reset_avatar(
         .bind(target_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -518,7 +519,7 @@ pub async fn admin_reset_username(
         .bind(target_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -555,7 +556,7 @@ pub async fn admin_get_user_sessions(
     .bind(target_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows))
 }
@@ -572,7 +573,7 @@ pub async fn admin_terminate_user_sessions(
         .bind(target_id)
         .execute(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -626,7 +627,7 @@ pub async fn admin_get_user_notes(
     .bind(target_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     Ok(Json(rows))
 }
@@ -657,7 +658,7 @@ pub async fn admin_add_user_note(
     .bind(content)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -712,7 +713,7 @@ pub async fn admin_impersonate_user(
     .bind(expires)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     let _ = audit::log_action(
         &state.pool,
@@ -779,7 +780,7 @@ pub async fn admin_audit_log(
         .build_query_scalar::<i64>()
         .fetch_one(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let mut rows_qb: QueryBuilder<sqlx::Postgres> = QueryBuilder::new(
         r#"SELECT a.id, a.moderator_id, a.action, a.target_type, a.target_id, a.details, a.created_at,
@@ -805,7 +806,7 @@ pub async fn admin_audit_log(
         .build_query_as::<AuditLogRow>()
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .or_500()?;
 
     let total_pages = (total + per_page - 1) / per_page;
     let items = rows.into_iter().map(AuditLogEntry::from_row).collect();
@@ -1021,13 +1022,13 @@ pub async fn admin_broadcast(
             sqlx::query_as("SELECT id FROM users")
                 .fetch_all(&state.pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
         } else {
             sqlx::query_as("SELECT id FROM users WHERE global_role = $1")
                 .bind(role_filter)
                 .fetch_all(&state.pool)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                .or_500()?
         };
         rows.into_iter().map(|(id,)| id).collect()
     };

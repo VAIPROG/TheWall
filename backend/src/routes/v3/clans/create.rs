@@ -2,6 +2,7 @@
 //!
 //! Creates a new native clan owned by the authenticated user.
 //! One clan per owner (409 if the user already owns one).
+use crate::http_error::ResultExt;
 
 use axum::{
     Json,
@@ -41,7 +42,7 @@ pub async fn create_clan(
             .bind(auth.user_id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            .or_500()?;
     if already_owns.is_some() {
         return Err((StatusCode::CONFLICT, "already own a clan".to_string()));
     }
@@ -65,7 +66,7 @@ pub async fn create_clan(
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // ── add owner as admin membership ─────────────────────────────────────────
     sqlx::query(
@@ -78,7 +79,7 @@ pub async fn create_clan(
     .bind(new_id)
     .execute(&state.pool)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .or_500()?;
 
     // ── create clan chat ──────────────────────────────────────────────────────
     clan_chat_id(&state.pool, new_id).await?;
