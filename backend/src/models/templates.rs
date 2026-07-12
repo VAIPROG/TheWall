@@ -107,6 +107,10 @@ pub struct TemplateSummary {
     /// True when the `document` column is non-NULL (i.e. the row has been
     /// backfilled to the v2 format and export endpoints will work).
     pub has_document: bool,
+    /// Number of templates in the document bundle (`document.templates[]`).
+    /// 1 for a single template. Queries that don't project it default to 0.
+    #[sqlx(default)]
+    pub template_count: i32,
 }
 
 /// Paginated template list (offset pagination) — used by the moderation queue.

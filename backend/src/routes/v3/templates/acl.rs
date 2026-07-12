@@ -69,6 +69,63 @@ pub fn can_view(user: Uuid, doc: &Value) -> bool {
     !is_blocked(user, doc) && passes_whitelist(user, doc)
 }
 
+/// Full SQL visibility condition for the `templates` table, parameterised by the
+/// `$user_bind` placeholder (the caller's user id, bound as `Option<Uuid>`;
+/// NULL = anonymous). Drop it into a WHERE as `AND ( <this> )`.
+///
+/// A user may VIEW a template when ANY of:
+///   - they are the owner (`user_id`);
+///   - they are a co-editor via `allowedToEdit.userIds`, or a member of a clan
+///     in `allowedToEdit.clanIds`;
+///   - the privacy gates pass: NOT in `usersBlocklist`, AND (a non-empty
+///     `usersWhitelist` requires membership; otherwise the normal scope rules
+///     apply — public+approved, or clan member for clan scope).
+///
+/// NULL or malformed documents degrade to "no privacy restrictions" (scope rules
+/// only) — never a SQL error. UUIDs in the access arrays are JSON strings, hence
+/// the `@> to_jsonb($u::text)` containment check.
+pub fn view_sql(user_bind: usize) -> String {
+    let u = format!("${user_bind}");
+    // Raw string with real newlines: the newlines survive as whitespace in the
+    // SQL, so tokens/placeholders stay separated. (A regular "\"-continued
+    // string strips the next line's leading whitespace and would glue tokens
+    // together, e.g. `$6OR`.)
+    let scope_visible = format!(
+        r#"((scope = 'public' AND status = 'approved')
+            OR (scope = 'clan' AND clan_id IN (
+                  SELECT clan_id FROM clan_memberships WHERE user_id = {u} AND active = TRUE)))"#
+    );
+    // Every `@> to_jsonb($u::text)` is guarded by `$u IS NOT NULL`: for an
+    // anonymous caller `$u` is SQL NULL, and `array @> NULL` yields NULL (not
+    // false), which would poison the COALESCE and spuriously deny anon on
+    // templates carrying present-but-empty access arrays. An anon is simply
+    // never a member of any list.
+    format!(
+        r#"COALESCE((
+           user_id = {u}
+           OR ({u} IS NOT NULL AND jsonb_typeof(document -> 'allowedToEdit' -> 'userIds') = 'array'
+                 AND document -> 'allowedToEdit' -> 'userIds' @> to_jsonb(({u})::text))
+           OR EXISTS (SELECT 1 FROM clan_memberships cm
+                        WHERE cm.user_id = {u} AND cm.active = TRUE
+                          AND jsonb_typeof(document -> 'allowedToEdit' -> 'clanIds') = 'array'
+                          AND document -> 'allowedToEdit' -> 'clanIds' @> to_jsonb((cm.clan_id)::text))
+           OR (
+               (document -> 'usersBlocklist' IS NULL
+                 OR jsonb_typeof(document -> 'usersBlocklist') <> 'array'
+                 OR {u} IS NULL
+                 OR NOT (document -> 'usersBlocklist' @> to_jsonb(({u})::text)))
+               AND (
+                 CASE WHEN jsonb_typeof(document -> 'usersWhitelist') = 'array'
+                           AND jsonb_array_length(document -> 'usersWhitelist') > 0
+                      THEN ({u} IS NOT NULL AND document -> 'usersWhitelist' @> to_jsonb(({u})::text))
+                      ELSE {scope_visible}
+                 END
+               )
+           )
+        ), false)"#
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

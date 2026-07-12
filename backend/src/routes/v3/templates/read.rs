@@ -37,19 +37,11 @@ pub async fn get(
     let user_id = access.context.user_id;
     let has_password = access.context.password.is_some();
 
-    // First attempt: normal visibility + optional password flag.
+    // First attempt: full visibility (scope + whitelist/blocklist + co-editors)
+    // + optional password flag. `$2` = the caller's user id.
+    let visibility = super::acl::view_sql(2);
     let row = sqlx::query_as::<_, TemplateV3>(&format!(
-        r#"SELECT {COLS}
-             FROM templates
-            WHERE id = $1
-              AND (
-                  (scope = 'public' AND status = 'approved')
-                  OR user_id = $2
-                  OR (scope = 'clan' AND clan_id IN (
-                        SELECT clan_id FROM clan_memberships
-                         WHERE user_id = $2 AND active = TRUE
-                      ))
-              )"#
+        r#"SELECT {COLS} FROM templates WHERE id = $1 AND {visibility}"#
     ))
     .bind(id)
     .bind(user_id)
@@ -115,28 +107,24 @@ pub async fn list(
     let limit = q.limit.unwrap_or(50).min(200);
     let user_id = access.context.user_id;
 
-    // Light projection — no `document` column.  `has_document` lets the
-    // client know whether the /wall-dev export endpoint will work.
-    let rows = sqlx::query_as::<_, TemplateSummary>(
+    // Light projection — no `document` column in the result. `has_document`
+    // and `template_count` are derived from it; the WHERE still references the
+    // `document` column (visibility). `$6` = the caller's user id.
+    let visibility = super::acl::view_sql(6);
+    let rows = sqlx::query_as::<_, TemplateSummary>(&format!(
         r#"SELECT id, user_id, name, x, y, scale, scope, status,
                   version, clan_id, verified_at, created_at,
-                  (document IS NOT NULL) AS has_document
+                  (document IS NOT NULL) AS has_document,
+                  COALESCE(jsonb_array_length(document -> 'templates'), 1) AS template_count
              FROM templates
             WHERE ($1::text IS NULL OR scope = $1)
               AND ($2::text IS NULL OR status = $2)
               AND ($3::uuid IS NULL OR user_id = $3)
               AND ($4::timestamptz IS NULL OR created_at < $4)
-              AND (
-                  user_id = $6
-                  OR (scope = 'public' AND status = 'approved')
-                  OR (scope = 'clan' AND $6 IS NOT NULL AND clan_id IN (
-                        SELECT clan_id FROM clan_memberships
-                         WHERE user_id = $6 AND active = TRUE
-                      ))
-              )
+              AND {visibility}
             ORDER BY created_at DESC
-            LIMIT $5"#,
-    )
+            LIMIT $5"#
+    ))
     .bind(q.scope.as_deref())
     .bind(q.status.as_deref())
     .bind(q.author)

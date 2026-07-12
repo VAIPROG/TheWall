@@ -34,20 +34,15 @@ pub async fn load_visible(
 {
     let user_id = access.user_id;
 
+    // Full visibility (scope + whitelist/blocklist + co-editors). Shared by
+    // render (preview/png/animated) and export. `$2` = the caller's user id.
+    let visibility = super::acl::view_sql(2);
     let row: Option<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>, i32)> =
-        sqlx::query_as(
+        sqlx::query_as(&format!(
             r#"SELECT user_id, scope, clan_id, author, document, version
                  FROM templates
-                WHERE id = $1
-                  AND (
-                      (scope = 'public' AND status = 'approved')
-                      OR user_id = $2
-                      OR (scope = 'clan' AND clan_id IN (
-                            SELECT clan_id FROM clan_memberships
-                             WHERE user_id = $2 AND active = TRUE
-                          ))
-                  )"#,
-        )
+                WHERE id = $1 AND {visibility}"#
+        ))
         .bind(template_id)
         .bind(user_id)
         .fetch_optional(&state.pool)
