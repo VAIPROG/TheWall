@@ -63,7 +63,20 @@ pub async fn update(
         .or_500()?
         .is_admin();
 
-    if !is_owner && !is_global_admin {
+    // Co-editors: allowedToEdit in the document grants PATCH beyond the owner.
+    let user_clans: Vec<uuid::Uuid> = sqlx::query_scalar(
+        "SELECT clan_id FROM clan_memberships WHERE user_id = $1 AND active = true",
+    )
+    .bind(auth.user_id)
+    .fetch_all(&state.pool)
+    .await
+    .or_500()?;
+    let is_editor = document_opt
+        .as_ref()
+        .map(|d| crate::routes::v3::templates::acl::is_editor(auth.user_id, &user_clans, d))
+        .unwrap_or(false);
+
+    if !is_owner && !is_global_admin && !is_editor {
         return Err((StatusCode::FORBIDDEN, "forbidden".into()));
     }
 
