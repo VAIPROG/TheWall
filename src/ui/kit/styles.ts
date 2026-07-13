@@ -194,5 +194,19 @@ export function kitStyles(): string {
 .wd-tplgrid--compact .wd-tplcard-name { display:none; }
 .wd-tplcard-badges { display:flex; gap:2px; justify-content:center; flex-wrap:wrap; margin-top:1px; }
 .wd-tplcard-badges:empty { display:none; }
+
+/* Templates Detail drill-in */
+.wd-tpl-detail { display:flex; flex-direction:column; gap:6px; }
+.wd-tpl-hero { text-align:center; background:var(--group); border:2px solid; border-color:var(--dark) var(--light) var(--light) var(--dark); padding:6px; }
+.wd-tpl-hero-img { max-width:100%; max-height:200px; image-rendering:pixelated; object-fit:contain; }
+.wd-tpl-title { margin:0; font-size:14px; font-weight:bold; word-break:break-word; }
+.wd-tpl-pills { display:flex; gap:3px; flex-wrap:wrap; }
+.wd-kvgrid { display:flex; flex-direction:column; gap:2px; }
+.wd-kv { display:flex; justify-content:space-between; gap:8px; font-size:11px; }
+.wd-kv-k { color:var(--sub); }
+.wd-kv-v { color:var(--text); text-align:right; word-break:break-word; }
+.wd-notes { margin:0; padding-left:16px; font-size:11px; display:flex; flex-direction:column; gap:2px; }
+.wd-bundle { margin:0; padding-left:18px; font-size:11px; }
+.wd-tpl-id { font:10px monospace; color:var(--sub); text-align:center; margin-top:4px; word-break:break-all; user-select:all; opacity:.7; }
 `;
 }

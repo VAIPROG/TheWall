@@ -7,6 +7,7 @@
 import { PanelStack, type PanelScreen } from "../kit/panel-stack";
 import { $ } from "../../helpers";
 import { browseScreen } from "./browse";
+import { detailScreen } from "./detail";
 
 // Screen factories. Browse/Detail/Publish get their real implementations in
 // later slices; kept behind this indirection so the shell + navigation can be
@@ -20,11 +21,7 @@ export interface StackScreens {
 export function makeStackScreens(): StackScreens {
   return {
     browse: () => browseScreen(),
-    detail: (id: string) => ({
-      title: "Template",
-      render: () => `<div id="tpl-detail">${id}</div>`,
-      onMount: () => {},
-    }),
+    detail: (id: string) => detailScreen(id),
     publish: (_handoff: unknown) => ({
       title: "Publish",
       render: () => `<div id="tpl-publish" class="wd-empty">Publish (coming next)</div>`,

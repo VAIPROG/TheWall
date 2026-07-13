@@ -16,12 +16,18 @@ let curChip: Chip = "all";
 let curDensity: "grid" | "compact" = "grid";
 let rows: TplSummary[] = [];
 let search = "";
+// Scope toggles (mirror the old tab): show pending/unverified templates, and
+// hide animated ones. `showUnverified` changes the server query (refetch);
+// `hideAnimated` is a client-side filter (re-render only).
+let showUnverified = false;
+let hideAnimated = false;
 
 function filtered(): TplSummary[] {
   const q = search.trim().toLowerCase();
-  if (!q) return rows;
-  const toks = q.split(/\s+/).filter(Boolean);
+  const toks = q ? q.split(/\s+/).filter(Boolean) : [];
   return rows.filter((r) => {
+    if (hideAnimated && r.animated) return false;
+    if (!toks.length) return true;
     const hay = `${r.name} ${r.id}`.toLowerCase();
     return toks.every((tk) => hay.includes(tk));
   });
@@ -31,7 +37,7 @@ function renderGrid(): string {
   const list = filtered();
   if (!list.length) return emptyState(t("tplNone") || "No templates here yet.", "📭");
   const cls = curDensity === "compact" ? "wd-tplgrid wd-tplgrid--compact" : "wd-tplgrid";
-  return `<div class="${cls}">${list.map(templateCard).join("")}</div>`;
+  return `<div class="${cls}">${list.map((r) => templateCard(r, curChip)).join("")}</div>`;
 }
 
 export function browseScreen(): PanelScreen {
@@ -60,6 +66,14 @@ export function browseScreen(): PanelScreen {
             curDensity,
           )}</span>
         </div>
+        <div style="display:flex;gap:12px;align-items:center;margin-top:6px;font-size:10px;color:var(--sub)">
+          <label style="display:flex;gap:3px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="tpl-unverified"${showUnverified ? " checked" : ""}>${esc(t("tplShowUnverified") || "Show unverified")}
+          </label>
+          <label style="display:flex;gap:3px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="tpl-hideanim"${hideAnimated ? " checked" : ""}>${esc(t("tplHideAnimated") || "Hide animated")}
+          </label>
+        </div>
       </div>
       <div id="tpl-grid">${loading()}</div>`,
     onMount: () => {
@@ -68,7 +82,7 @@ export function browseScreen(): PanelScreen {
         if (!grid) return;
         grid.innerHTML = loading();
         try {
-          rows = await listTemplates(curChip);
+          rows = await listTemplates(curChip, showUnverified);
         } catch {
           grid.innerHTML = errorState(t("tplLoadErr") || "Failed to load templates.");
           return;
@@ -105,6 +119,16 @@ export function browseScreen(): PanelScreen {
         );
       $("tpl-search")?.addEventListener("input", (e) => {
         search = (e.target as HTMLInputElement).value;
+        rerender();
+      });
+      // Show unverified → changes the server query, so refetch.
+      $("tpl-unverified")?.addEventListener("change", (e) => {
+        showUnverified = (e.target as HTMLInputElement).checked;
+        load();
+      });
+      // Hide animated → client-side filter, re-render only.
+      $("tpl-hideanim")?.addEventListener("change", (e) => {
+        hideAnimated = (e.target as HTMLInputElement).checked;
         rerender();
       });
       $("tpl-reload")?.addEventListener("click", load);

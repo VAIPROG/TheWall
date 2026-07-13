@@ -14,8 +14,10 @@ import { makeStackScreens, buildTemplatesPane } from "../../src/ui/templates/she
   assert.strictEqual(typeof s.browse().render, "function");
   assert.strictEqual(typeof detail.render, "function");
   assert.strictEqual(typeof publish.render, "function");
-  // detail embeds its id; publish is a distinct titled screen.
-  assert.ok(detail.render().includes("abc"), "detail render embeds id");
+  // Detail fetches its template on mount, so render() shows a loading shell
+  // with the drill-in container rather than embedding the id.
+  assert.ok(detail.render().includes("tpl-detail"), "detail render hosts the detail container");
+  assert.ok(detail.title, "detail has a title");
   assert.strictEqual(publish.title, "Publish");
 }
 
