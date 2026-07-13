@@ -4,14 +4,15 @@ import { t } from "./i18n";
 import { cfg } from "./config";
 import { VERSION } from "./constants";
 import { injectStyle } from "./styles";
-import { applyTheme, applyUiScale, applyCozy, watchSiteTheme } from "./theme";
+import { applyTheme, applyUiScale, applyCozy, applyPixelIcons, watchSiteTheme } from "./theme";
+import { injectIconFilter } from "./ui/kit/icons";
 import { renderOverlay, updateLockBtn } from "./overlay";
+import { initGuide } from "./guide";
 import { wireUI } from "./ui-wire";
 import { syncProfile, loadGuilds, refreshNotifications } from "./data";
 import { buildOverlayPane } from "./ui/overlay-tab";
 import { buildSharePane } from "./ui/share-tab";
-import { buildTemplatesPane } from "./ui/templates-tab";
-import { buildProtectPane } from "./ui/build-protect";
+import { buildTemplatesPane } from "./ui/templates/shell";
 import { buildMailPane } from "./ui/build-mail";
 import { buildSocialPane } from "./ui/build-social";
 import { buildProfilePane } from "./ui/profile-tab";
@@ -39,7 +40,6 @@ export function buildUI(): void {
               <div class="wp-tab active" data-p="ov">${ic("grid")}${t("tabOverlay")}</div>
               <div class="wp-tab" data-p="sh">${ic("send")}${t("tabShare")}</div>
               <div class="wp-tab" data-p="tp">${ic("disk")}${t("tabTpl")}</div>
-              <div class="wp-tab" data-p="pt">${ic("shield")}${t("tabProtect")}</div>
               <div class="wp-tab" data-p="ma">${ic("bell")}Mail</div>
               <div class="wp-tab" data-p="so">${ic("globe")}${t("tabSocial")}</div>
               <div class="wp-tab" data-p="pr">${ic("user")}${t("tabProfile")}</div>
@@ -55,8 +55,6 @@ export function buildUI(): void {
               ${buildSharePane()}
               <!-- TEMPLATES (catalog only — upload moved to Share tab) -->
               ${buildTemplatesPane()}
-              <!-- PROTECT -->
-              ${buildProtectPane()}
               <!-- MAIL -->
               ${buildMailPane()}
               <!-- SOCIAL -->
@@ -92,6 +90,8 @@ export function buildUI(): void {
   applyTheme();
   applyUiScale();
   applyCozy();
+  injectIconFilter(document);
+  applyPixelIcons();
   watchSiteTheme();
   wireUI(win);
   syncProfile();
@@ -99,4 +99,6 @@ export function buildUI(): void {
   refreshNotifications();
   renderOverlay();
   updateLockBtn();
+  // Layers now exist — restore the saved guide layer + apply its style.
+  initGuide();
 }
