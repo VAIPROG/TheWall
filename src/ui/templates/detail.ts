@@ -16,7 +16,7 @@ import { confirmDlg, promptDlg } from "../../dialog";
 import { getActiveClient } from "../../backend/index";
 import { decodeAny, primaryLayer } from "../../formats";
 import { applyLayer } from "../../formats/apply-layer";
-import { previewUrl, animatedUrl } from "./api";
+import { previewUrl, animatedUrl, exportUrl, shareLink } from "./api";
 import { computePercentPainted, formatPct } from "./percent";
 import { resetToBrowse } from "./shell";
 
@@ -147,7 +147,10 @@ function render(tpl: FullTpl): string {
   const actions =
     button(t("tplLoad") || "Load onto wall", { variant: "primary", full: true, id: "tpl-d-load", icon: "download" }) +
     `<div style="display:flex;gap:6px;margin-top:6px">` +
+    button(t("tplShareLink") || "Share link", { id: "tpl-d-share", size: "sm", icon: "link" }) +
+    button(t("tplExport") || "Export", { id: "tpl-d-export", size: "sm" }) +
     button(t("tplPin") || "Pin", { id: "tpl-d-pin", size: "sm" }) +
+    `</div><div style="display:flex;gap:6px;margin-top:6px">` +
     button(t("tplCopyId") || "Copy ID", { id: "tpl-d-copyid", size: "sm" }) +
     button(t("tplReport") || "Report", { id: "tpl-d-report", size: "sm" }) +
     (isOwner ? button(t("tplDelete") || "Delete", { id: "tpl-d-delete", size: "sm", variant: "danger" }) : "") +
@@ -235,6 +238,17 @@ export function detailScreen(id: string): PanelScreen {
       $("tpl-d-copyid")?.addEventListener("click", () => {
         void navigator.clipboard?.writeText(id);
         toast(t("tplCopyId") || "Copy ID", t("tplCopied") || "Copied to clipboard.");
+      });
+      $("tpl-d-share")?.addEventListener("click", () => {
+        const link = shareLink(id);
+        if (!link) return;
+        void navigator.clipboard?.writeText(link);
+        const note = tpl.scope === "public" ? "" : " " + (t("tplShareNote") || "(private — recipient must have access)");
+        toast(t("tplShareLink") || "Share link", (t("tplShareCopied") || "Share link copied.") + note);
+      });
+      $("tpl-d-export")?.addEventListener("click", () => {
+        const url = exportUrl(id, "wall-dev");
+        if (url) window.open(url, "_blank", "noopener");
       });
       $("tpl-d-report")?.addEventListener("click", async () => {
         const reason = await promptDlg(

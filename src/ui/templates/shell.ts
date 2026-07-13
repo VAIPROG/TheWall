@@ -8,6 +8,7 @@ import { PanelStack, type PanelScreen } from "../kit/panel-stack";
 import { $ } from "../../helpers";
 import { browseScreen } from "./browse";
 import { detailScreen } from "./detail";
+import { publishScreen, type PublishHandoff } from "./publish";
 
 // Screen factories. Browse/Detail/Publish get their real implementations in
 // later slices; kept behind this indirection so the shell + navigation can be
@@ -15,18 +16,14 @@ import { detailScreen } from "./detail";
 export interface StackScreens {
   browse: () => PanelScreen;
   detail: (id: string) => PanelScreen;
-  publish: (handoff: unknown) => PanelScreen;
+  publish: (handoff?: PublishHandoff) => PanelScreen;
 }
 
 export function makeStackScreens(): StackScreens {
   return {
     browse: () => browseScreen(),
     detail: (id: string) => detailScreen(id),
-    publish: (_handoff: unknown) => ({
-      title: "Publish",
-      render: () => `<div id="tpl-publish" class="wd-empty">Publish (coming next)</div>`,
-      onMount: () => {},
-    }),
+    publish: (handoff?: PublishHandoff) => publishScreen(handoff),
   };
 }
 
@@ -53,8 +50,8 @@ export function openDetail(id: string): void {
 }
 
 /** Push the Publish screen, optionally pre-filled from an Overlay hand-off. */
-export function openPublish(handoff?: unknown): void {
-  stack?.push(screens.publish(handoff ?? {}));
+export function openPublish(handoff?: PublishHandoff): void {
+  stack?.push(screens.publish(handoff));
 }
 
 /** Return to Browse (used after publish/delete). */

@@ -37,11 +37,27 @@ export function wireShare(win: HTMLElement): void {
     if (v) importShare(v);
   });
   $("btn-share")?.addEventListener("click", () => genShare());
-  // Tiny convenience button on Overlay tab → jump to Share tab without
-  // making the user hunt for the new label.
-  $("btn-jump-share")?.addEventListener("click", () => {
-    const t = win.querySelector<HTMLElement>('.wp-tab[data-p="sh"]');
-    t?.click();
+  // Overlay's "Share/Publish" button → jump to the Templates super-tab and open
+  // Publish, pre-filled with the current overlay encoded as the-wall-dev/2.
+  // Built here (dynamic imports) so the overlay/formats deps stay out of the
+  // DOM-free publish screen.
+  $("btn-jump-share")?.addEventListener("click", async () => {
+    const tab = win.querySelector<HTMLElement>('.wp-tab[data-p="tp"]');
+    tab?.click();
+    const { openPublish } = await import("./templates/shell");
+    try {
+      const { overlayData } = await import("../overlay");
+      if (!overlayData?.src && !overlayData?.srcOrig) {
+        openPublish();
+        return;
+      }
+      const { exportCurrentOverlay } = await import("../walldev-config");
+      const { encode } = await import("../formats");
+      const doc = encode(exportCurrentOverlay(), "wall-dev/2") as unknown as Record<string, unknown>;
+      openPublish({ document: doc });
+    } catch {
+      openPublish();
+    }
   });
 
   // ----- Charity import (Bluemarble-style JSON config) ----------------------
