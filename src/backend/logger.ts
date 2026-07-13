@@ -46,7 +46,9 @@ export class BatchLogger {
     this.flushIntervalMs = opts.flushIntervalMs ?? 30_000;
     this.minLevel = opts.level ?? "info";
     this.echo = opts.echo ?? false;
-    if (this.flushIntervalMs > 0) {
+    // Guard `window` so this module is import-safe outside a browser (unit
+    // tests, SSR). In the extension `window` always exists.
+    if (this.flushIntervalMs > 0 && typeof window !== "undefined") {
       this.timer = window.setInterval(() => this.flush(), this.flushIntervalMs);
     }
   }

@@ -178,5 +178,21 @@ export function kitStyles(): string {
 .ov-prog-cell { flex:1; text-align:center; border:1px solid var(--shadow); padding:4px 2px; background:var(--group); }
 .ov-prog-cell .k { font-size:9px; color:var(--sub); text-transform:uppercase; letter-spacing:.5px; }
 .ov-prog-cell .wd-readout { font-size:13px; }
+
+/* Templates Browse — card grid */
+.wd-tplgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:6px; }
+.wd-tplgrid--compact { grid-template-columns:repeat(auto-fill,minmax(60px,1fr)); gap:4px; }
+.wd-tplcard {
+  display:flex; flex-direction:column; align-items:stretch; text-align:center; padding:3px; cursor:pointer;
+  background:var(--field); color:var(--text); font:inherit;
+  border:2px solid; border-color:var(--light) var(--dark) var(--dark) var(--light);
+}
+.wd-tplcard:hover { filter:brightness(1.05); }
+.wd-tplcard:active { border-color:var(--dark) var(--light) var(--light) var(--dark); }
+.wd-tplcard-img { width:100%; aspect-ratio:1/1; object-fit:contain; image-rendering:pixelated; background:var(--group); border:1px solid var(--shadow); }
+.wd-tplcard-name { font-size:10px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wd-tplgrid--compact .wd-tplcard-name { display:none; }
+.wd-tplcard-badges { display:flex; gap:2px; justify-content:center; flex-wrap:wrap; margin-top:1px; }
+.wd-tplcard-badges:empty { display:none; }
 `;
 }

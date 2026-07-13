@@ -99,6 +99,13 @@ export const DICT: Record<string, Record<string, string>> = {
       "0% = exact colour match; higher forgives anti-aliasing / palette drift.",
     publicTpl: "Public (verified)",
     clanTpl: "Clan templates",
+    tplAll: "All",
+    tplPublic: "Public",
+    tplClan: "Clan",
+    tplMine: "Mine",
+    tplSearch: "Search name / id…",
+    tplNone: "No templates here yet.",
+    tplLoadErr: "Failed to load templates.",
     unverified: "Show unverified",
     shareScope: "Share as",
     scopeClan: "Clan only",
@@ -499,6 +506,13 @@ export const DICT: Record<string, Record<string, string>> = {
       "0% = точное совпадение цвета; выше — прощает анти-алиасинг / дрейф палитры.",
     publicTpl: "Публичные (проверенные)",
     clanTpl: "Шаблоны клана",
+    tplAll: "Все",
+    tplPublic: "Общие",
+    tplClan: "Клановые",
+    tplMine: "Свои",
+    tplSearch: "Поиск по имени / id…",
+    tplNone: "Здесь пока нет шаблонов.",
+    tplLoadErr: "Не удалось загрузить шаблоны.",
     unverified: "Показать непроверенные",
     shareScope: "Поделиться как",
     scopeClan: "Только клан",
@@ -809,7 +823,10 @@ export const DICT: Record<string, Record<string, string>> = {
   },
 };
 
-export let lang: string = localStorage.getItem("wall_overlay_lang") ?? "en";
+export let lang: string =
+  (typeof localStorage !== "undefined"
+    ? localStorage.getItem("wall_overlay_lang")
+    : null) ?? "en";
 export let remoteDict: Record<string, string> = {};
 
 export function setRemoteDict(d: Record<string, string>): void {
