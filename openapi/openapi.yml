@@ -275,6 +275,9 @@ paths:
   /users/me/block-list:
     $ref: "./paths/users.yaml#/UsersMeBlockList"
 
+  /users/resolve:
+    $ref: "./paths/users.yaml#/UsersResolve"
+
   /users/me/site-identities:
     $ref: "./paths/users.yaml#/UsersMeSiteIdentities"
 

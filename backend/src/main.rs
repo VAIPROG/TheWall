@@ -597,6 +597,7 @@ async fn main() {
         .route("/api/v3/users/me/keys/{id}", get(routes::v3::users::get_key).patch(routes::v3::users::update_key).delete(routes::v3::users::delete_key))
         .route("/api/v3/users/me/keys/{id}/request-higher-limits", post(routes::v3::users::request_higher_limits))
         .route("/api/v3/users/me/block-list", get(routes::v3::users::get_block_list))
+        .route("/api/v3/users/resolve", post(routes::v3::users::resolve_users))
         .route("/api/v3/users/{user_ref}", get(routes::v3::users::get_user_by_ref))
         .route("/api/v3/users/{user_ref}/socials", get(routes::v3::users::get_user_socials))
         .route("/api/v3/users/{user_ref}/templates", get(routes::v3::users::get_user_templates))

@@ -2,6 +2,50 @@
 # USERS — Profiles, Settings, Identity
 # ══════════════════════════════════════════════════════════════════════
 
+UsersResolve:
+  post:
+    tags: [Users]
+    summary: Resolve user references to UUIDs
+    operationId: resolveUsers
+    description: |
+      Batch-resolve user references (UUID, `@username`, or bare username) to
+      UUIDs. Lets clients accept human-friendly usernames in template access
+      lists (whitelist / blocklist / co-editors) and convert them to the UUIDs
+      the ACL stores. Authenticated to avoid anonymous user-enumeration; capped
+      at 200 refs per request.
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [refs]
+            properties:
+              refs:
+                type: array
+                items: { type: string }
+                example: ["@alice", "bob", "51d07786-6d57-4ae8-aa7e-86f27926ee3b"]
+    responses:
+      "200":
+        description: Resolution result.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolved, unresolved]
+              properties:
+                resolved:
+                  type: object
+                  additionalProperties: { type: string, format: uuid }
+                  description: input ref → resolved UUID
+                unresolved:
+                  type: array
+                  items: { type: string }
+                  description: refs that matched no user
+
 UsersMe:
   get:
     tags: [Users]

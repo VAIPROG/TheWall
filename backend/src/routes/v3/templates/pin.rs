@@ -61,30 +61,54 @@ pub async fn pin(
         return Err((StatusCode::NOT_FOUND, "template not found".to_string()));
     }
 
-    // Assign the next available slot (V3 keeps slots internal for ordering).
-    let slot: i32 = sqlx::query_scalar(
-        "SELECT COALESCE(MAX(slot) + 1, 0) FROM pinned_templates WHERE user_id = $1",
-    )
-    .bind(auth.user_id)
-    .fetch_one(&state.pool)
-    .await
-    .or_500()?;
-
-    let result = sqlx::query(
-        r#"INSERT INTO pinned_templates (user_id, template_id, slot)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (user_id, template_id) DO UPDATE SET pinned_at = NOW()"#,
+    // Slots are constrained to 1..=3 (max three pinned templates per user).
+    // If this template is already pinned, refresh its timestamp and keep its
+    // slot; otherwise assign the lowest free slot, rejecting when all are taken.
+    let existing: Option<i32> = sqlx::query_scalar(
+        "SELECT slot FROM pinned_templates WHERE user_id = $1 AND template_id = $2",
     )
     .bind(auth.user_id)
     .bind(id)
-    .bind(slot)
-    .execute(&state.pool)
+    .fetch_optional(&state.pool)
     .await
     .or_500()?;
 
-    if result.rows_affected() == 0 {
-        return Err((StatusCode::CONFLICT, "already pinned".to_string()));
-    }
+    let slot: i32 = if let Some(slot) = existing {
+        sqlx::query(
+            "UPDATE pinned_templates SET pinned_at = NOW() WHERE user_id = $1 AND template_id = $2",
+        )
+        .bind(auth.user_id)
+        .bind(id)
+        .execute(&state.pool)
+        .await
+        .or_500()?;
+        slot
+    } else {
+        let free: Option<i32> = sqlx::query_scalar(
+            r#"SELECT s FROM generate_series(1, 3) s
+                WHERE s NOT IN (SELECT slot FROM pinned_templates WHERE user_id = $1)
+                ORDER BY s
+                LIMIT 1"#,
+        )
+        .bind(auth.user_id)
+        .fetch_optional(&state.pool)
+        .await
+        .or_500()?;
+
+        let slot = free.ok_or((
+            StatusCode::CONFLICT,
+            "You can pin at most 3 templates. Unpin one first.".to_string(),
+        ))?;
+
+        sqlx::query("INSERT INTO pinned_templates (user_id, template_id, slot) VALUES ($1, $2, $3)")
+            .bind(auth.user_id)
+            .bind(id)
+            .bind(slot)
+            .execute(&state.pool)
+            .await
+            .or_500()?;
+        slot
+    };
 
     let _ = audit::log_action(
         &state.pool,
