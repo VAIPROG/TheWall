@@ -11,6 +11,18 @@ export interface WallConfig {
   theme: "auto" | "light" | "dark";
   uiScale: number;
   cozy: boolean;
+  /** Run kit line icons through the pixelation filter (retro Win95 look). */
+  pixelIcons: boolean;
+  /** Progress-count colour tolerance, as a percent (0 = exact match). Higher
+   *  forgives anti-aliasing / palette drift when counting "done" pixels. */
+  progressTolerancePct: number;
+  /** On-site toast anchor: 3×3 grid (t/m/b × l/c/r). */
+  toastPosition:
+    | "tl" | "tc" | "tr"
+    | "ml" | "mc" | "mr"
+    | "bl" | "bc" | "br";
+  /** On-site toast size. */
+  toastSize: "s" | "m" | "l";
   cursorMode: "off" | "clan";
   cursorSelector: string;
   showUnverified: boolean;
@@ -36,6 +48,12 @@ export interface WallConfig {
   hideAnimatedMine: boolean;
   /** Marker size 10..90% of a pixel. Only used when compactMarkers is on. */
   compactMarkerSize: number;
+  /** Guide layer (local-only annotation canvas) settings. */
+  guideMode: "pixels" | "dots";
+  guideOpacity: number;
+  guideColor: string;
+  guideBrush: number;
+  guideVisible: boolean;
   /** Show a toast / OS notification when paint refills from 0. */
   notifyOnPaintRefill: boolean;
   /** Play a short WebAudio chime when paint refills from 0. */
@@ -68,6 +86,10 @@ const DEFAULT_CFG: WallConfig = {
   theme: "auto",
   uiScale: 1,
   cozy: true,
+  pixelIcons: false,
+  progressTolerancePct: 3,
+  toastPosition: "br",
+  toastSize: "m",
   cursorMode: "off",
   cursorSelector: '[class*="cursor"]',
   showUnverified: false,
@@ -81,6 +103,11 @@ const DEFAULT_CFG: WallConfig = {
   hideAnimatedClan: false,
   hideAnimatedMine: false,
   compactMarkerSize: 40,
+  guideMode: "pixels",
+  guideOpacity: 0.85,
+  guideColor: "#ff2bd6",
+  guideBrush: 1,
+  guideVisible: true,
   notifyOnPaintRefill: true,
   paintRefillSound: true,
   paintRefillVolume: 0.35,

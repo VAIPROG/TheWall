@@ -1,4 +1,5 @@
 import { $ } from "./helpers";
+import { kitStyles } from "./ui/kit/styles";
 
 export function styleSheet(): string {
   return `
@@ -162,6 +163,19 @@ export function styleSheet3(): string {
 .picking-mode{cursor:crosshair !important}
 #walldev-toasts{position:fixed;right:16px;bottom:16px;z-index:1000001;display:flex;flex-direction:column;gap:6px;--bg:#c0c0c0;--light:#fff;--dark:#404040;--text:#000}
 #walldev-toasts.wd-dark{--bg:#2c2c2c;--light:#5a5a5a;--dark:#000;--text:#fff}
+/* toast anchor (3×3) — each fully specifies its corner and resets the rest */
+#walldev-toasts.wd-tp-tl{top:16px;left:16px;right:auto;bottom:auto;transform:none}
+#walldev-toasts.wd-tp-tc{top:16px;left:50%;right:auto;bottom:auto;transform:translateX(-50%);align-items:center}
+#walldev-toasts.wd-tp-tr{top:16px;right:16px;left:auto;bottom:auto;transform:none;align-items:flex-end}
+#walldev-toasts.wd-tp-ml{top:50%;left:16px;right:auto;bottom:auto;transform:translateY(-50%)}
+#walldev-toasts.wd-tp-mc{top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);align-items:center}
+#walldev-toasts.wd-tp-mr{top:50%;right:16px;left:auto;bottom:auto;transform:translateY(-50%);align-items:flex-end}
+#walldev-toasts.wd-tp-bl{bottom:16px;left:16px;right:auto;top:auto;transform:none}
+#walldev-toasts.wd-tp-bc{bottom:16px;left:50%;right:auto;top:auto;transform:translateX(-50%);align-items:center}
+#walldev-toasts.wd-tp-br{bottom:16px;right:16px;left:auto;top:auto;transform:none;align-items:flex-end}
+/* toast size */
+#walldev-toasts.wd-ts-s .wp-toast{font-size:10px;padding:5px 8px;max-width:220px}
+#walldev-toasts.wd-ts-l .wp-toast{font-size:14px;padding:9px 13px;max-width:320px}
 .wp-toast{background:var(--bg);color:var(--text);border:2px solid;border-color:var(--light) var(--dark) var(--dark) var(--light);
   padding:7px 10px;max-width:260px;font:11px "MS Sans Serif",Tahoma,sans-serif;box-shadow:2px 2px 5px rgba(0,0,0,.5);transition:opacity .4s}
 #walldev-reopen{--bg:#c0c0c0;--light:#fff;--dark:#404040;--text:#000}
@@ -321,6 +335,6 @@ export function injectStyle(): void {
   const s = document.createElement("style");
   s.id = "walldev-style";
   s.textContent =
-    styleSheet() + styleSheet2() + styleSheet3() + styleSheetMobile();
+    styleSheet() + styleSheet2() + styleSheet3() + styleSheetMobile() + kitStyles();
   document.head.appendChild(s);
 }

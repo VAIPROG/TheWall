@@ -159,7 +159,7 @@ export async function syncProfile(): Promise<void> {
     const discordTag = prof.discord_username ? `@${esc(prof.discord_username)}` : (prof.discord_id ? `discord #${esc(prof.discord_id)}` : "");
     const client = getActiveClient();
     card.innerHTML = `<div class="wp-card">
-      ${avImg(avatarSrcs(prof.id, prof.discord_id, client?.url ?? "", !!(getMe() && getMe()!.has_custom_avatar)))}
+      ${avImg(avatarSrcs(prof.id, prof.discord_id, client?.rootUrl ?? "", !!(getMe() && getMe()!.has_custom_avatar)))}
       <div style="flex:1">
         <div class="nm">${esc(prof.username)} <span class="sub">#${prof.id}</span>${roleBadge(role)}</div>
         <div class="sub">wall: <b>${esc(prof.username)}</b>${discordTag ? ` · discord: <b>${discordTag}</b>` : ""}</div>
@@ -234,7 +234,7 @@ export async function loadRoster(): Promise<void> {
       (ms || [])
         .map((m) => {
           const member = m as ClanMember;
-          return `<div class="wp-li">${avImg(avatarSrcs(member.id, member.discord_id, client.url, !!member.has_custom_avatar), "")}
+          return `<div class="wp-li">${avImg(avatarSrcs(member.id, member.discord_id, client.rootUrl, !!member.has_custom_avatar), "")}
           <div><b>${esc(member.username)}</b> ${roleBadge(member.clan_role || member.role)}<br><span class="sub">cursor ${esc(member.cursor_id || "?")}</span></div></div>`;
         })
         .join("") ||
@@ -542,8 +542,8 @@ export async function sendClanMessage(): Promise<void> {
 
 function templateRow(tp: LegacyTemplate, opts: { pending?: boolean; pub?: boolean }): string {
   const client = getActiveClient();
-  const thumb = client?.base && tp.id != null
-    ? `<img src="${client.url}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" class="wp-tpl-thumb" loading="lazy" onerror="this.style.opacity=0.3">`
+  const thumb = client?.rootUrl && tp.id != null
+    ? `<img src="${client.rootUrl}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" class="wp-tpl-thumb" loading="lazy" onerror="this.style.opacity=0.3">`
     : '<div class="ph"></div>';
   const isPending = opts.pending || tp.status === "pending";
   const badge = isPending

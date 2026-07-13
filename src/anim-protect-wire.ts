@@ -89,16 +89,20 @@ async function myClanId(): Promise<string | null> {
 
 function updateAnimStatus(): void {
   const elStatus = $("anim-status");
-  if (!elStatus) return;
   const rt = getOverlayAnimRuntime();
+  // Compact headline shown on the Overlay's Animation drill row.
+  const elRow = $("ov-row-anim-hl");
   if (!rt) {
-    elStatus.textContent = t("animStatusOff");
+    if (elStatus) elStatus.textContent = t("animStatusOff");
+    if (elRow) elRow.textContent = t("animStatusOff");
     return;
   }
   const frame = rt.frameAt(Date.now());
-  elStatus.textContent =
+  const full =
     `${rt.name} · ${rt.kind} · frame ${frame + 1}/${rt.frameCount} ` +
     `(${rt.frameWidth}×${rt.frameHeight})`;
+  if (elStatus) elStatus.textContent = full;
+  if (elRow) elRow.textContent = `▶ ${rt.frameCount}f · ${rt.kind}`;
 }
 
 /** Fill the advanced fields from the active animation (or sheet defaults). */

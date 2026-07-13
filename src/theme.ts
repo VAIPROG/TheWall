@@ -49,6 +49,11 @@ export function applyCozy(): void {
   if (el) el.classList.toggle("wd-cozy", !!cfg.cozy);
 }
 
+export function applyPixelIcons(): void {
+  const el = $("walldev-tool");
+  if (el) el.classList.toggle("wd-pixel-icons", !!cfg.pixelIcons);
+}
+
 let themeObs: MutationObserver | null = null;
 
 export function watchSiteTheme(): void {

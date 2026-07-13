@@ -21,7 +21,8 @@
     "test:backend:live": "cargo test --manifest-path backend/Cargo.toml -- --ignored",
     "test:all": "bun scripts/test.ts --backend",
     "openapi": "bun scripts/gen-openapi.ts",
-    "docs": "bun scripts/gen-docs.ts"
+    "docs": "bun scripts/gen-docs.ts",
+    "icons": "bun scripts/gen-icons-preview.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",

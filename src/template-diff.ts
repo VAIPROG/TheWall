@@ -14,6 +14,14 @@
  *  practice matches are exact; the tolerance only absorbs sub-quant noise. */
 export const COLOR_MATCH_TOL = 24;
 
+/** Map a user-facing 0–100% progress tolerance to the sum-of-abs-RGB threshold
+ *  this core uses (max 765 = 3×255). 0% → exact (tol 1). Dependency-free so it
+ *  can be unit-tested without a DOM. */
+export function toleranceFromPct(pct: number): number {
+  const clamped = Math.max(0, Math.min(100, pct || 0));
+  return Math.max(1, Math.round((clamped / 100) * 765));
+}
+
 /** Sum-of-abs-RGB closeness test. Inlinable; the ONLY match predicate in the
  *  codebase. Alpha is intentionally ignored — callers gate on template alpha. */
 export function colorClose(

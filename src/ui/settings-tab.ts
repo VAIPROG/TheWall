@@ -2,14 +2,14 @@ import { $, esc, errMsg } from "../helpers";
 import { ic } from "../icons";
 import { t } from "../i18n";
 import { cfg, saveCfg } from "../config";
-import { applyTheme, applyUiScale, applyCozy } from "../theme";
+import { applyTheme, applyUiScale, applyCozy, applyPixelIcons } from "../theme";
 import { applyCursorMode } from "../cursors";
 import { loadRemoteI18n, backendConnect } from "../data";
 import { reloadEmotes } from "../emoji";
 import { confirmDlg, errorDlg, infoDlg, promptDlg } from "../dialog";
-import { toast } from "../notify";
+import { toast, applyToastPlacement } from "../notify";
 import { WallEvents } from "../events";
-import { getActiveClient, api } from "../backend/index";
+import { getActiveClient, api, getMe } from "../backend/index";
 import { manualCheck, skipVersion, cmpVersion } from "../update-check";
 import { VERSION } from "../constants";
 import { playPaintRefillSound } from "../paint-sound";
@@ -33,6 +33,34 @@ export function wireSettings(_win: HTMLElement): void {
     saveCfg();
     applyCozy();
   });
+  $("cfg-pixel-icons")?.addEventListener("change", (e: Event) => {
+    cfg.pixelIcons = (e.target as HTMLInputElement).checked;
+    saveCfg();
+    applyPixelIcons();
+  });
+
+  // --- Notification toasts: 3×3 position + size ---
+  document.querySelectorAll<HTMLElement>(".wd-toast-pos").forEach((b) => {
+    b.addEventListener("click", () => {
+      cfg.toastPosition = (b.dataset.toastPos || "br") as typeof cfg.toastPosition;
+      saveCfg();
+      applyToastPlacement();
+      document.querySelectorAll<HTMLElement>(".wd-toast-pos").forEach((x) => {
+        const on = x.dataset.toastPos === cfg.toastPosition;
+        x.style.background = on ? "var(--accent)" : "";
+        x.style.color = on ? "#fff" : "";
+      });
+      toast(t("notifToasts"), `→ ${cfg.toastPosition.toUpperCase()}`);
+    });
+  });
+  $("cfg-toast-size")?.addEventListener("change", (e: Event) => {
+    cfg.toastSize = (e.target as HTMLSelectElement).value as typeof cfg.toastSize;
+    saveCfg();
+    applyToastPlacement();
+  });
+  $("btn-toast-test")?.addEventListener("click", () =>
+    toast(t("notifToasts"), t("toastTestBody")),
+  );
   $("lang-select")!.addEventListener("change", (e: Event) => {
     localStorage.setItem(
       "wall_overlay_lang",
@@ -167,12 +195,52 @@ export function wireSettings(_win: HTMLElement): void {
   });
   renderEmoteChannels();
 
+  // Connection / account card
+  const updateConnCard = () => {
+    const connected = !!cfg.backendToken;
+    const on = $("se-conn-on");
+    const off = $("se-conn-off");
+    if (on) on.style.display = connected ? "" : "none";
+    if (off) off.style.display = connected ? "none" : "";
+    const card = $("se-conn-card");
+    if (card) card.style.borderLeftColor = connected ? "var(--ok)" : "var(--warn)";
+    if (!connected) return;
+    const me = getMe() as any;
+    const nameEl = $("se-conn-name");
+    if (nameEl) nameEl.textContent = me?.username || "connected";
+    const role = String(me?.globalRole || me?.global_role || me?.role || "").toLowerCase();
+    const roleEl = $("se-conn-role");
+    if (roleEl) {
+      const show = role && role !== "user";
+      roleEl.textContent = role;
+      roleEl.style.display = show ? "" : "none";
+    }
+    const st = $("se-conn-status");
+    if (st) st.textContent = "● connected · " + cfg.backendUrl.replace(/^https?:\/\//, "");
+    const av = $("se-conn-avatar") as HTMLImageElement | null;
+    if (av && me?.id) {
+      av.style.visibility = "";
+      av.src = `${getActiveClient()?.rootUrl ?? ""}/avatar?userId=${encodeURIComponent(String(me.id))}`;
+    }
+  };
+  const connectThenSync = async () => {
+    await backendConnect();
+    setTimeout(updateConnCard, 500);
+  };
+  $("se-conn-btn")?.addEventListener("click", connectThenSync);
+  $("se-conn-disc")?.addEventListener("click", connectThenSync);
+  document.addEventListener("wd:profile-loaded", updateConnCard);
+  updateConnCard();
+
   // Backend URL + connect
   $("cfg-backend-url")!.addEventListener("change", (e: Event) => {
     cfg.backendUrl = (e.target as HTMLInputElement).value.trim();
     saveCfg();
   });
-  $("btn-backend-connect")!.addEventListener("click", backendConnect);
+  $("btn-backend-connect")!.addEventListener("click", async () => {
+    await backendConnect();
+    setTimeout(updateConnCard, 500);
+  });
 
   // Toggles
   $("cfg-intercept")!.addEventListener("change", (e: Event) => {
@@ -320,6 +388,20 @@ export function wireSettings(_win: HTMLElement): void {
 
 export function buildSettingsPane(): string {
   return `<div class="wp-pane" data-p="se">
+                  <!-- connection / account card — filled by updateConnCard() -->
+                  <div class="wd-card" id="se-conn-card" style="margin-bottom:8px;border-left:3px solid var(--ok)">
+                      <div id="se-conn-on" style="display:none">
+                          <div style="display:flex;gap:8px;align-items:center">
+                              <img id="se-conn-avatar" alt="" style="width:34px;height:34px;flex:none;border-radius:3px;background:var(--group)" onerror="this.style.visibility='hidden'">
+                              <div style="flex:1;min-width:0"><b id="se-conn-name"></b> <span class="wd-badge" id="se-conn-role" style="display:none"></span><br><span class="wd-status wd-status--ok" id="se-conn-status"></span></div>
+                              <button class="wd-btn" id="se-conn-disc">${t("disconnect")}</button>
+                          </div>
+                      </div>
+                      <div id="se-conn-off">
+                          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span style="font-size:22px">🔌</span><div><b>${t("notConnected")}</b><br><span class="wd-status wd-status--warn">${t("notConnectedHint")}</span></div></div>
+                          <button class="wd-btn wd-btn--primary wd-btn--full" id="se-conn-btn">${ic("plug")}${t("connect")}</button>
+                      </div>
+                  </div>
                   <div class="wp-section-hdr">${ic("user", 10)} Display</div>
                   <div class="wp-group"><div class="wp-legend">${ic("moon")}${t("theme")}</div>
                       <select id="cfg-theme" class="wp-input" style="font:11px sans-serif">
@@ -330,6 +412,31 @@ export function buildSettingsPane(): string {
                       <div class="wp-legend" style="position:static;margin-top:8px">${t("uiScale")}: <span id="uiscale-val">${Math.round(cfg.uiScale * 100)}%</span></div>
                       <input type="range" id="cfg-uiscale" min="0.8" max="1.6" step="0.1" value="${cfg.uiScale}" style="width:100%">
                       <label class="wp-check"><input type="checkbox" id="cfg-cozy" ${cfg.cozy ? "checked" : ""}> ${t("cozy")}</label>
+                      <label class="wp-check"><input type="checkbox" id="cfg-pixel-icons" ${cfg.pixelIcons ? "checked" : ""}> ${t("pixelIcons")}</label>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("bell")}${t("notifToasts")}</div>
+                      <div style="display:flex;gap:10px;align-items:flex-start">
+                          <div>
+                              <div class="wp-note" style="color:var(--sub);font-size:10px;margin-bottom:3px">${t("toastPosition")}</div>
+                              <div id="toast-pos-grid" style="display:grid;grid-template-columns:repeat(3,20px);grid-template-rows:repeat(3,20px);gap:2px">
+                                  ${["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"]
+                                    .map(
+                                      (p) =>
+                                        `<button class="wp-btn wd-toast-pos" data-toast-pos="${p}" style="width:20px;height:20px;min-width:0;padding:0;margin:0;${cfg.toastPosition === p ? "background:var(--accent);color:#fff" : ""}" title="${p}"></button>`,
+                                    )
+                                    .join("")}
+                              </div>
+                          </div>
+                          <div style="flex:1">
+                              <div class="wp-note" style="color:var(--sub);font-size:10px;margin-bottom:3px">${t("toastSize")}</div>
+                              <select id="cfg-toast-size" class="wp-input" style="font:11px sans-serif">
+                                  <option value="s" ${cfg.toastSize === "s" ? "selected" : ""}>S</option>
+                                  <option value="m" ${cfg.toastSize === "m" ? "selected" : ""}>M</option>
+                                  <option value="l" ${cfg.toastSize === "l" ? "selected" : ""}>L</option>
+                              </select>
+                              <button class="wp-btn" id="btn-toast-test" style="margin-top:6px;width:100%">${t("toastTest")}</button>
+                          </div>
+                      </div>
                   </div>
                   <div class="wp-group"><div class="wp-legend">${t("lang")}</div>
                       <select id="lang-select" class="wp-input" style="font:11px sans-serif">

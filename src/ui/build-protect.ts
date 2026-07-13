@@ -2,8 +2,10 @@ import { ic } from "../icons";
 import { t } from "../i18n";
 import { scopeOptions } from "./build-shared";
 
+// Returns the Protect controls as inner content only (no `.wp-pane` wrapper) —
+// it is embedded as the "Protect regions" drill-in inside the Overlay pane.
 export function buildProtectPane(): string {
-  return `<div class="wp-pane" data-p="pt">
+  return `
                   <div class="wp-group"><div class="wp-legend">${ic("shield")}${t("protectLegend")}</div>
                       <div class="wp-row">
                           <div>${t("protectTolerance")}<input type="number" id="protect-tolerance" class="wp-input" min="0" max="100" step="0.5" value="0"></div>
@@ -27,6 +29,5 @@ export function buildProtectPane(): string {
                   </div>
                   <div class="wp-group"><div class="wp-legend">${ic("disk")}${t("protectLocalList")}</div>
                       <div class="wp-list" id="protect-list-local"><div style="padding:6px;color:var(--sub)">—</div></div>
-                  </div>
-              </div>`;
+                  </div>`;
 }
