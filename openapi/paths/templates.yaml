@@ -12,6 +12,11 @@ Templates:
       listed without authentication. Clan and private templates are only
       included when the caller is authenticated (Bearer, API key, or session).
       Filter by scope, status, author, clan, position range, text search.
+
+      **Access control.** The document access block (`usersWhitelist`,
+      `usersBlocklist`, `allowedToEdit`) is enforced here: templates the caller
+      may not view are silently omitted from the list rather than surfaced.
+      `domainsWhitelist` is CLIENT-SIDE only and is never enforced by the backend.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/SessionQuery"
@@ -187,7 +192,16 @@ TemplateById:
       Returns the full template details including the the-wall-dev/2 document.
       Public approved templates are readable without authentication. Clan and
       private templates require one of: Bearer JWT, API key, `?session` token,
-      or the per-template `?password`.
+      or the per-template `?password`. The `?password` and `?session` query
+      params power share links to private templates without exposing the
+      owner's long-term credentials.
+
+      **Access control.** The document access block is enforced on read:
+      `usersWhitelist` / `usersBlocklist` gate viewing and `allowedToEdit`
+      grants co-edit access. When a template exists but the caller may not
+      view it, the server returns **`404 Not Found`** (not `403`) so the
+      response never leaks the existence of a template the caller cannot see.
+      `domainsWhitelist` is CLIENT-SIDE only and is never enforced here.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -236,8 +250,16 @@ TemplateById:
       Flexible partial edit of a stored template. Supports changing scope/clan,
       patching document-level metadata (notes, contacts, access control,
       author visibility), and applying layer operations (add, remove, move,
-      update) to document.templates[]. Only owner or moderators. Significant
-      changes may re-trigger the moderation queue.
+      update) to document.templates[]. Significant changes may re-trigger the
+      moderation queue.
+
+      **Access control.** Edit rights are enforced on PATCH: the owner,
+      moderators, and any co-editor listed in the document `allowedToEdit`
+      block (`userIds` / `clanIds`) may patch; everyone else is rejected. Note
+      that when the caller lacks even *view* access (per `usersWhitelist` /
+      `usersBlocklist`), the endpoint returns **`404 Not Found`** rather than
+      `403` to avoid leaking the template's existence. The access block itself
+      is set here via `doc.access` (co-editors) and mirrored from create.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -318,7 +340,11 @@ TemplatePreview:
       appearance (Charity and other consumers have no native `scale` field).
       Defaults to layer 0 and size 128. Public approved templates are
       readable without authentication; clan/private templates require auth,
-      session, or password.
+      session, or password (the `?session` and `?password` query params power
+      share links). The document access block (`usersWhitelist` /
+      `usersBlocklist` / `allowedToEdit`) is enforced on render; when the
+      caller may not view the template the server returns `404` (not `403`) so
+      it never leaks the template's existence.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -365,7 +391,11 @@ TemplatePng:
       and similar tools cannot scale images themselves. Use `?layer={idx}` to
       select a layer other than the first one. Public approved templates are
       readable without authentication; clan/private templates require auth,
-      session, or password.
+      session, or password (the `?session` and `?password` query params power
+      share links). The document access block (`usersWhitelist` /
+      `usersBlocklist` / `allowedToEdit`) is enforced on render; when the
+      caller may not view the template the server returns `404` (not `403`) so
+      it never leaks the template's existence.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -404,7 +434,11 @@ TemplateAnimated:
       overrides, and the looping flag. Layers with no `animation` block fall
       back to a single still PNG, so this endpoint is always safe to point an
       `<img>` at. Public approved templates are readable without authentication;
-      clan/private templates require auth, session, or password.
+      clan/private templates require auth, session, or password (the `?session`
+      and `?password` query params power share links). The document access block
+      (`usersWhitelist` / `usersBlocklist` / `allowedToEdit`) is enforced on
+      render; when the caller may not view the template the server returns `404`
+      (not `403`) so it never leaks the template's existence.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -465,7 +499,11 @@ TemplateCharity:
       consume `data:` URLs and has no native `scale` field; the PNG endpoint
       bakes the layer's scale into the rendered image. Public approved
       templates are readable without authentication; clan/private templates
-      require auth, session, or password.
+      require auth, session, or password (the `?session` and `?password` query
+      params power share links). The document access block (`usersWhitelist` /
+      `usersBlocklist` / `allowedToEdit`) is enforced on export; when the caller
+      may not view the template the server returns `404` (not `403`) so it never
+      leaks the template's existence.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -494,7 +532,12 @@ TemplateWallDev:
       canonical stored form — no conversion is applied. Includes full
       metadata, animation, access control, contacts, and multi-source
       image fallback lists. Public approved templates are readable without
-      authentication; clan/private templates require auth, session, or password.
+      authentication; clan/private templates require auth, session, or password
+      (the `?session` and `?password` query params power share links). The
+      document access block (`usersWhitelist` / `usersBlocklist` /
+      `allowedToEdit`) is enforced on export; when the caller may not view the
+      template the server returns `404` (not `403`) so it never leaks the
+      template's existence.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"

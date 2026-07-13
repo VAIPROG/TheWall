@@ -1,5 +1,10 @@
 ErrorResponse:
   type: object
+  description: |
+    Structured error envelope returned by every 4xx/5xx response. The body is
+    always a single `error` object carrying a machine-readable `code`, a
+    human-readable `message`, and a `traceId` that can be quoted in support
+    requests to correlate the failure with server logs.
   required:
     - error
   properties:
@@ -11,17 +16,33 @@ ErrorResponse:
       properties:
         code:
           type: string
-          description: Machine-readable error code in UPPER_SNAKE_CASE.
-          example: "INVALID_INPUT"
+          description: |
+            Machine-readable error category. One of the structured categories
+            (`not_found`, `forbidden`, `unauthorized`, `bad_request`,
+            `conflict`, `rate_limited`, `internal`) or a more specific legacy
+            `UPPER_SNAKE_CASE` identifier.
+          example: "not_found"
         message:
           type: string
           description: Human-readable error description.
           example: "The request body contains invalid fields."
+        traceId:
+          type: string
+          format: uuid
+          description: |
+            Correlation id for this failure. Quotable in support requests to
+            locate the corresponding entry in the server logs.
+          example: "b6a8c3d4-1e2f-4a5b-8c9d-0e1f2a3b4c5d"
         details:
           type: object
           nullable: true
           description: Additional error details.
           example: null
+
+# Alias for the structured error envelope. Reference this (or the equivalent
+# shared error responses) from the 4xx/5xx responses of any endpoint.
+Error:
+  $ref: "#/ErrorResponse"
 
 SuccessMessage:
   type: object

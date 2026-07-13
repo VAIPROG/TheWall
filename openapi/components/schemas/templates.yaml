@@ -43,13 +43,13 @@ WallDevDocument:
       items:
         type: string
         format: hostname
-      description: Allowed domains. CLIENT-SIDE enforcement only.
+      description: Allowed domains. CLIENT-SIDE enforcement only (the backend never gates on domain).
     usersWhitelist:
       type: array
       items:
         type: string
         format: uuid
-      description: User IDs ALLOWED to view. BACKEND MUST ENFORCE.
+      description: User IDs ALLOWED to view. BACKEND MUST ENFORCE. Empty/absent = no restriction.
     usersBlocklist:
       type: array
       items:
@@ -194,7 +194,7 @@ WallDevContacts:
 
 WallDevAccessControl:
   type: object
-  description: Edit permissions ACL. BACKEND MUST ENFORCE.
+  description: Co-editors beyond the owner. BACKEND MUST ENFORCE on PATCH.
   properties:
     userIds:
       type: array
@@ -434,6 +434,9 @@ TemplateSummaryV3:
         True when the `document` column is non-NULL (i.e. the row has been
         backfilled to the the-wall-dev/2 format). When false, the `/wall-dev`
         and `/charity` export endpoints will return 409 Conflict.
+    templateCount:
+      type: integer
+      description: "Number of templates in the document bundle (`document.templates[]`); 1 for a single template."
 
 Template:
   type: object
