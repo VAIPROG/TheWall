@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "the-wall-backend"
-version = "6.2.1"
+version = "6.2.3"
 dependencies = [
  "axum",
  "base64",

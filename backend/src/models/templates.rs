@@ -111,6 +111,11 @@ pub struct TemplateSummary {
     /// 1 for a single template. Queries that don't project it default to 0.
     #[sqlx(default)]
     pub template_count: i32,
+    /// True when any layer carries a sprite-sheet `animation` block, i.e. the
+    /// template renders as an animated GIF. Queries that don't project it
+    /// default to false.
+    #[sqlx(default)]
+    pub animated: bool,
 }
 
 /// Paginated template list (offset pagination) — used by the moderation queue.

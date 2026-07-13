@@ -115,7 +115,8 @@ pub async fn list(
         r#"SELECT id, user_id, name, x, y, scale, scope, status,
                   version, clan_id, verified_at, created_at,
                   (document IS NOT NULL) AS has_document,
-                  COALESCE(jsonb_array_length(document -> 'templates'), 1) AS template_count
+                  COALESCE(jsonb_array_length(document -> 'templates'), 1) AS template_count,
+                  COALESCE(document @? '$.templates[*].layers[*].animation', false) AS animated
              FROM templates
             WHERE ($1::text IS NULL OR scope = $1)
               AND ($2::text IS NULL OR status = $2)

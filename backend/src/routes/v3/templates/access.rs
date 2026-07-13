@@ -94,11 +94,20 @@ impl FromRequestParts<AppState> for TemplateAccess {
             }
         }
 
-        // 3. Try session query param.
+        // 3. Try session query param. `<img>`/`<gif>` tags can't send an
+        //    Authorization header, so preview/animated URLs pass credentials
+        //    here instead: either an opaque session token, or — as a fallback —
+        //    a Bearer JWT (the extension only holds the JWT, not a session id).
         if context.user_id.is_none() {
             if let Some(token) = query.session.as_deref() {
                 if let Some(uid) = verify_session(&state.pool, token).await {
                     context.user_id = Some(uid);
+                } else if token.chars().filter(|&c| c == '.').count() >= 2 {
+                    if let Ok(claims) = crate::auth::verify_token(token, &state.config.jwt_secret) {
+                        if let Ok(uid) = Uuid::parse_str(&claims.sub) {
+                            context.user_id = Some(uid);
+                        }
+                    }
                 }
             }
         }

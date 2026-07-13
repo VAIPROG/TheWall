@@ -437,6 +437,12 @@ TemplateSummaryV3:
     templateCount:
       type: integer
       description: "Number of templates in the document bundle (`document.templates[]`); 1 for a single template."
+    animated:
+      type: boolean
+      description: |
+        True when any layer carries a sprite-sheet `animation` block — i.e. the
+        template renders as an animated GIF via `/animated`. False for static
+        templates and rows without a backfilled document.
 
 Template:
   type: object
