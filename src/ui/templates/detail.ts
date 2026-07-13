@@ -66,10 +66,18 @@ function docAnimated(doc?: WallDoc | null): boolean {
 
 function authorLabel(tpl: FullTpl): string {
   const anon = t("tplAnonymous") || "Anonymous";
+  // Prefer the document's author (honours author_visibility): object → show the
+  // nickname, "anon"/null → anonymous. Fall back to the row column for older
+  // rows that predate the structured author.
+  const da = (tpl.document as { author?: unknown } | null | undefined)?.author;
+  if (da === "anon" || da === null) return anon;
+  if (da && typeof da === "object") {
+    const o = da as { name?: string; id?: string };
+    return o.name || (o.id ? o.id.slice(0, 8) : anon);
+  }
   const a = tpl.author;
   if (!a || a === "anon" || a === "anonymous") return anon;
-  if (typeof a === "string") return a;
-  return a.username || a.name || (a.id ? a.id.slice(0, 8) : anon);
+  return typeof a === "string" ? a : a.username || a.name || (a.id ? a.id.slice(0, 8) : anon);
 }
 
 function fmtDate(s?: string): string {
@@ -145,13 +153,22 @@ function render(tpl: FullTpl): string {
         })
       : "";
 
+  const labelRow = (label: string, buttons: string) =>
+    `<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span style="font-size:10px;color:var(--sub);min-width:66px">${esc(label)}</span>${buttons}</div>`;
+
   const actions =
     button(t("tplLoad") || "Load onto wall", { variant: "primary", full: true, id: "tpl-d-load", icon: "download" }) +
+    labelRow(
+      t("tplShareLink") || "Share link",
+      button("WallDev", { id: "tpl-d-share-wd", size: "sm", icon: "link" }) +
+        button("Charity", { id: "tpl-d-share-ch", size: "sm", icon: "link" }),
+    ) +
+    labelRow(
+      t("tplExportJson") || "Export JSON",
+      button("WallDev", { id: "tpl-d-export", size: "sm", title: "the-wall-dev/2 JSON" }) +
+        button("Charity", { id: "tpl-d-charity", size: "sm", title: "Charity config JSON" }),
+    ) +
     `<div style="display:flex;gap:6px;margin-top:6px">` +
-    button(t("tplShareLink") || "Share link", { id: "tpl-d-share", size: "sm", icon: "link" }) +
-    button(t("tplExport") || "Export", { id: "tpl-d-export", size: "sm", title: "the-wall-dev/2 JSON" }) +
-    button(t("tplCharity") || "Charity", { id: "tpl-d-charity", size: "sm", title: "Charity config JSON" }) +
-    `</div><div style="display:flex;gap:6px;margin-top:6px">` +
     button(t("tplPin") || "Pin", { id: "tpl-d-pin", size: "sm" }) +
     button(t("tplCopyId") || "Copy ID", { id: "tpl-d-copyid", size: "sm" }) +
     button(t("tplReport") || "Report", { id: "tpl-d-report", size: "sm" }) +
@@ -246,13 +263,15 @@ export function detailScreen(id: string): PanelScreen {
         void navigator.clipboard?.writeText(id);
         toast(t("tplCopyId") || "Copy ID", t("tplCopied") || "Copied to clipboard.");
       });
-      $("tpl-d-share")?.addEventListener("click", () => {
-        const link = shareLink(id);
+      const copyShare = (format: "wall-dev" | "charity") => {
+        const link = shareLink(id, { format });
         if (!link) return;
         void navigator.clipboard?.writeText(link);
         const note = tpl.scope === "public" ? "" : " " + (t("tplShareNote") || "(private — recipient must have access)");
         toast(t("tplShareLink") || "Share link", (t("tplShareCopied") || "Share link copied.") + note);
-      });
+      };
+      $("tpl-d-share-wd")?.addEventListener("click", () => copyShare("wall-dev"));
+      $("tpl-d-share-ch")?.addEventListener("click", () => copyShare("charity"));
       $("tpl-d-export")?.addEventListener("click", () => {
         const url = exportUrl(id, "wall-dev");
         if (url) window.open(url, "_blank", "noopener");

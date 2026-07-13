@@ -25,3 +25,31 @@ export async function publishCurrentOverlay(): Promise<void> {
   const doc = await currentOverlayDocument();
   openPublish(doc ? { document: doc } : undefined);
 }
+
+/** File-pick a WallDev/Charity JSON, auto-detect the format, and load it onto
+ *  the overlay (from where it can be tweaked and re-published). */
+export async function importJsonOntoWall(): Promise<void> {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.onchange = async () => {
+    const { toast } = await import("../../notify");
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const [{ decodeAny, primaryLayer }, { applyLayer }] = await Promise.all([
+        import("../../formats"),
+        import("../../formats/apply-layer"),
+      ]);
+      const { set } = decodeAny(text);
+      const layer = primaryLayer(set);
+      if (!layer) throw new Error("no layer");
+      await applyLayer(layer);
+      toast("Import", "Template loaded onto the wall.");
+    } catch {
+      toast("Import", "Could not import this JSON.");
+    }
+  };
+  input.click();
+}

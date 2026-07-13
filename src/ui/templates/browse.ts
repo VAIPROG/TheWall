@@ -58,6 +58,7 @@ export function browseScreen(): PanelScreen {
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
           <button class="wp-btn" id="tpl-reload" style="margin:0" title="${esc(t("refresh") || "Refresh")}">↻</button>
           <button class="wp-btn wp-btn--primary" id="tpl-publish-btn" style="margin:0" title="${esc(t("tplPublishHint") || "Share the current overlay")}">＋ ${esc(t("tplPublishBtn") || "Publish")}</button>
+          <button class="wp-btn" id="tpl-import-btn" style="margin:0" title="${esc(t("tplImportHint") || "Import a WallDev/Charity JSON onto the wall")}">⤒ ${esc(t("tplImport") || "Import")}</button>
           <span style="flex:1"></span>
           <span id="tpl-density">${segmented(
             [
@@ -136,6 +137,10 @@ export function browseScreen(): PanelScreen {
       // Entry point to Publish/Share from inside the Templates tab.
       $("tpl-publish-btn")?.addEventListener("click", () => {
         void import("./handoff").then((m) => m.publishCurrentOverlay());
+      });
+      // Import a WallDev/Charity JSON onto the wall.
+      $("tpl-import-btn")?.addEventListener("click", () => {
+        void import("./handoff").then((m) => m.importJsonOntoWall());
       });
       // Card open — delegate on the grid (recreated fresh each mount, so no
       // listener accumulation on the persistent stack container).

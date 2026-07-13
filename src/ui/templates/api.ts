@@ -107,14 +107,30 @@ export interface PublishInput {
   authorVisibility: AuthorVisibility;
   access?: AccessConfig;
   notes?: string[];
+  /** the-wall-dev/2 `contacts` object (discord/telegram/x/site arrays). */
+  contacts?: Record<string, unknown>;
 }
 
 /** Apply the author-visibility choice to a document, mirroring the backend
- *  PATCH transform: anon → "anon" string, hidden → null, full → structured. */
-function applyAuthor(doc: Record<string, unknown>, vis: AuthorVisibility, meId?: string): void {
-  if (vis === "anon") doc.author = "anon";
-  else if (vis === "hidden") doc.author = null;
-  else doc.author = meId ? { id: meId } : doc.author ?? null;
+ *  PATCH transform: anon → "anon" string, hidden → null, full → structured
+ *  object carrying the id AND the nickname (`name`) so viewers see the handle. */
+function applyAuthor(
+  doc: Record<string, unknown>,
+  vis: AuthorVisibility,
+  me?: { id?: string; username?: string },
+): void {
+  if (vis === "anon") {
+    doc.author = "anon";
+    return;
+  }
+  if (vis === "hidden") {
+    doc.author = null;
+    return;
+  }
+  const a: Record<string, unknown> = {};
+  if (me?.id) a.id = me.id;
+  if (me?.username) a.name = me.username;
+  doc.author = Object.keys(a).length ? a : doc.author ?? null;
 }
 
 /** Merge non-empty access fields into the document root (where the ACL reads them). */
@@ -139,7 +155,8 @@ export async function createTemplate(input: PublishInput): Promise<{ template: T
   const doc: Record<string, unknown> = { ...input.document, format: "the-wall-dev/2" };
   applyAccess(doc, input.access);
   if (input.notes?.length) doc.notes = input.notes;
-  applyAuthor(doc, input.authorVisibility, c.me?.id);
+  if (input.contacts && Object.keys(input.contacts).length) doc.contacts = input.contacts;
+  applyAuthor(doc, input.authorVisibility, c.me);
   const body = {
     scope: input.scope,
     clanId: input.scope === "clan" ? input.clanId ?? undefined : undefined,
@@ -180,20 +197,26 @@ export async function resolveUsernames(refs: string[]): Promise<ResolveResult> {
   return c.post<ResolveResult>("/users/resolve", { refs });
 }
 
-/** A shareable site link that autoloads the template (`?the_wall_dev=<export>`).
- *  The export URL carries `?password=` when supplied so a recipient without an
- *  account can still open a password-protected template; it never leaks the
- *  sharer's session token. Public templates need no credential. */
-export function shareLink(id: string, password?: string): string {
+/** A shareable site link that autoloads the template. WallDev links use the
+ *  `?the_wall_dev=` autoload param; Charity links use `?charity=`. The export
+ *  URL carries `?password=` when supplied so a recipient without an account can
+ *  still open a password-protected template; it never leaks the sharer's
+ *  session token. Public templates need no credential. */
+export function shareLink(
+  id: string,
+  opts: { format?: "wall-dev" | "charity"; password?: string } = {},
+): string {
   const c = getActiveClient();
   if (!c) return "";
-  const pw = password?.trim() ? `?password=${encodeURIComponent(password.trim())}` : "";
-  const exp = `${c.url}/templates/${encodeURIComponent(id)}/wall-dev${pw}`;
+  const format = opts.format ?? "wall-dev";
+  const pw = opts.password?.trim() ? `?password=${encodeURIComponent(opts.password.trim())}` : "";
+  const exp = `${c.url}/templates/${encodeURIComponent(id)}/${format}${pw}`;
   let origin = "";
   try {
     origin = new URL(c.url).origin;
   } catch {
     origin = "";
   }
-  return `${origin}/?the_wall_dev=${encodeURIComponent(exp)}`;
+  const param = format === "charity" ? "charity" : "the_wall_dev";
+  return `${origin}/?${param}=${encodeURIComponent(exp)}`;
 }
