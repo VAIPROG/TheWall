@@ -70,12 +70,11 @@ pub async fn approve_email_request(
         .begin()
         .await
         .or_500()?;
-    sqlx::query("UPDATE users SET notifications_email = $1 WHERE id = $2")
-        .bind(&row.1)
-        .bind(row.0)
-        .execute(&mut *tx)
-        .await
-        .or_500()?;
+    // NOTE: `users.notifications_email` was dropped in migration 023 (V3
+    // identity). This legacy email-link approval no longer stores the address;
+    // it only marks the request approved below. (`row.1` = the requested email
+    // is intentionally unused now.)
+    let _ = &row.1;
     sqlx::query(
         "UPDATE email_link_requests SET status = 'approved', decided_at = NOW() WHERE id = $1",
     )

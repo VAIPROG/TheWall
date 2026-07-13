@@ -67,7 +67,7 @@ pub async fn get_status(
     ) = sqlx::query_as(
         r#"SELECT discord_id, discord_username, COALESCE(discord_linked_via_oauth, FALSE),
                   telegram_user_id, telegram_username, telegram_photo_url,
-                  notifications_email
+                  NULL::text
              FROM users WHERE id = $1"#,
     )
     .bind(auth.user_id)
