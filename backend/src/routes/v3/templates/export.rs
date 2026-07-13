@@ -36,7 +36,9 @@ pub async fn load_visible(
 
     // Full visibility (scope + whitelist/blocklist + co-editors). Shared by
     // render (preview/png/animated) and export. `$2` = the caller's user id.
-    let visibility = super::acl::view_sql(2);
+    // Global staff bypass the blocklist/whitelist entirely.
+    let privileged = super::acl::is_privileged(&state.pool, user_id).await;
+    let visibility = super::acl::view_sql(2, privileged);
     let row: Option<(Uuid, String, Option<Uuid>, Option<String>, Option<Value>, i32)> =
         sqlx::query_as(&format!(
             r#"SELECT user_id, scope, clan_id, author, document, version

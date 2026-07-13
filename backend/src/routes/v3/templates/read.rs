@@ -38,8 +38,10 @@ pub async fn get(
     let has_password = access.context.password.is_some();
 
     // First attempt: full visibility (scope + whitelist/blocklist + co-editors)
-    // + optional password flag. `$2` = the caller's user id.
-    let visibility = super::acl::view_sql(2);
+    // + optional password flag. `$2` = the caller's user id. Global staff
+    // bypass the blocklist/whitelist entirely.
+    let privileged = super::acl::is_privileged(&state.pool, user_id).await;
+    let visibility = super::acl::view_sql(2, privileged);
     let row = sqlx::query_as::<_, TemplateV3>(&format!(
         r#"SELECT {COLS} FROM templates WHERE id = $1 AND {visibility}"#
     ))
@@ -110,7 +112,8 @@ pub async fn list(
     // Light projection — no `document` column in the result. `has_document`
     // and `template_count` are derived from it; the WHERE still references the
     // `document` column (visibility). `$6` = the caller's user id.
-    let visibility = super::acl::view_sql(6);
+    let privileged = super::acl::is_privileged(&state.pool, user_id).await;
+    let visibility = super::acl::view_sql(6, privileged);
     let rows = sqlx::query_as::<_, TemplateSummary>(&format!(
         r#"SELECT id, user_id, name, x, y, scale, scope, status,
                   version, clan_id, verified_at, created_at,

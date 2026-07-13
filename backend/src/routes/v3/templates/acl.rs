@@ -84,7 +84,14 @@ pub fn can_view(user: Uuid, doc: &Value) -> bool {
 /// NULL or malformed documents degrade to "no privacy restrictions" (scope rules
 /// only) — never a SQL error. UUIDs in the access arrays are JSON strings, hence
 /// the `@> to_jsonb($u::text)` containment check.
-pub fn view_sql(user_bind: usize) -> String {
+pub fn view_sql(user_bind: usize, is_privileged: bool) -> String {
+    if is_privileged {
+        // Global moderators/admins/owners see every template regardless of
+        // scope, whitelist, or blocklist — this is what makes staff immune to a
+        // template's blocklist. The `${user_bind}` reference keeps the caller's
+        // `.bind(user_id)` count valid while always evaluating TRUE.
+        return format!("(${user_bind} IS NOT NULL OR TRUE)");
+    }
     let u = format!("${user_bind}");
     // Raw string with real newlines: the newlines survive as whitespace in the
     // SQL, so tokens/placeholders stay separated. (A regular "\"-continued
@@ -124,6 +131,19 @@ pub fn view_sql(user_bind: usize) -> String {
            )
         ), false)"#
     )
+}
+
+/// Whether a viewer is a global moderator/admin/owner — such staff see every
+/// template regardless of scope/whitelist/blocklist (blocklist immunity).
+/// Anonymous callers, or a role-lookup failure, yield `false`.
+pub async fn is_privileged(pool: &sqlx::PgPool, user_id: Option<Uuid>) -> bool {
+    match user_id {
+        Some(uid) => crate::routes::v3::utils::permissions::global_role_of(pool, uid)
+            .await
+            .map(|r| r.is_moderator())
+            .unwrap_or(false),
+        None => false,
+    }
 }
 
 #[cfg(test)]
