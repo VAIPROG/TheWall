@@ -75,12 +75,9 @@ pub async fn get_status(
     .await
     .or_500()?;
 
-    let last_request: Option<String> = sqlx::query_scalar(
-        "SELECT status FROM email_link_requests WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
-    )
-    .bind(auth.user_id)
-    .fetch_optional(&state.pool).await
-    .or_500()?;
+    // Email linking was removed in V3 (migration 023 dropped the
+    // `email_link_requests` table); report no pending request.
+    let last_request: Option<String> = None;
 
     Ok(Json(LinkStatus {
         discord_id: row.0,
@@ -543,50 +540,12 @@ pub struct EmailRequestResponse {
 }
 
 pub async fn request_email_link(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Json(b): Json<EmailRequest>,
+    _auth: AuthUser,
+    State(_state): State<AppState>,
+    Json(_b): Json<EmailRequest>,
 ) -> Result<Json<EmailRequestResponse>, (StatusCode, String)> {
-    let proposed = b.email.trim().to_string();
-    if !proposed.contains('@') || proposed.len() > 254 {
-        return Err((StatusCode::BAD_REQUEST, "invalid email".into()));
-    }
-    // Generate a friendly short code: 6 chars from a no-ambiguous alphabet.
-    const ALPHA: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let code: String = (0..6)
-        .map(|_| ALPHA[rand::thread_rng().gen_range(0..ALPHA.len())] as char)
-        .collect();
-
-    sqlx::query(
-        r#"INSERT INTO email_link_requests (user_id, proposed_email, code)
-           VALUES ($1, $2, $3)"#,
-    )
-    .bind(auth.user_id)
-    .bind(&proposed)
-    .bind(&code)
-    .execute(&state.pool)
-    .await
-    .or_500()?;
-
-    let username: String = sqlx::query_scalar("SELECT username FROM users WHERE id = $1")
-        .bind(auth.user_id)
-        .fetch_one(&state.pool)
-        .await
-        .or_500()?;
-
-    let body = format!(
-        "Hi VAI,\n\nPlease link the email address {proposed} to my The Wall Dev account.\n\n\
-         Account username : {username}\n\
-         Verification code: {code}\n\nThanks.",
-    );
-
-    Ok(Json(EmailRequestResponse {
-        code,
-        send_to: state.config.oauth.support_email.clone(),
-        subject: "LINK-MAIL".into(),
-        body_template: body,
-        status: "pending".into(),
-    }))
+    // Email linking was removed in V3 (migration 023 dropped email_link_requests).
+    Err((StatusCode::GONE, "email linking has been removed".into()))
 }
 // ---- small helpers --------------------------------------------------------
 
