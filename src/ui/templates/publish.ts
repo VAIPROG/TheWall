@@ -1,10 +1,14 @@
 /**
- * Publish screen for the Templates super-tab — the reworked Share, on V3. Takes
- * a the-wall-dev/2 document (from the Overlay hand-off, or built from the
- * current overlay) and a metadata form (name/position/scale, scope,
- * author-visibility, password, and an advanced access block: whitelist,
- * blocklist, co-editors, domains) and POSTs it to `/templates/new`. Access
- * fields live at the document root and are enforced by the backend ACL.
+ * Publish / Share screen for the Templates super-tab — the reworked Share, on
+ * V3. Placement & scale are the Overlay's job; this screen is purely about
+ * *sharing*: it shows what you're sharing (a preview + name), lets you set
+ * metadata (name, notes) and access (scope, author visibility, password, and an
+ * advanced block of whitelist / blocklist / co-editors by username, plus
+ * domains), then POSTs to `/templates/new` — or PATCHes an existing template in
+ * edit mode. Usernames in the access lists are resolved to uuids server-side.
+ *
+ * DOM-free (no overlay/formats imports) so the shell test stays import-safe;
+ * the hand-off (handoff.ts) builds the document from the overlay.
  */
 import type { PanelScreen } from "../kit/panel-stack";
 import { segmented, button, group } from "../kit/primitives";
@@ -14,44 +18,50 @@ import { t } from "../../i18n";
 import { toast } from "../../notify";
 import {
   createTemplate,
+  patchTemplate,
   parseIdList,
+  resolveUsernames,
   type AuthorVisibility,
   type Scope,
-  type PublishInput,
+  type AccessConfig,
 } from "./api";
 import { openDetail, resetToBrowse } from "./shell";
 
+export interface PublishAccessPrefill {
+  usersWhitelist?: string[];
+  usersBlocklist?: string[];
+  coEditorUsers?: string[];
+  coEditorClans?: string[];
+  domains?: string[];
+}
+
 export interface PublishHandoff {
-  /** A ready the-wall-dev/2 document (built by the Overlay hand-off, which owns
-   *  the overlay-encoding imports so this screen stays DOM-free / test-safe). */
+  /** the-wall-dev/2 document (built by the Overlay hand-off, or an existing
+   *  template's document in edit mode). */
   document?: Record<string, unknown>;
   name?: string;
+  /** When set, PATCH this template instead of creating a new one. */
+  editId?: string;
+  scope?: Scope;
+  authorVisibility?: AuthorVisibility;
+  access?: PublishAccessPrefill;
+  notes?: string[];
 }
 
 interface DocTpl {
   name?: string;
-  x?: number;
-  y?: number;
-  scale?: number;
+  imageSources?: string[];
   [k: string]: unknown;
 }
 
-/** The base document comes from the Overlay hand-off (which owns the
- *  overlay-encoding). Null when Publish is opened with nothing to publish. */
-function baseDocument(handoff?: PublishHandoff): Record<string, unknown> | null {
-  return handoff?.document ?? null;
-}
-
 function firstTpl(doc: Record<string, unknown>): DocTpl {
-  const arr = doc.templates as DocTpl[] | undefined;
-  return arr?.[0] ?? {};
+  return (doc.templates as DocTpl[] | undefined)?.[0] ?? {};
 }
 
-function numInput(id: string, label: string, value: number, step = "1"): string {
-  return `<label class="wd-kv" style="align-items:center">
-    <span class="wd-kv-k">${esc(label)}</span>
-    <input id="${id}" class="wp-input" type="number" step="${step}" value="${value}" style="width:88px">
-  </label>`;
+/** The primary image (data URI or URL) to show as the share preview. */
+function previewSrc(doc: Record<string, unknown>): string {
+  const src = firstTpl(doc).imageSources?.[0];
+  return typeof src === "string" ? src : "";
 }
 
 function textField(id: string, label: string, value: string, placeholder = ""): string {
@@ -61,48 +71,55 @@ function textField(id: string, label: string, value: string, placeholder = ""): 
   </label>`;
 }
 
-function listField(id: string, label: string, hint: string): string {
+function listField(id: string, label: string, value: string, hint: string): string {
   return `<label style="display:block;margin-top:6px">
     <span style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px">${esc(label)}</span>
-    <textarea id="${id}" class="wp-input" rows="2" placeholder="${esc(hint)}" style="width:100%;margin-top:2px;resize:vertical;font:11px monospace"></textarea>
+    <textarea id="${id}" class="wp-input" rows="2" placeholder="${esc(hint)}" style="width:100%;margin-top:2px;resize:vertical;font:11px monospace">${esc(value)}</textarea>
   </label>`;
 }
 
+const joinList = (a?: string[]): string => (a?.length ? a.join(" ") : "");
+
 export function publishScreen(handoff?: PublishHandoff): PanelScreen {
-  const doc = baseDocument(handoff);
-  let scope: Scope = "private";
-  let authorVis: AuthorVisibility = "full";
+  const doc = handoff?.document ?? null;
+  const isEdit = !!handoff?.editId;
+  let scope: Scope = handoff?.scope ?? "private";
+  let authorVis: AuthorVisibility = handoff?.authorVisibility ?? "full";
 
   return {
-    title: t("tplPublishTitle") || "Publish",
+    title: isEdit ? t("tplEditTitle") || "Edit share" : t("tplPublishTitle") || "Publish",
     render: () => {
       if (!doc) {
         return emptyState(
-          t("tplPublishNoSource") || "Load or create an overlay first, then Publish it here.",
+          t("tplPublishNoSource") || "Load a template onto the wall (Overlay tab), then hit Share to publish it here.",
           "📤",
         );
       }
       const tpl = firstTpl(doc);
       const name = (tpl.name as string) || handoff?.name || "";
-      const scaleGrid = `<div class="wd-kvgrid" style="margin-top:4px">
-        ${numInput("pub-x", "X", Number(tpl.x ?? 0))}
-        ${numInput("pub-y", "Y", Number(tpl.y ?? 0))}
-        ${numInput("pub-scale", t("tplScale") || "Scale", Number(tpl.scale ?? 1), "0.1")}
-      </div>`;
+      const src = previewSrc(doc);
+      const notesText = (handoff?.notes ?? (doc.notes as string[] | undefined) ?? []).join("\n");
+      const acc = handoff?.access ?? {};
+
+      const hero = src
+        ? `<div class="wd-tpl-hero"><img class="wd-tpl-hero-img" src="${esc(src)}" onerror="this.style.opacity=.2"></div>`
+        : "";
 
       const advanced = group(
         t("tplAccessAdvanced") || "Access (advanced)",
-        listField("pub-wl", t("tplWhitelist") || "Whitelist (user ids)", "uuid uuid …") +
-          listField("pub-bl", t("tplBlocklist") || "Blocklist (user ids)", "uuid uuid …") +
-          listField("pub-edit-u", t("tplCoEditorUsers") || "Co-editors (user ids)", "uuid uuid …") +
-          listField("pub-edit-c", t("tplCoEditorClans") || "Co-editor clans (clan ids)", "uuid uuid …") +
-          listField("pub-domains", t("tplDomains") || "Allowed domains", "wplace.live filianislost.com"),
+        `<div style="font-size:10px;color:var(--sub);margin-bottom:2px">${esc(t("tplAccessHint") || "Usernames or ids, space/comma separated.")}</div>` +
+          listField("pub-wl", t("tplWhitelist") || "Whitelist (users)", joinList(acc.usersWhitelist), "@alice bob") +
+          listField("pub-bl", t("tplBlocklist") || "Blocklist (users)", joinList(acc.usersBlocklist), "@spammer") +
+          listField("pub-edit-u", t("tplCoEditorUsers") || "Co-editors (users)", joinList(acc.coEditorUsers), "@alice") +
+          listField("pub-edit-c", t("tplCoEditorClans") || "Co-editor clans (clan ids)", joinList(acc.coEditorClans), "clan-uuid") +
+          listField("pub-domains", t("tplDomains") || "Allowed domains", joinList(acc.domains), "wplace.live filianislost.com"),
       );
 
       return `
         <div class="wd-tpl-publish">
+          ${hero}
           ${textField("pub-name", t("tplName") || "Name", name, t("tplName") || "Name")}
-          ${group(t("tplPlacement") || "Placement", scaleGrid)}
+          ${listField("pub-notes", t("tplNotes") || "Notes", notesText, t("tplNotesHint") || "One note per line")}
 
           <div style="margin-top:6px">
             <span style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px">${esc(t("tplScope") || "Scope")}</span>
@@ -131,10 +148,10 @@ export function publishScreen(handoff?: PublishHandoff): PanelScreen {
             )}</div>
           </div>
 
-          ${textField("pub-pass", t("tplPassword") || "Password (optional)", "", "leave empty for none")}
+          ${textField("pub-pass", t("tplPassword") || "Password (optional)", "", isEdit ? "unchanged unless set" : "leave empty for none")}
           ${advanced}
 
-          <div style="margin-top:8px">${button(t("tplPublishBtn") || "Publish", {
+          <div style="margin-top:8px">${button(isEdit ? t("tplSaveChanges") || "Save changes" : t("tplPublishBtn") || "Publish", {
             variant: "primary",
             full: true,
             id: "pub-submit",
@@ -175,53 +192,90 @@ export function publishScreen(handoff?: PublishHandoff): PanelScreen {
             status.textContent = msg;
           }
         };
-
         const val = (id: string) => ($(id) as HTMLInputElement | null)?.value ?? "";
-        const num = (id: string, d: number) => {
-          const n = Number(val(id));
-          return Number.isFinite(n) ? n : d;
-        };
 
-        // Clone the base document and stamp the form's placement/name onto the
-        // primary layer so the backend derives the row fields from it.
-        const outDoc: Record<string, unknown> = JSON.parse(JSON.stringify(doc));
-        const tpls = (outDoc.templates as DocTpl[] | undefined) ?? [];
-        if (tpls[0]) {
-          tpls[0].name = val("pub-name").trim() || (tpls[0].name as string) || "Untitled";
-          tpls[0].x = num("pub-x", Number(tpls[0].x ?? 0));
-          tpls[0].y = num("pub-y", Number(tpls[0].y ?? 0));
-          tpls[0].scale = num("pub-scale", Number(tpls[0].scale ?? 1));
-        }
-
-        const input: PublishInput = {
-          document: outDoc,
-          scope,
-          clanId: scope === "clan" ? val("pub-clan").trim() || null : null,
-          password: val("pub-pass"),
-          authorVisibility: authorVis,
-          access: {
-            usersWhitelist: parseIdList(val("pub-wl")),
-            usersBlocklist: parseIdList(val("pub-bl")),
-            allowedToEdit: {
-              userIds: parseIdList(val("pub-edit-u")),
-              clanIds: parseIdList(val("pub-edit-c")),
-            },
-            domainsWhitelist: parseIdList(val("pub-domains")),
-          },
-        };
+        // Resolve every user ref (whitelist/blocklist/co-editors) to uuids in a
+        // single batch. Clans + domains are passed through as-is.
+        const wl = parseIdList(val("pub-wl"));
+        const bl = parseIdList(val("pub-bl"));
+        const coU = parseIdList(val("pub-edit-u"));
+        const coC = parseIdList(val("pub-edit-c"));
+        const domains = parseIdList(val("pub-domains"));
+        const userRefs = [...new Set([...wl, ...bl, ...coU])];
 
         btn?.classList.add("is-working");
-        setStatus("muted", t("tplPublishing") || "Publishing…");
+        setStatus("muted", t("tplPublishing") || "Working…");
+
         try {
-          const res = await createTemplate(input);
-          const id = res?.template?.id;
-          const warn = res?.warnings?.length ? ` (${res.warnings.length} warning(s))` : "";
-          toast(t("tplPublishBtn") || "Publish", (t("tplPublishOk") || "Published.") + warn);
-          if (id) openDetail(id);
-          else resetToBrowse();
+          let map: Record<string, string> = {};
+          if (userRefs.length) {
+            const res = await resolveUsernames(userRefs);
+            map = res.resolved;
+            if (res.unresolved.length) {
+              setStatus("err", (t("tplUnknownUsers") || "Unknown users") + ": " + res.unresolved.join(", "));
+              btn?.classList.remove("is-working");
+              return;
+            }
+          }
+          const toIds = (refs: string[]) => refs.map((r) => map[r] ?? r);
+
+          const access: AccessConfig = {
+            usersWhitelist: toIds(wl),
+            usersBlocklist: toIds(bl),
+            allowedToEdit: { userIds: toIds(coU), clanIds: coC },
+            domainsWhitelist: domains,
+          };
+          const notes = val("pub-notes")
+            .split(/\r?\n/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const name = val("pub-name").trim();
+          const password = val("pub-pass");
+
+          if (isEdit && handoff?.editId) {
+            // PATCH: doc.access merges into the document root; empty arrays clear.
+            const patch: Record<string, unknown> = {
+              scope,
+              doc: {
+                name: name || undefined,
+                notes,
+                access: {
+                  usersWhitelist: access.usersWhitelist,
+                  usersBlocklist: access.usersBlocklist,
+                  allowedToEdit: access.allowedToEdit,
+                  domainsWhitelist: access.domainsWhitelist,
+                },
+                authorVisibility: authorVis,
+              },
+              ...(scope === "clan" && val("pub-clan").trim() ? { clanId: val("pub-clan").trim() } : {}),
+              ...(password.trim() ? { accessPassword: password.trim() } : {}),
+            };
+            await patchTemplate(handoff.editId, patch);
+            toast(t("tplSaveChanges") || "Save changes", t("tplSaveOk") || "Changes saved.");
+            openDetail(handoff.editId);
+          } else {
+            // CREATE: stamp name onto the primary layer; access lives at doc root.
+            const outDoc: Record<string, unknown> = JSON.parse(JSON.stringify(doc));
+            const tpls = (outDoc.templates as DocTpl[] | undefined) ?? [];
+            if (tpls[0] && name) tpls[0].name = name;
+            const res = await createTemplate({
+              document: outDoc,
+              scope,
+              clanId: scope === "clan" ? val("pub-clan").trim() || null : null,
+              password,
+              authorVisibility: authorVis,
+              access,
+              notes,
+            });
+            const id = res?.template?.id;
+            const warn = res?.warnings?.length ? ` (${res.warnings.length} warning(s))` : "";
+            toast(t("tplPublishBtn") || "Publish", (t("tplPublishOk") || "Published.") + warn);
+            if (id) openDetail(id);
+            else resetToBrowse();
+          }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          setStatus("err", (t("tplPublishFail") || "Publish failed") + ": " + msg);
+          setStatus("err", (t("tplPublishFail") || "Failed") + ": " + msg);
         } finally {
           btn?.classList.remove("is-working");
         }

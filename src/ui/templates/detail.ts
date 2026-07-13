@@ -18,7 +18,8 @@ import { decodeAny, primaryLayer } from "../../formats";
 import { applyLayer } from "../../formats/apply-layer";
 import { previewUrl, animatedUrl, exportUrl, shareLink } from "./api";
 import { computePercentPainted, formatPct } from "./percent";
-import { resetToBrowse } from "./shell";
+import { openPublish, resetToBrowse } from "./shell";
+import type { AuthorVisibility, Scope } from "./api";
 
 interface DocTemplate {
   name?: string;
@@ -148,13 +149,19 @@ function render(tpl: FullTpl): string {
     button(t("tplLoad") || "Load onto wall", { variant: "primary", full: true, id: "tpl-d-load", icon: "download" }) +
     `<div style="display:flex;gap:6px;margin-top:6px">` +
     button(t("tplShareLink") || "Share link", { id: "tpl-d-share", size: "sm", icon: "link" }) +
-    button(t("tplExport") || "Export", { id: "tpl-d-export", size: "sm" }) +
-    button(t("tplPin") || "Pin", { id: "tpl-d-pin", size: "sm" }) +
+    button(t("tplExport") || "Export", { id: "tpl-d-export", size: "sm", title: "the-wall-dev/2 JSON" }) +
+    button(t("tplCharity") || "Charity", { id: "tpl-d-charity", size: "sm", title: "Charity config JSON" }) +
     `</div><div style="display:flex;gap:6px;margin-top:6px">` +
+    button(t("tplPin") || "Pin", { id: "tpl-d-pin", size: "sm" }) +
     button(t("tplCopyId") || "Copy ID", { id: "tpl-d-copyid", size: "sm" }) +
     button(t("tplReport") || "Report", { id: "tpl-d-report", size: "sm" }) +
-    (isOwner ? button(t("tplDelete") || "Delete", { id: "tpl-d-delete", size: "sm", variant: "danger" }) : "") +
-    `</div>`;
+    `</div>` +
+    (isOwner
+      ? `<div style="display:flex;gap:6px;margin-top:6px">` +
+        button(t("tplEdit") || "Edit", { id: "tpl-d-edit", size: "sm", icon: "edit" }) +
+        button(t("tplDelete") || "Delete", { id: "tpl-d-delete", size: "sm", variant: "danger" }) +
+        `</div>`
+      : "");
 
   return `
     <div class="wd-tpl-detail">
@@ -249,6 +256,32 @@ export function detailScreen(id: string): PanelScreen {
       $("tpl-d-export")?.addEventListener("click", () => {
         const url = exportUrl(id, "wall-dev");
         if (url) window.open(url, "_blank", "noopener");
+      });
+      $("tpl-d-charity")?.addEventListener("click", () => {
+        const url = exportUrl(id, "charity");
+        if (url) window.open(url, "_blank", "noopener");
+      });
+      $("tpl-d-edit")?.addEventListener("click", () => {
+        const d = (tpl.document ?? {}) as Record<string, unknown>;
+        const a = d.author;
+        const authorVisibility: AuthorVisibility =
+          a === "anon" || a === "anonymous" ? "anon" : a === null || a === undefined ? "hidden" : "full";
+        const ate = (d.allowedToEdit ?? {}) as { userIds?: string[]; clanIds?: string[] };
+        openPublish({
+          editId: tpl.id,
+          document: d,
+          name: tpl.name,
+          scope: tpl.scope as Scope,
+          authorVisibility,
+          notes: (d.notes as string[] | undefined) ?? [],
+          access: {
+            usersWhitelist: d.usersWhitelist as string[] | undefined,
+            usersBlocklist: d.usersBlocklist as string[] | undefined,
+            coEditorUsers: ate.userIds,
+            coEditorClans: ate.clanIds,
+            domains: d.domainsWhitelist as string[] | undefined,
+          },
+        });
       });
       $("tpl-d-report")?.addEventListener("click", async () => {
         const reason = await promptDlg(

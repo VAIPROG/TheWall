@@ -44,20 +44,8 @@ export function wireShare(win: HTMLElement): void {
   $("btn-jump-share")?.addEventListener("click", async () => {
     const tab = win.querySelector<HTMLElement>('.wp-tab[data-p="tp"]');
     tab?.click();
-    const { openPublish } = await import("./templates/shell");
-    try {
-      const { overlayData } = await import("../overlay");
-      if (!overlayData?.src && !overlayData?.srcOrig) {
-        openPublish();
-        return;
-      }
-      const { exportCurrentOverlay } = await import("../walldev-config");
-      const { encode } = await import("../formats");
-      const doc = encode(exportCurrentOverlay(), "wall-dev/2") as unknown as Record<string, unknown>;
-      openPublish({ document: doc });
-    } catch {
-      openPublish();
-    }
+    const { publishCurrentOverlay } = await import("./templates/handoff");
+    await publishCurrentOverlay();
   });
 
   // ----- Charity import (Bluemarble-style JSON config) ----------------------

@@ -156,11 +156,28 @@ export async function patchTemplate(id: string, patch: Record<string, unknown>):
   return c.patch(`/templates/${encodeURIComponent(id)}`, patch);
 }
 
-/** Owner download URL for an export format (authenticated via ?session=). */
+/** Owner download URL for an export format (authenticated via ?session=). The
+ *  export path has no query of its own, so the session is the first param
+ *  (`?session=`), not `&session=` — otherwise it lands in the path → 404. */
 export function exportUrl(id: string, format: "wall-dev" | "charity" = "wall-dev"): string {
   const c = getActiveClient();
   if (!c) return "";
-  return `${c.url}/templates/${encodeURIComponent(id)}/${format}${authSuffix()}`;
+  const q = c.token ? `?session=${encodeURIComponent(c.token)}` : "";
+  return `${c.url}/templates/${encodeURIComponent(id)}/${format}${q}`;
+}
+
+export interface ResolveResult {
+  /** input ref (username / uuid) → resolved uuid */
+  resolved: Record<string, string>;
+  unresolved: string[];
+}
+
+/** Resolve a batch of user refs (usernames / @handles / uuids) to uuids via the
+ *  backend, so access lists can be entered as human-friendly usernames. */
+export async function resolveUsernames(refs: string[]): Promise<ResolveResult> {
+  const c = getActiveClient();
+  if (!c || !refs.length) return { resolved: {}, unresolved: [] };
+  return c.post<ResolveResult>("/users/resolve", { refs });
 }
 
 /** A shareable site link that autoloads the template (`?the_wall_dev=<export>`).
