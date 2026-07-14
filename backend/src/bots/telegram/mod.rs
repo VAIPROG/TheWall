@@ -166,8 +166,10 @@ async fn handle_message(
 /// Command name = first whitespace token, leading `/` stripped, `@botname`
 /// suffix stripped, lowercased. Argument coercion is driven off the registered
 /// command's `args()` schema:
-///   * if the first schema arg is `Sub(subs)`, the next token selects the
-///     subcommand and the remaining tokens map positionally onto that sub's args;
+///   * if the command's first top-level arg is `Sub`-kind (⇒ this is a
+///     subcommand-style command), the first token selects among the TOP-LEVEL
+///     args by name, and the remaining tokens map positionally onto the selected
+///     arg's `Sub(leaves)`;
 ///   * otherwise the remaining whitespace tokens map positionally onto the
 ///     command's args, coerced by `ArgKind`.
 /// A trailing free-text `String` arg collects the REST of the line.
@@ -175,31 +177,27 @@ async fn handle_message(
 ///
 /// ## Subcommand schema shape (CONTRACT — Task 5 authors ~18 commands against it)
 ///
-/// A subcommand's own (leaf) args MUST be wrapped in a SECOND, inner `Sub`.
-/// The parser only maps leaf args when the selected subcommand's `kind` is
-/// itself `ArgKind::Sub(leaf_args)`. If you write the leaf args as a bare
-/// `ArgKind` (e.g. `Sub([{ name: "roster", kind: ArgKind::Int }])`), the
-/// subcommand is still *selected* but its args come back EMPTY — silently, no
-/// error. Always nest:
+/// A subcommand-style command lists its subcommands as its top-level `args()`,
+/// each `CommandArg{ kind: Sub(leaf_args) }` with BARE-kind leaves
+/// (`ArgKind::String/Int/Bool`, never a nested `Sub`). Do NOT add an outer
+/// wrapping `Sub`. A subcommand with no args is `kind: Sub(vec![])`. This exact
+/// shape is what the Discord adapter registers as native SUB_COMMANDs, so both
+/// platforms agree.
 ///
 /// ```ignore
-/// // `clanchat read [n]`  and  `template find <q>`
-/// vec![CommandArg {
-///     name: "action".into(),
-///     kind: ArgKind::Sub(vec![
-///         // read  [n:Int]
-///         CommandArg { name: "read".into(), kind: ArgKind::Sub(vec![
-///             CommandArg { name: "n".into(), kind: ArgKind::Int },
+/// // `clanchat read [n]`  and  `clanchat send <text>`
+/// vec![
+///     CommandArg { name: "read".into(), desc: "Show recent clan chat".into(), required: false,
+///         kind: ArgKind::Sub(vec![
+///             CommandArg { name: "n".into(), desc: "How many (1-25)".into(), required: false, kind: ArgKind::Int },
 ///         ]) },
-///         // find  <q:String>  (trailing String swallows the rest of the line)
-///         CommandArg { name: "find".into(), kind: ArgKind::Sub(vec![
-///             CommandArg { name: "q".into(), kind: ArgKind::String },
+///     CommandArg { name: "send".into(), desc: "Post to your clan chat".into(), required: true,
+///         kind: ArgKind::Sub(vec![
+///             // trailing String swallows the rest of the line
+///             CommandArg { name: "text".into(), desc: "Message text".into(), required: true, kind: ArgKind::String },
 ///         ]) },
-///     ]),
-/// }]
+/// ]
 /// ```
-///
-/// A subcommand that takes no args still nests as `kind: ArgKind::Sub(vec![])`.
 fn parse_command(reg: &Registry, text: &str) -> (String, Option<String>, HashMap<String, ArgValue>) {
     let mut tokens = text.split_whitespace();
     let raw = tokens.next().unwrap_or("");
@@ -219,26 +217,20 @@ fn parse_command(reg: &Registry, text: &str) -> (String, Option<String>, HashMap
     };
     let schema = cmd.args();
 
-    // Subcommand-style: first schema arg is Sub(subs).
-    if let Some(first) = schema.first() {
-        if let ArgKind::Sub(subs) = &first.kind {
-            let mut it = rest.iter();
-            if let Some(tok) = it.next() {
-                sub = Some((*tok).to_string());
-                let selected = subs.iter().find(|s| s.name.eq_ignore_ascii_case(tok));
-                if let Some(s) = selected {
-                    if let ArgKind::Sub(inner) = &s.kind {
-                        let remaining: Vec<&str> = it.copied().collect();
-                        map_positional(inner, &remaining, &mut args);
-                    } else if it.clone().next().is_some() {
-                        // Sub selected, leftover tokens, but its kind isn't Sub:
-                        // schema author forgot the inner Sub wrapper (see doc above).
-                        tracing::debug!(command = %command, sub = %s.name, "bots::telegram parse: subcommand args ignored — leaf args must be wrapped in an inner ArgKind::Sub");
-                    }
+    // Subcommand-style: the command's top-level args ARE the subcommands, each a
+    // `Sub(leaf_args)`. The first token picks one by name; its leaves map positionally.
+    if matches!(schema.first().map(|a| &a.kind), Some(ArgKind::Sub(_))) {
+        let mut it = rest.iter();
+        if let Some(tok) = it.next() {
+            sub = Some((*tok).to_string());
+            if let Some(s) = schema.iter().find(|a| a.name.eq_ignore_ascii_case(tok)) {
+                if let ArgKind::Sub(leaves) = &s.kind {
+                    let remaining: Vec<&str> = it.copied().collect();
+                    map_positional(leaves, &remaining, &mut args);
                 }
             }
-            return (command, sub, args);
         }
+        return (command, sub, args);
     }
 
     map_positional(&schema, &rest, &mut args);
@@ -279,7 +271,9 @@ fn map_positional(schema: &[crate::bots::core::command::CommandArg], tokens: &[&
                 }
             }
             ArgKind::Sub(_) => {
-                // Nested Sub beyond position 0 is unsupported here; skip token.
+                // Defensive no-op: under Option A, leaf args are always bare
+                // kinds (String/Int/Bool), never `Sub`, so this arm is not hit
+                // for well-formed schemas. Skip the token if it ever occurs.
                 i += 1;
             }
         }
@@ -520,9 +514,49 @@ fn downgrade_html(html: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::downgrade_html;
+    use super::{downgrade_html, map_positional};
+    use crate::bots::core::command::{ArgKind, ArgValue, CommandArg};
     use crate::bots::core::response::{BotResponse, Block};
     use crate::bots::render::telegram::render_html;
+    use std::collections::HashMap;
+
+    /// Locks Option-A leaf-mapping: given a subcommand's `Sub(leaves)` schema, the
+    /// tokens after the subcommand name map positionally onto the leaves.
+    /// (End-to-end subcommand *selection* is exercised by Task 5's real
+    /// `clanchat`/`template` commands on both platforms; `parse_command` takes a
+    /// `&Registry` whose `build()` only has `wall`, so we assert the predicate +
+    /// leaf-mapping directly here.)
+    #[test]
+    fn parse_subcommand_option_a() {
+        // The selection predicate: a subcommand-style command's first top-level
+        // arg is `Sub`-kind.
+        let clanchat = vec![
+            CommandArg { name: "send".into(), desc: String::new(), required: true,
+                kind: ArgKind::Sub(vec![
+                    CommandArg { name: "text".into(), desc: String::new(), required: true, kind: ArgKind::String },
+                ]) },
+        ];
+        assert!(matches!(clanchat.first().map(|a| &a.kind), Some(ArgKind::Sub(_))));
+
+        // Trailing String swallows the rest of the line.
+        let schema = vec![CommandArg { name: "text".into(), desc: String::new(), required: true, kind: ArgKind::String }];
+        let mut args = HashMap::new();
+        map_positional(&schema, &["hello", "world"], &mut args);
+        assert!(matches!(args.get("text"), Some(ArgValue::Str(s)) if s == "hello world"));
+
+        // Int leaf coercion.
+        let schema = vec![CommandArg { name: "n".into(), desc: String::new(), required: false, kind: ArgKind::Int }];
+        let mut args = HashMap::new();
+        map_positional(&schema, &["7"], &mut args);
+        assert!(matches!(args.get("n"), Some(ArgValue::Int(7))));
+
+        // A no-arg subcommand is `Sub(vec![])`: mapping its (empty) leaves over any
+        // remaining tokens maps nothing and does not panic.
+        let leaves: Vec<CommandArg> = vec![];
+        let mut args = HashMap::new();
+        map_positional(&leaves, &["ignored"], &mut args);
+        assert!(args.is_empty());
+    }
 
     #[test]
     fn downgrade_strips_img() {

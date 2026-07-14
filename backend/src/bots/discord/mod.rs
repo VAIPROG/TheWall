@@ -96,8 +96,16 @@ pub fn register_commands(oauth: OAuthConfig) {
 }
 
 /// Map framework command args to Discord application-command options.
-/// String→3, Int→4, Bool→5, Sub(subs)→1 (SUB_COMMAND) with nested options built
-/// recursively (a sub-arg that is itself `Sub` becomes a nested SUB_COMMAND).
+/// String→3, Int→4, Bool→5, Sub(leaves)→1 (SUB_COMMAND) whose options are the
+/// BARE-kind leaves.
+///
+/// Convention (shared with the Telegram adapter): a subcommand-style command
+/// lists its subcommands as its TOP-LEVEL args, each `Sub(leaf_args)` with
+/// bare-kind leaves. So a top-level `Sub` becomes a SUB_COMMAND (type 1) and its
+/// leaves map to plain options (3/4/5). A nested `Sub`-inside-`Sub` would be a
+/// SUB_COMMAND_GROUP (type 2) and is NOT produced or supported here: a type-1
+/// SUB_COMMAND may only contain leaf options, so emitting a subcommand inside a
+/// subcommand would be rejected by Discord at registration.
 fn args_to_options(args: &[CommandArg]) -> Vec<Value> {
     args.iter().map(arg_to_option).collect()
 }
@@ -285,6 +293,8 @@ fn parse_options(v: &Value) -> (Option<String>, HashMap<String, ArgValue>) {
         return (None, args);
     };
     if let Some(first) = opts.first() {
+        // Handles SUB_COMMAND (type 1) only; SUB_COMMAND_GROUP (type 2) is not
+        // used/handled (a future grouped command would need explicit support).
         if first.get("type").and_then(|t| t.as_u64()) == Some(1) {
             let sub = first.get("name").and_then(|n| n.as_str()).map(String::from);
             if let Some(sub_opts) = first.get("options").and_then(|o| o.as_array()) {
