@@ -704,3 +704,116 @@ ClanApplicationReview:
         $ref: "../components/responses/common.yaml#/NotFound"
       "409":
         $ref: "../components/responses/common.yaml#/Conflict"
+
+# ── Discord clan integration (v6.2.8) ────────────────────────────────────────
+ClansDiscordOwnedGuilds:
+  get:
+    tags: [Clans]
+    summary: List the caller's server-verified owned Discord guild ids
+    operationId: clansDiscordOwnedGuilds
+    description: |
+      Returns the Discord guild ids the caller was verified to own during the
+      most recent clan-guilds OAuth round-trip (empty if none/expired — the
+      client re-runs the consent via `/auth/oauth/start` with `intent=clan-guilds`).
+    security: [{ BearerAuth: [] }]
+    responses:
+      "200":
+        description: Verified owned guild ids.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties: { id: { type: string } }
+
+ClansSiteSuggestion:
+  get:
+    tags: [Clans]
+    summary: The caller's filianislost site-clan suggestion
+    operationId: clansSiteSuggestion
+    description: The stored site-clan the caller can import via `/clans/from-site`, or 204 when none.
+    security: [{ BearerAuth: [] }]
+    responses:
+      "200":
+        description: The suggestion.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source: { type: string }
+                externalId: { type: string }
+                name: { type: string }
+                displayName: { type: string, nullable: true }
+                discordId: { type: string, nullable: true }
+                icon: { type: string, nullable: true }
+      "204": { description: No site clan to import. }
+
+ClansFromGuild:
+  post:
+    tags: [Clans]
+    summary: Create an owner-verified clan from an owned Discord guild
+    operationId: clansFromGuild
+    description: |
+      Creates a clan bound to a Discord guild the caller was server-verified to
+      own (the guild id must be in the caller's verified cache; single-use).
+      `ownerVerified=true`, `ownerVerifiedVia=discord`.
+    security: [{ BearerAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [guildId]
+            properties:
+              guildId: { type: string }
+              name: { type: string }
+              tag: { type: string }
+    responses:
+      "200":
+        description: Created clan id.
+        content:
+          application/json:
+            schema: { type: object, properties: { id: { type: string, format: uuid } } }
+      "403": { description: Guild ownership not verified (re-run the Discord consent). }
+      "409": { description: This guild is already a clan. }
+
+ClansFromSite:
+  post:
+    tags: [Clans]
+    summary: Create an owner-unverified clan from the site suggestion
+    operationId: clansFromSite
+    description: Creates a clan from the caller's stored filianislost suggestion; `ownerVerified=false` until confirmed.
+    security: [{ BearerAuth: [] }]
+    responses:
+      "200":
+        description: Created clan id.
+        content:
+          application/json:
+            schema: { type: object, properties: { id: { type: string, format: uuid } } }
+      "409": { description: No site clan to import, or the clan already exists. }
+
+ClansVerifyOwnership:
+  post:
+    tags: [Clans]
+    summary: Verify ownership of an unverified clan via Discord
+    operationId: clansVerifyOwnership
+    description: |
+      A clan admin proves ownership of the clan's bound Discord guild (the guild
+      id must be in the caller's verified cache) → flips `ownerVerified=true`.
+    security: [{ BearerAuth: [] }]
+    parameters:
+      - name: clanId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    responses:
+      "200":
+        description: Clan id (now verified).
+        content:
+          application/json:
+            schema: { type: object, properties: { id: { type: string, format: uuid } } }
+      "403": { description: Not a clan admin, or guild ownership not verified. }
+      "409": { description: Clan has no Discord server to verify. }

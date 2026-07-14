@@ -33,6 +33,13 @@ pub struct ClanV3 {
     pub join_policy: String,
     pub settings: serde_json::Value,
     pub moderation: serde_json::Value,
+    // +043 ownership verification
+    #[sqlx(default)]
+    pub owner_verified: bool,
+    #[sqlx(default)]
+    pub owner_verified_via: Option<String>,
+    #[sqlx(default)]
+    pub owner_verified_at: Option<DateTime<Utc>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +100,9 @@ pub struct ClanView {
     pub links: Vec<serde_json::Value>,
     pub max_members: Option<i32>,
     pub stats: ClanStats,
+    pub owner_verified: bool,
+    pub owner_verified_via: Option<String>,
+    pub owner_verified_at: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub viewer: Option<ClanViewerContext>,
     #[serde(skip_serializing_if = "Option::is_none")]

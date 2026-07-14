@@ -321,6 +321,21 @@ paths:
   /clans/new:
     $ref: "./paths/clans.yaml#/ClansNew"
 
+  /clans/discord/owned-guilds:
+    $ref: "./paths/clans.yaml#/ClansDiscordOwnedGuilds"
+
+  /clans/site-suggestion:
+    $ref: "./paths/clans.yaml#/ClansSiteSuggestion"
+
+  /clans/from-guild:
+    $ref: "./paths/clans.yaml#/ClansFromGuild"
+
+  /clans/from-site:
+    $ref: "./paths/clans.yaml#/ClansFromSite"
+
+  /clans/{clanId}/verify-ownership:
+    $ref: "./paths/clans.yaml#/ClansVerifyOwnership"
+
   /clans/{clanId}:
     $ref: "./paths/clans.yaml#/ClanById"
 

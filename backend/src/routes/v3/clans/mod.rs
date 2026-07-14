@@ -51,7 +51,8 @@ pub(crate) async fn load_clan(
         r#"SELECT id, source, external_id, name, display_name, discord_id, icon,
                   stats, created_at, updated_at,
                   avatar_url, banner_url, description, tag, verified, discoverable,
-                  lang, max_members, owner_id, join_policy, settings, moderation
+                  lang, max_members, owner_id, join_policy, settings, moderation,
+                  owner_verified, owner_verified_via, owner_verified_at
            FROM clans WHERE id = $1"#,
     )
     .bind(id)
@@ -241,6 +242,9 @@ pub(crate) async fn build_clan_view(
             template_count,
             online_count: None,
         },
+        owner_verified: clan.owner_verified,
+        owner_verified_via: clan.owner_verified_via,
+        owner_verified_at: clan.owner_verified_at,
         viewer,
         moderation,
     })

@@ -69,7 +69,8 @@ pub async fn list_clans(
                       c.icon, c.stats, c.created_at, c.updated_at,
                       c.avatar_url, c.banner_url, c.description, c.tag, c.verified,
                       c.discoverable, c.lang, c.max_members, c.owner_id, c.join_policy,
-                      c.settings, c.moderation
+                      c.settings, c.moderation,
+                      c.owner_verified, c.owner_verified_via, c.owner_verified_at
                FROM clans c
                WHERE ($1 OR c.discoverable = TRUE)
                  AND c.name ILIKE $2
@@ -99,7 +100,8 @@ pub async fn list_clans(
                       c.icon, c.stats, c.created_at, c.updated_at,
                       c.avatar_url, c.banner_url, c.description, c.tag, c.verified,
                       c.discoverable, c.lang, c.max_members, c.owner_id, c.join_policy,
-                      c.settings, c.moderation
+                      c.settings, c.moderation,
+                      c.owner_verified, c.owner_verified_via, c.owner_verified_at
                FROM clans c
                WHERE ($1 OR c.discoverable = TRUE)
                ORDER BY {order_clause}
