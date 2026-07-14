@@ -94,7 +94,21 @@ pub async fn get(
         HeaderValue::from_static("private, must-revalidate"),
     );
 
-    Ok((StatusCode::OK, resp_headers, Json(template)).into_response())
+    // Anonymity: when the author chose to be anonymous, a viewer who is neither
+    // the owner nor global staff must not be able to recover the creator — so
+    // redact the identity columns (`author` username + `user_id`, which is
+    // otherwise resolvable to a username). The document's own author field is
+    // already "anon"/null and carries no identity.
+    let viewer_is_owner = user_id == Some(template.user_id);
+    let mut body = serde_json::to_value(&template).unwrap_or(serde_json::Value::Null);
+    if !viewer_is_owner && !privileged && super::acl::author_hidden(&template.document) {
+        if let Some(obj) = body.as_object_mut() {
+            obj.insert("author".into(), serde_json::Value::Null);
+            obj.insert("userId".into(), serde_json::Value::Null);
+        }
+    }
+
+    Ok((StatusCode::OK, resp_headers, Json(body)).into_response())
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +129,16 @@ pub async fn list(
     let privileged = super::acl::is_privileged(&state.pool, user_id).await;
     let visibility = super::acl::view_sql(6, privileged);
     let rows = sqlx::query_as::<_, TemplateSummary>(&format!(
-        r#"SELECT id, user_id, name, x, y, scale, scope, status,
+        r#"SELECT id,
+                  -- Anonymity: hide the creator id on anonymous templates from
+                  -- anyone but the owner or global staff (`$7`). An anon row is
+                  -- one whose document.author is not a full object.
+                  CASE WHEN (document -> 'author' IS NULL
+                             OR jsonb_typeof(document -> 'author') <> 'object')
+                            AND NOT $7
+                            AND ($6::uuid IS NULL OR user_id <> $6)
+                       THEN NULL ELSE user_id END AS user_id,
+                  name, x, y, scale, scope, status,
                   version, clan_id, verified_at, created_at,
                   (document IS NOT NULL) AS has_document,
                   COALESCE(jsonb_array_length(document -> 'templates'), 1) AS template_count,
@@ -135,6 +158,7 @@ pub async fn list(
     .bind(q.cursor)
     .bind(limit)
     .bind(user_id)
+    .bind(privileged)
     .fetch_all(&state.pool)
     .await
     .or_500()?;

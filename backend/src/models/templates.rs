@@ -93,7 +93,9 @@ pub struct TemplateCreated {
 #[serde(rename_all = "camelCase")]
 pub struct TemplateSummary {
     pub id: Uuid,
-    pub user_id: Uuid,
+    /// The creator's id, or `None` when redacted for anonymity (an anonymous
+    /// template shown to a viewer who isn't the owner or global staff).
+    pub user_id: Option<Uuid>,
     pub name: String,
     pub x: i32,
     pub y: i32,

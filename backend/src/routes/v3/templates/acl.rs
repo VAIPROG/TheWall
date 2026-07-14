@@ -133,6 +133,18 @@ pub fn view_sql(user_bind: usize, is_privileged: bool) -> String {
     )
 }
 
+/// True when a document's author is anonymous — the `author` field is `"anon"`,
+/// `null`, or absent, i.e. NOT a full author object. Full-mode authors carry a
+/// JSON object (`{ id, name, … }`); every other shape hides the creator. Used
+/// to redact the identity columns (`author`, `user_id`) from read responses for
+/// viewers who aren't the owner or global staff.
+pub fn author_hidden(document: &Option<Value>) -> bool {
+    match document.as_ref().and_then(|d| d.get("author")) {
+        Some(a) => !a.is_object(),
+        None => true,
+    }
+}
+
 /// Whether a viewer is a global moderator/admin/owner — such staff see every
 /// template regardless of scope/whitelist/blocklist (blocklist immunity).
 /// Anonymous callers, or a role-lookup failure, yield `false`.
