@@ -4,6 +4,7 @@ use crate::http_error::ResultExt;
 mod applications;
 mod create;
 mod detail;
+pub mod discord;
 mod invites;
 mod join;
 mod lifecycle;
@@ -17,6 +18,9 @@ mod templates;
 pub use applications::{list_applications, review_application};
 pub use create::create_clan;
 pub use detail::{get_clan, update_clan};
+pub use discord::{
+    create_from_guild, create_from_site, owned_guilds, site_suggestion, verify_ownership,
+};
 pub use invites::{create_invite, list_invites, revoke_invite};
 pub use join::{apply_for_role, join_clan};
 pub use lifecycle::{disband_clan, leave_clan};
@@ -47,7 +51,8 @@ pub(crate) async fn load_clan(
         r#"SELECT id, source, external_id, name, display_name, discord_id, icon,
                   stats, created_at, updated_at,
                   avatar_url, banner_url, description, tag, verified, discoverable,
-                  lang, max_members, owner_id, join_policy, settings, moderation
+                  lang, max_members, owner_id, join_policy, settings, moderation,
+                  owner_verified, owner_verified_via, owner_verified_at
            FROM clans WHERE id = $1"#,
     )
     .bind(id)
@@ -237,6 +242,9 @@ pub(crate) async fn build_clan_view(
             template_count,
             online_count: None,
         },
+        owner_verified: clan.owner_verified,
+        owner_verified_via: clan.owner_verified_via,
+        owner_verified_at: clan.owner_verified_at,
         viewer,
         moderation,
     })

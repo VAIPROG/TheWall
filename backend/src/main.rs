@@ -6,6 +6,7 @@ mod discord_commands;
 mod discord_gateway;
 mod error_envelope;
 mod formats;
+mod guild_cache;
 mod http_error;
 mod models;
 mod owner_seed;
@@ -37,6 +38,7 @@ pub struct AppState {
     pub config: AppConfig,
     pub started_at: std::time::SystemTime,
     pub session_cache: std::sync::Arc<crate::session_cache::SessionCache>,
+    pub guild_cache: std::sync::Arc<crate::guild_cache::GuildCache>,
 }
 
 // Re-export config types so the rest of the crate can keep using
@@ -141,6 +143,7 @@ async fn main() {
         config,
         started_at: std::time::SystemTime::now(),
         session_cache: std::sync::Arc::new(crate::session_cache::SessionCache::new()),
+        guild_cache: std::sync::Arc::new(crate::guild_cache::GuildCache::new()),
     };
 
     // Discord gateway: keeps the bot's presence Online and serves slash
@@ -708,6 +711,27 @@ async fn main() {
         .route(
             "/api/v3/clans/{id}",
             get(routes::v3::clans::get_clan).patch(routes::v3::clans::update_clan),
+        )
+        // --- V3 clans: Discord owned-guilds + site-clan suggestion ------------
+        .route(
+            "/api/v3/clans/discord/owned-guilds",
+            get(routes::v3::clans::owned_guilds),
+        )
+        .route(
+            "/api/v3/clans/site-suggestion",
+            get(routes::v3::clans::site_suggestion),
+        )
+        .route(
+            "/api/v3/clans/from-guild",
+            post(routes::v3::clans::create_from_guild),
+        )
+        .route(
+            "/api/v3/clans/from-site",
+            post(routes::v3::clans::create_from_site),
+        )
+        .route(
+            "/api/v3/clans/{id}/verify-ownership",
+            post(routes::v3::clans::verify_ownership),
         )
         // --- V3 clans: members roster + role/kick hierarchy ------------------
         .route(

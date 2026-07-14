@@ -107,6 +107,21 @@ Clan:
     verified:
       type: boolean
       description: Whether the clan has been officially verified.
+    ownerVerified:
+      type: boolean
+      description: |
+        Whether the clan creator's ownership is proven. True for clans created
+        from a Discord guild the caller owns; false for site/manual clans until
+        confirmed via POST /clans/{clanId}/verify-ownership.
+    ownerVerifiedVia:
+      type: string
+      nullable: true
+      description: How ownership was verified (`discord`), or null if unverified.
+    ownerVerifiedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When ownership was verified, or null if unverified.
     discoverable:
       type: boolean
       description: Whether the clan appears in public search and discovery listings.
