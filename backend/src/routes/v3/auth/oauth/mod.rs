@@ -16,13 +16,14 @@ use axum::{
     Json,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
 };
 use uuid::Uuid;
 
 use crate::{
     AppState,
     auth::{issue_session_pair, verify_token},
-    models::{OAuthCallbackBody, OAuthStartQuery, OAuthStartResponse, User, V3AuthResponse},
+    models::{OAuthCallbackBody, OAuthStartQuery, OAuthStartResponse, User},
 };
 
 // ---------------------------------------------------------------------------
@@ -44,15 +45,22 @@ pub async fn start(
 
     // 3. Validate intent.
     let intent = q.intent.as_str();
-    if intent != "login" && intent != "link" {
+    if intent != "login" && intent != "link" && intent != "clan-guilds" {
         return Err((
             StatusCode::BAD_REQUEST,
-            "intent must be 'login' or 'link'".to_string(),
+            "intent must be 'login', 'link', or 'clan-guilds'".to_string(),
+        ));
+    }
+    // clan-guilds is a Discord-only flow (owned-guild enumeration).
+    if intent == "clan-guilds" && provider != Provider::Discord {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "intent=clan-guilds is only supported for provider=discord".to_string(),
         ));
     }
 
-    // 4. For "link", require a valid Bearer JWT — extract account_id.
-    let account_id: Option<Uuid> = if intent == "link" {
+    // 4. For "link"/"clan-guilds", require a valid Bearer JWT — extract account_id.
+    let account_id: Option<Uuid> = if intent == "link" || intent == "clan-guilds" {
         let uid = headers
             .get(axum::http::header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
@@ -61,7 +69,7 @@ pub async fn start(
             .and_then(|claims| Uuid::parse_str(&claims.sub).ok())
             .ok_or((
                 StatusCode::UNAUTHORIZED,
-                "intent=link requires an authenticated session (Bearer token)".to_string(),
+                "this intent requires an authenticated session (Bearer token)".to_string(),
             ))?;
         Some(uid)
     } else {
@@ -101,6 +109,7 @@ pub async fn start(
         &redirect_uri,
         &state_token,
         &code_challenge,
+        intent,
     );
 
     Ok(Json(OAuthStartResponse {
@@ -117,7 +126,7 @@ pub async fn callback(
     State(state): State<AppState>,
     Path(provider_str): Path<String>,
     Json(body): Json<OAuthCallbackBody>,
-) -> Result<Json<V3AuthResponse>, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
     // 1. Resolve provider.
     let provider = Provider::parse(&provider_str)
         .ok_or((StatusCode::BAD_REQUEST, format!("unknown provider: {provider_str}")))?;
@@ -145,6 +154,28 @@ pub async fn callback(
     ))?;
     let redirect_uri = redirect_uri_opt
         .unwrap_or_else(|| state.config.oauth.discord_redirect_uri.clone());
+
+    // 2b. clan-guilds flow: exchange the code for a raw Discord token, fetch the
+    // caller's owned guilds, cache them, and discard the token. No identity link.
+    if purpose == "clan-guilds" {
+        if provider != Provider::Discord {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "clan-guilds flow is only supported for provider=discord".to_string(),
+            ));
+        }
+        let uid = stored_user_id.ok_or((
+            StatusCode::BAD_REQUEST,
+            "clan-guilds flow requires a logged-in user".to_string(),
+        ))?;
+        let access_token =
+            providers::discord_code_to_token(&state, &body.code, &code_verifier, &redirect_uri)
+                .await?;
+        crate::routes::v3::clans::discord::ingest_owned_guilds(&state, uid, &access_token).await?;
+        return Ok(
+            Json(serde_json::json!({ "ok": true, "purpose": "clan-guilds" })).into_response(),
+        );
+    }
 
     // 3. Exchange code for provider identity.
     let identity = providers::code_to_identity(
@@ -288,7 +319,7 @@ pub async fn callback(
         .await
         .or_500()?;
 
-    Ok(Json(crate::routes::v3::auth::v3_response(access, refresh, &user)))
+    Ok(Json(crate::routes::v3::auth::v3_response(access, refresh, &user)).into_response())
 }
 
 // ---------------------------------------------------------------------------

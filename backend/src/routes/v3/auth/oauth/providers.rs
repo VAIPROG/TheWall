@@ -86,6 +86,7 @@ pub fn authorize_url(
     redirect_uri: &str,
     state: &str,
     code_challenge: &str,
+    purpose: &str,
 ) -> String {
     match provider {
         Provider::Telegram => format!(
@@ -98,16 +99,26 @@ pub fn authorize_url(
             st = url_encode(state),
             ch = url_encode(code_challenge),
         ),
-        Provider::Discord => format!(
-            "https://discord.com/api/oauth2/authorize\
-             ?client_id={cid}&redirect_uri={uri}&response_type=code\
-             &scope=identify&state={st}&prompt=consent\
-             &code_challenge={ch}&code_challenge_method=S256",
-            cid = url_encode(client_id),
-            uri = url_encode(redirect_uri),
-            st = url_encode(state),
-            ch = url_encode(code_challenge),
-        ),
+        Provider::Discord => {
+            // The clan-guilds flow needs the `guilds` scope to enumerate the
+            // caller's owned guilds; login/link only need `identify`.
+            let scope = if purpose == "clan-guilds" {
+                "identify guilds"
+            } else {
+                "identify"
+            };
+            format!(
+                "https://discord.com/api/oauth2/authorize\
+                 ?client_id={cid}&redirect_uri={uri}&response_type=code\
+                 &scope={scope}&state={st}&prompt=consent\
+                 &code_challenge={ch}&code_challenge_method=S256",
+                cid = url_encode(client_id),
+                uri = url_encode(redirect_uri),
+                scope = url_encode(scope),
+                st = url_encode(state),
+                ch = url_encode(code_challenge),
+            )
+        }
         Provider::GitHub => format!(
             "https://github.com/login/oauth/authorize\
              ?client_id={cid}&redirect_uri={uri}&scope=read%3Auser\
@@ -398,6 +409,61 @@ async fn discord_code_to_identity(
         username: Some(username),
         avatar_url,
     })
+}
+
+/// Exchange a Discord authorization code for a raw access token (PKCE).
+///
+/// Used by the `clan-guilds` flow, which needs the token itself (to hit
+/// `/users/@me/guilds`) rather than a resolved identity. The token is used
+/// once by the caller and then discarded — never persisted.
+pub async fn discord_code_to_token(
+    state: &AppState,
+    code: &str,
+    code_verifier: &str,
+    redirect_uri: &str,
+) -> Result<String, (StatusCode, String)> {
+    let client_id = state.config.oauth.discord_client_id.clone().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "discord oauth not configured".to_string(),
+    ))?;
+    let client_secret = state.config.oauth.discord_client_secret.clone().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "discord oauth secret missing".to_string(),
+    ))?;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .or_500()?;
+
+    let form = build_form(&[
+        ("client_id", client_id.as_str()),
+        ("client_secret", client_secret.as_str()),
+        ("grant_type", "authorization_code"),
+        ("code", code),
+        ("redirect_uri", redirect_uri),
+        ("code_verifier", code_verifier),
+    ]);
+    let tok_resp = client
+        .post("https://discord.com/api/v10/oauth2/token")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(form)
+        .send()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("discord token: {e}")))?;
+
+    if !tok_resp.status().is_success() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("discord token status {}", tok_resp.status()),
+        ));
+    }
+    let tok: DiscordTokenResp = tok_resp
+        .json()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("discord token decode: {e}")))?;
+
+    Ok(tok.access_token)
 }
 
 // ---------------------------------------------------------------------------

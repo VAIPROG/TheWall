@@ -4,6 +4,7 @@ use crate::http_error::ResultExt;
 mod applications;
 mod create;
 mod detail;
+pub mod discord;
 mod invites;
 mod join;
 mod lifecycle;
