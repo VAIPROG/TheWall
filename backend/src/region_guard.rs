@@ -19,7 +19,7 @@ use tokio::time::{MissedTickBehavior, interval};
 use uuid::Uuid;
 
 use crate::sites::{Source, config_for};
-use crate::telegram_rich::{esc, send_rich_html};
+use crate::bots::outbound::{esc, send_rich_html};
 use crate::{NotifyTargets, OAuthConfig};
 
 const TICK: Duration = Duration::from_secs(60);

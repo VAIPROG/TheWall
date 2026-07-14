@@ -16,5 +16,12 @@ pub fn registry() -> Arc<Registry> {
     REG.get_or_init(|| Arc::new(Registry::build())).clone()
 }
 
-/// Spawn the bot framework runtime. Filled in Task 7; legacy bots still run.
-pub fn spawn(_state: crate::AppState) {}
+/// Start every enabled bot adapter. Builds the shared registry once; the
+/// Telegram long-poll loop, Discord slash registration, and Discord gateway
+/// presence all share it.
+pub fn spawn(state: crate::AppState) {
+    let reg = registry(); // Arc<Registry>, built once (OnceLock)
+    crate::bots::telegram::spawn(state.clone(), reg);
+    crate::bots::discord::register_commands(state.config.oauth.clone());
+    crate::bots::discord::gateway_spawn(state.clone());
+}

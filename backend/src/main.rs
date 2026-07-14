@@ -1,10 +1,6 @@
 mod auth;
-mod bot_commands;
 mod bots;
 mod config;
-mod bot_core;
-mod discord_commands;
-mod discord_gateway;
 mod error_envelope;
 mod formats;
 mod guild_cache;
@@ -18,7 +14,6 @@ mod session_cache;
 mod signals;
 mod sites;
 mod snapshot_worker;
-mod telegram_rich;
 mod wall_tiles;
 
 use axum::{
@@ -132,13 +127,8 @@ async fn main() {
     snapshot_worker::spawn(pool.clone(), config.oauth.clone(), config.notify.clone());
     // Protected-region guard: server-side state verification + alerts.
     region_guard::spawn(pool.clone(), config.oauth.clone(), config.notify.clone());
-    // Telegram admin command bot (/help /status /snapshot /logs /regions).
-    bot_commands::spawn(pool.clone(), config.oauth.clone(), config.notify.clone());
     // Paint refill reminders: 10s sweep, DM delivery via linked channels.
     reminder_worker::spawn(pool.clone(), config.oauth.clone());
-    // Discord slash-command registration (commands answered via the
-    // /api/v2/discord/interactions webhook below).
-    discord_commands::register_commands(config.oauth.clone());
 
     let state = AppState {
         pool,
@@ -149,9 +139,11 @@ async fn main() {
         callback_store: std::sync::Arc::new(crate::bots::core::callbacks::CallbackStore::new()),
     };
 
-    // Discord gateway: keeps the bot's presence Online and serves slash
-    // commands as a fallback when the portal has no Interactions Endpoint URL.
-    discord_gateway::spawn(state.clone());
+    // Bot framework (v6.3.0): starts the Telegram long-poll adapter, registers
+    // Discord slash commands, and holds the Discord gateway presence — all on
+    // the shared command registry. Answers the /api/v2/discord/interactions
+    // webhook below.
+    bots::spawn(state.clone());
 
     // CORS is handled by nginx — don't add a CorsLayer here or headers will duplicate.
 
@@ -516,7 +508,7 @@ async fn main() {
         //     verified, public route — auth is the Ed25519 signature itself) --
         .route(
             "/api/v2/discord/interactions",
-            post(discord_commands::interactions),
+            post(bots::discord::interactions),
         )
         // --- avatars v2 ---------------------------------------------------------
         .route(
