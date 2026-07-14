@@ -1,4 +1,5 @@
 pub mod account;
+pub mod admin;
 pub mod wall;
 use crate::bots::core::command::Command;
 pub fn all_commands() -> Vec<Box<dyn Command>> {
@@ -9,5 +10,11 @@ pub fn all_commands() -> Vec<Box<dyn Command>> {
         Box::new(account::Help),
         Box::new(account::Me),
         Box::new(account::Link),
+        Box::new(admin::Status),
+        Box::new(admin::Users),
+        Box::new(admin::Logs),
+        Box::new(admin::Regions),
+        Box::new(admin::Announce),
+        Box::new(admin::Moderate),
     ]
 }
