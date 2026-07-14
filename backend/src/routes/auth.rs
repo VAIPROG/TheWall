@@ -53,26 +53,40 @@ async fn sync_clan_from_site(
         return Ok(());
     };
 
-    let clan_uuid: Uuid = sqlx::query_scalar(
-        r#"INSERT INTO clans (id, source, external_id, name, display_name, discord_id, icon)
-           VALUES (gen_random_uuid(), 'filianislost', $1, $2, $3, $4, $5)
-           ON CONFLICT (source, external_id) DO UPDATE
-             SET name = EXCLUDED.name,
-                 display_name = COALESCE(EXCLUDED.display_name, clans.display_name),
-                 discord_id = COALESCE(EXCLUDED.discord_id, clans.discord_id),
-                 icon = COALESCE(EXCLUDED.icon, clans.icon),
-                 updated_at = NOW()
-           RETURNING id"#,
+    // Record/refresh the site-clan suggestion so the client can create a clan
+    // from it on demand. We NO LONGER auto-create the clan here.
+    sqlx::query(
+        r#"INSERT INTO clan_suggestions
+               (user_id, source, external_id, name, display_name, discord_id, icon, updated_at)
+           VALUES ($1, 'filianislost', $2, $3, $4, $5, $6, NOW())
+           ON CONFLICT (user_id) DO UPDATE
+             SET source = 'filianislost', external_id = EXCLUDED.external_id,
+                 name = EXCLUDED.name, display_name = EXCLUDED.display_name,
+                 discord_id = EXCLUDED.discord_id, icon = EXCLUDED.icon,
+                 updated_at = NOW()"#,
     )
+    .bind(user_id)
     .bind(&ext)
     .bind(&name)
     .bind(&clan.display_name)
     .bind(&clan.discord_id)
     .bind(&clan.icon)
-    .fetch_one(pool)
+    .execute(pool)
     .await?;
 
-    // Normalise site clan_role to our enum.
+    // Attach membership ONLY if the clan already exists (legacy clans); never
+    // create a new clan from a login.
+    let existing: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM clans WHERE source = 'filianislost' AND external_id = $1",
+    )
+    .bind(&ext)
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(clan_uuid) = existing else {
+        return Ok(());
+    };
+
     let our_role = match clan.role.as_deref() {
         Some("owner") | Some("admin") => "admin",
         Some("moderator") | Some("mod") => "moderator",
