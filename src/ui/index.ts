@@ -3,7 +3,6 @@ export { wireChats } from "./chats";
 export { wireOverlay, applyScalePct } from "./overlay-tab";
 export { wireProfile } from "./profile-tab";
 export { wireSettings } from "./settings-tab";
-export { wireShare } from "./share-tab";
 export { wireTemplates } from "./templates/shell";
 export * from "./paint";
 export { wireWindowChrome } from "./window-chrome";
@@ -13,7 +12,6 @@ import { wireAnimAndProtect } from "../anim-protect-wire";
 import { wireLinks } from "../links-wire";
 import { wireWindowChrome } from "./window-chrome";
 import { wireOverlay } from "./overlay-tab";
-import { wireShare } from "./share-tab";
 import { wireTemplates } from "./templates/shell";
 import { wireProfile } from "./profile-tab";
 import { wireChats } from "./chats";
@@ -32,10 +30,8 @@ export function wireExtensionUI(win: HTMLElement): void {
   // Window chrome: tab switching, drag, resize grip, min/close, mail-tab listener
   wireWindowChrome(win);
 
-  // overlay tab
+  // overlay tab (incl. the Share/Publish hand-off button)
   wireOverlay(win);
-  // share tab (import / export wiring)
-  wireShare(win);
 
   // draw tab
   win.querySelectorAll(".wp-sw button").forEach((b) =>

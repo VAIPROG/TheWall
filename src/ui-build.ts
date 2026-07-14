@@ -11,7 +11,6 @@ import { initGuide } from "./guide";
 import { wireUI } from "./ui-wire";
 import { syncProfile, loadGuilds, refreshNotifications } from "./data";
 import { buildOverlayPane } from "./ui/overlay-tab";
-import { buildSharePane } from "./ui/share-tab";
 import { buildTemplatesPane } from "./ui/templates/shell";
 import { buildMailPane } from "./ui/build-mail";
 import { buildSocialPane } from "./ui/build-social";
@@ -38,7 +37,6 @@ export function buildUI(): void {
       <div class="wp-body">
           <div class="wp-tabs">
               <div class="wp-tab active" data-p="ov">${ic("grid")}${t("tabOverlay")}</div>
-              <div class="wp-tab" data-p="sh">${ic("send")}${t("tabShare")}</div>
               <div class="wp-tab" data-p="tp">${ic("disk")}${t("tabTpl")}</div>
               <div class="wp-tab" data-p="ma">${ic("bell")}Mail</div>
               <div class="wp-tab" data-p="so">${ic("globe")}${t("tabSocial")}</div>
@@ -51,9 +49,7 @@ export function buildUI(): void {
           <div class="wp-content">
               <!-- OVERLAY -->
               ${buildOverlayPane()}
-              <!-- SHARE (unified import / publish / export) -->
-              ${buildSharePane()}
-              <!-- TEMPLATES (catalog only — upload moved to Share tab) -->
+              <!-- TEMPLATES (V3 super-tab: browse / detail / publish / share) -->
               ${buildTemplatesPane()}
               <!-- MAIL -->
               ${buildMailPane()}

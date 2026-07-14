@@ -20,6 +20,7 @@ import { previewUrl, animatedUrl, exportUrl, shareLink, getUsername } from "./ap
 import { computePercentPainted, formatPct } from "./percent";
 import { openPublish, resetToBrowse } from "./shell";
 import type { AuthorVisibility, Scope } from "./api";
+import { isAllowedOnDomain, domainsOf } from "../../domain-guard";
 
 interface DocTemplate {
   name?: string;
@@ -164,6 +165,17 @@ function render(tpl: FullTpl): string {
         })
       : "";
 
+  // Site restriction (domainsWhitelist) — a courtesy note when this template is
+  // not shared for the current site.
+  const domains = domainsOf(doc);
+  const domainNote =
+    domains?.length && !isAllowedOnDomain(domains)
+      ? group(
+          t("tplRestricted") || "Site-restricted",
+          `<div class="wd-status wd-status--warn">${esc((t("tplNotForSite") || "This template isn't shared for this site.") + " " + domains.join(", "))}</div>`,
+        )
+      : "";
+
   const labelRow = (label: string, buttons: string) =>
     `<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span style="font-size:10px;color:var(--sub);min-width:66px">${esc(label)}</span>${buttons}</div>`;
 
@@ -202,6 +214,7 @@ function render(tpl: FullTpl): string {
       ${group(t("tplNotes") || "Notes", notesBody)}
       ${bundleBody}
       ${rejected}
+      ${domainNote}
       <div style="margin-top:8px">${actions}</div>
       <div class="wd-tpl-id" title="${esc(tpl.id)}">${esc(tpl.id)}</div>
     </div>`;
@@ -213,6 +226,10 @@ async function loadOntoWall(id: string, btn: HTMLElement): Promise<void> {
   btn.classList.add("is-working");
   try {
     const doc = await c.get<unknown>(`/templates/${encodeURIComponent(id)}/wall-dev`);
+    if (!isAllowedOnDomain(domainsOf(doc))) {
+      toast(t("tplLoad") || "Load", t("tplNotForSite") || "This template isn't shared for this site.");
+      return;
+    }
     const { set } = decodeAny(doc as object);
     const layer = primaryLayer(set);
     if (!layer) throw new Error("no layer");

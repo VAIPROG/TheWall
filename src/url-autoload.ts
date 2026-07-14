@@ -27,6 +27,7 @@ import { decodeAny } from "./formats/shared/format-registry";
 import { applyLayer } from "./formats/apply-layer";
 import { layerCount, primaryLayer, summarize } from "./formats/shared/template-set";
 import { UnknownFormatError } from "./formats/shared/parse-errors";
+import { isAllowedOnDomain, domainsOf } from "./domain-guard";
 
 const PARAM = "the_wall_dev";
 const CHARITY_PARAM = "charity";
@@ -52,6 +53,13 @@ function stripParam(name: string): void {
  * tab) can reuse the same dispatching pipeline as the URL auto-loader.
  */
 export async function applyParsedJson(j: any, sourceLabel: string): Promise<boolean> {
+  // Courtesy domainsWhitelist gate: don't apply a template the author restricted
+  // to other sites.
+  if (!isAllowedOnDomain(domainsOf(j))) {
+    toast("Auto-load", "This template isn't shared for this site.");
+    log.warn("AUTOLOAD", `domainsWhitelist blocked ${sourceLabel} on ${location.hostname}`);
+    return false;
+  }
   let set;
   try {
     // decodeAny accepts either a string or a parsed object.

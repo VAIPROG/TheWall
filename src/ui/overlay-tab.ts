@@ -66,7 +66,15 @@ export function applyScalePct(pct: number, immediate: boolean): void {
     }, 220);
 }
 
-export function wireOverlay(_win: HTMLElement): void {
+export function wireOverlay(win: HTMLElement): void {
+  // Overlay's "Share/Publish" button → jump to the Templates super-tab and open
+  // Publish, pre-filled with the current overlay (built via the handoff bridge).
+  $("btn-jump-share")?.addEventListener("click", async () => {
+    win.querySelector<HTMLElement>('.wp-tab[data-p="tp"]')?.click();
+    const { publishCurrentOverlay } = await import("./templates/handoff");
+    await publishCurrentOverlay();
+  });
+
   $("file-upload")!.addEventListener("change", (e: Event) => {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (!f) return;
@@ -311,23 +319,23 @@ export function wireOverlay(_win: HTMLElement): void {
     // goes click-through again (otherwise it would swallow wall clicks).
     if (name !== "guide" && getGuideTool()) {
       setGuideTool(null);
-      _win
+      win
         .querySelectorAll("#ov-guide-tool [data-tool]")
         .forEach((x) => x.classList.remove("is-on"));
     }
     // Scroll the panel body back to the top so the pushed screen starts at the
     // header rather than wherever the root was scrolled.
-    const content = _win.querySelector(".wp-content") as HTMLElement | null;
+    const content = win.querySelector(".wp-content") as HTMLElement | null;
     if (content) content.scrollTop = 0;
     // Refresh live data on entry.
     if (name === "progress") templateProgress(false).catch(() => {});
   };
-  _win.querySelectorAll<HTMLElement>("#ov-root [data-drill]").forEach((b) =>
+  win.querySelectorAll<HTMLElement>("#ov-root [data-drill]").forEach((b) =>
     b.addEventListener("click", () =>
       showDrill(b.dataset.drill as (typeof DRILLS)[number]),
     ),
   );
-  _win.querySelectorAll<HTMLElement>("[data-drill-back]").forEach((b) => {
+  win.querySelectorAll<HTMLElement>("[data-drill-back]").forEach((b) => {
     b.addEventListener("click", () => showDrill(null));
     b.addEventListener("keydown", (e) => {
       const k = (e as KeyboardEvent).key;
@@ -364,13 +372,13 @@ export function wireOverlay(_win: HTMLElement): void {
   // one) updates cfg.guideColor and the highlighted swatch.
   const markGuideSwatch = () => {
     const cur = (cfg.guideColor || "").toLowerCase();
-    _win
+    win
       .querySelectorAll<HTMLElement>("#ov-guide-sw [data-ghex]")
       .forEach((b) =>
         b.classList.toggle("sel", (b.dataset.ghex || "").toLowerCase() === cur),
       );
   };
-  _win.querySelectorAll<HTMLElement>("#ov-guide-sw [data-ghex]").forEach((b) =>
+  win.querySelectorAll<HTMLElement>("#ov-guide-sw [data-ghex]").forEach((b) =>
     b.addEventListener("click", () => {
       cfg.guideColor = b.dataset.ghex || cfg.guideColor;
       saveCfg();

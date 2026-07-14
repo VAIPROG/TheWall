@@ -38,6 +38,11 @@ export async function importJsonOntoWall(): Promise<void> {
     if (!file) return;
     try {
       const text = await file.text();
+      const { isAllowedOnDomain, domainsOf } = await import("../../domain-guard");
+      if (!isAllowedOnDomain(domainsOf(text))) {
+        toast("Import", "This template isn't shared for this site.");
+        return;
+      }
       const [{ decodeAny, primaryLayer }, { applyLayer }] = await Promise.all([
         import("../../formats"),
         import("../../formats/apply-layer"),
