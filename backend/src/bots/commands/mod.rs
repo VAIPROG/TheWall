@@ -1,6 +1,7 @@
 pub mod account;
 pub mod admin;
 pub mod clan;
+pub mod notify;
 pub mod templates;
 pub mod wall;
 use crate::bots::core::command::Command;
@@ -22,6 +23,8 @@ pub fn all_commands() -> Vec<Box<dyn Command>> {
         Box::new(clan::Roster),
         Box::new(clan::Applications),
         Box::new(clan::Clanchat),
+        Box::new(notify::Subscribe),
+        Box::new(notify::Unsubscribe),
         Box::new(templates::Template),
     ]
 }
