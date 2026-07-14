@@ -1,5 +1,6 @@
 mod auth;
 mod bot_commands;
+mod bots;
 mod config;
 mod bot_core;
 mod discord_commands;
