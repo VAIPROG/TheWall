@@ -1,5 +1,6 @@
 pub mod account;
 pub mod admin;
+pub mod binding;
 pub mod clan;
 pub mod notify;
 pub mod templates;
@@ -23,6 +24,8 @@ pub fn all_commands() -> Vec<Box<dyn Command>> {
         Box::new(clan::Roster),
         Box::new(clan::Applications),
         Box::new(clan::Clanchat),
+        Box::new(binding::BindClan),
+        Box::new(binding::UnbindClan),
         Box::new(notify::Subscribe),
         Box::new(notify::Unsubscribe),
         Box::new(templates::Template),
