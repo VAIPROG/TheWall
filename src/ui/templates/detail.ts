@@ -45,7 +45,8 @@ type AuthorField = { id?: string; username?: string; name?: string } | string | 
 
 export interface FullTpl {
   id: string;
-  userId: string;
+  /** null when redacted for anonymity (see api.ts TplSummary.userId). */
+  userId: string | null;
   name: string;
   x: number;
   y: number;

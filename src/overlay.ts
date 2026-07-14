@@ -126,7 +126,8 @@ export function initLayers(): void {
     guideCanvas.width = WALL_W;
     guideCanvas.height = WALL_H;
     layers.appendChild(guideCanvas);
-    guideCtx = guideCanvas.getContext("2d");
+    // willReadFrequently: guide pixels are sampled via getImageData (guide.ts).
+    guideCtx = guideCanvas.getContext("2d", { willReadFrequently: true });
   }
   bindOverlayDrag();
   bindCanvasPick();
@@ -552,7 +553,9 @@ function hashLiveRegion(): number {
     if (!_hashCanvas) _hashCanvas = document.createElement("canvas");
     _hashCanvas.width = sw;
     _hashCanvas.height = sh;
-    const hctx = _hashCanvas.getContext("2d");
+    // willReadFrequently: this scratch canvas exists purely to getImageData the
+    // downsampled live region on every change-detection poll (hot path).
+    const hctx = _hashCanvas.getContext("2d", { willReadFrequently: true });
     if (!hctx) return 0;
     hctx.drawImage(c, rx, ry, rw, rh, 0, 0, sw, sh);
     const data = hctx.getImageData(0, 0, sw, sh).data;

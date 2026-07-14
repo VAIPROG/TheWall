@@ -58,7 +58,7 @@ function quantizeToDataUrl(img: HTMLImageElement): string {
   const cv = document.createElement("canvas");
   cv.width = img.naturalWidth;
   cv.height = img.naturalHeight;
-  const cx = cv.getContext("2d")!;
+  const cx = cv.getContext("2d", { willReadFrequently: true })!;
   cx.drawImage(img, 0, 0);
   const d = cx.getImageData(0, 0, cv.width, cv.height);
   quantizeImageData(d);

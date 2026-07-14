@@ -13,7 +13,9 @@ export type Chip = "all" | "public" | "clan" | "mine";
 export interface TplSummary {
   id: string;
   name: string;
-  userId: string;
+  /** null when the creator is redacted for anonymity (anon template, viewer
+   *  is neither the owner nor global staff). */
+  userId: string | null;
   scope: string;
   status: string;
   version?: number;
