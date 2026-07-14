@@ -47,7 +47,7 @@ pub async fn create(
     }
 
     // ── 2. Convert input to the-wall-dev/2 (passthrough for native v2) ───────
-    let crate::formats::Converted { document: doc, warnings } =
+    let crate::formats::Converted { document: mut doc, warnings } =
         crate::formats::to_v2(
             &body.source.format,
             &body.source.document,
@@ -180,6 +180,17 @@ pub async fn create(
         .fetch_one(&state.pool)
         .await
         .or_500()?;
+
+    // Default: a full-mode (object) author always carries the creator's id AND
+    // nickname, so viewers see a username rather than a bare id. "anon"/null
+    // authors are left untouched (privacy choice respected).
+    if let Some(obj) = doc.get_mut("author").and_then(|a| a.as_object_mut()) {
+        obj.insert(
+            "id".to_string(),
+            serde_json::Value::String(auth.user_id.to_string()),
+        );
+        obj.insert("name".to_string(), serde_json::Value::String(username.clone()));
+    }
 
     // ── 8. INSERT ────────────────────────────────────────────────────────────
     // `share` is NOT NULL in the schema (legacy column); v3 stores truth in
