@@ -3,7 +3,7 @@
 //! create/verify clans against the server-verified owned-guild cache.
 use axum::{
     Json,
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
 
-use crate::{AppState, auth::AuthUser, http_error::ResultExt};
+use crate::{
+    AppState, auth::AuthUser, http_error::ResultExt,
+    routes::v3::utils::permissions::effective_clan_role,
+};
 
 #[derive(Debug, Deserialize)]
 struct DiscordGuild {
@@ -173,6 +176,51 @@ pub async fn create_from_guild(
     insert_admin_membership(&state, auth.user_id, clan_id).await?;
     // Give the clan its chat, exactly like create.rs does (idempotent).
     crate::routes::v3::chats::clan_chat_id(&state.pool, clan_id).await?;
+    Ok(Json(ClanCreated { id: clan_id }))
+}
+
+/// Upgrade an owner-unverified clan to verified by proving the caller owns its
+/// bound Discord guild (guild id must be in the caller's verified cache).
+pub async fn verify_ownership(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(clan_id): Path<Uuid>,
+) -> Result<Json<ClanCreated>, (StatusCode, String)> {
+    // Caller must be a clan admin (matches how members/settings gate admin
+    // actions: effective role folds in global authority, owner counts as admin).
+    let effective = effective_clan_role(&state.pool, auth.user_id, clan_id)
+        .await
+        .or_500()?;
+    if !effective.map(|r| r.is_admin()).unwrap_or(false) {
+        return Err((StatusCode::FORBIDDEN, "clan admin only".to_string()));
+    }
+
+    // Clan must carry a discord_id to verify against.
+    let discord_id: Option<String> = sqlx::query_scalar(
+        "SELECT discord_id FROM clans WHERE id = $1",
+    )
+    .bind(clan_id)
+    .fetch_optional(&state.pool)
+    .await
+    .or_500()?
+    .flatten();
+    let Some(guild_id) = discord_id else {
+        return Err((StatusCode::CONFLICT, "clan has no Discord server to verify".to_string()));
+    };
+
+    if !state.guild_cache.take(auth.user_id, &guild_id).await {
+        return Err((StatusCode::FORBIDDEN,
+            "guild ownership not verified (re-run the Discord consent)".to_string()));
+    }
+
+    sqlx::query(
+        r#"UPDATE clans SET owner_verified = TRUE, owner_verified_via = 'discord',
+               owner_verified_at = NOW() WHERE id = $1"#,
+    )
+    .bind(clan_id)
+    .execute(&state.pool)
+    .await
+    .or_500()?;
     Ok(Json(ClanCreated { id: clan_id }))
 }
 

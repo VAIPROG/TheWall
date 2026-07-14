@@ -729,6 +729,10 @@ async fn main() {
             "/api/v3/clans/from-site",
             post(routes::v3::clans::create_from_site),
         )
+        .route(
+            "/api/v3/clans/{id}/verify-ownership",
+            post(routes::v3::clans::verify_ownership),
+        )
         // --- V3 clans: members roster + role/kick hierarchy ------------------
         .route(
             "/api/v3/clans/{id}/members",
