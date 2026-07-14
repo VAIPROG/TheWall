@@ -3,6 +3,7 @@ pub mod commands;
 pub mod render;
 pub mod telegram;
 pub mod discord;
+pub mod outbound;
 
 use std::sync::{Arc, OnceLock};
 use crate::bots::core::registry::Registry;
