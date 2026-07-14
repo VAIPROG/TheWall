@@ -10,7 +10,13 @@ impl Platform {
 }
 
 #[derive(Debug, Clone)]
-pub struct Chat { pub id: String, pub is_group: bool, pub platform: Platform }
+pub struct Chat {
+    pub id: String,
+    pub is_group: bool,
+    pub platform: Platform,
+    /// guild_id: Discord server id when in a guild (None on Telegram / DMs). chat.id is the Telegram chat id or the Discord channel id.
+    pub guild_id: Option<String>,
+}
 
 #[derive(Debug, Clone)]
 pub enum ArgKind { String, Int, Bool, Sub(Vec<CommandArg>) }

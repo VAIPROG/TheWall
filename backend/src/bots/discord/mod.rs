@@ -234,10 +234,15 @@ fn chat_from(v: &Value) -> Chat {
         .and_then(|c| c.as_str())
         .unwrap_or_default()
         .to_string();
+    let guild_id = v
+        .get("guild_id")
+        .and_then(|g| g.as_str())
+        .map(String::from);
     Chat {
         id,
-        is_group: v.get("guild_id").is_some(),
+        is_group: guild_id.is_some(),
         platform: Platform::Discord,
+        guild_id,
     }
 }
 

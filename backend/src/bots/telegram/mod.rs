@@ -148,7 +148,7 @@ async fn handle_message(
     let (command, sub, args) = parse_command(reg, text);
     let inv = Invocation {
         external_id: from_id,
-        chat: Chat { id: chat_id.clone(), is_group, platform: Platform::Telegram },
+        chat: Chat { id: chat_id.clone(), is_group, platform: Platform::Telegram, guild_id: None },
         command,
         sub,
         args,
@@ -329,7 +329,7 @@ async fn handle_callback(
             }
             let inv = Invocation {
                 external_id: clicker_id.clone(),
-                chat: Chat { id: chat_id.clone(), is_group, platform: Platform::Telegram },
+                chat: Chat { id: chat_id.clone(), is_group, platform: Platform::Telegram, guild_id: None },
                 command,
                 sub,
                 args: arg_map,

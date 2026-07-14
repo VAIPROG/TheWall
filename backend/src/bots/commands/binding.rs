@@ -40,17 +40,35 @@ async fn may_admin_clan(pool: &sqlx::PgPool, cid: Uuid, uid: Uuid, owner_id: Opt
     matches!(role.as_deref(), Some("admin") | Some("moderator"))
 }
 
+/// The binding-scope id: the id a binding key is stored under and (on Discord)
+/// the id the live ownership probe targets.
+///
+/// - **Telegram:** the group chat id (`ctx.chat.id`) — correct for both
+///   `getChatMember` and the binding key.
+/// - **Discord:** the GUILD id (`ctx.chat.guild_id`), NOT `ctx.chat.id` (which is
+///   the channel id). `None` in a DM / outside a guild, so the caller refuses.
+fn scope_id(ctx: &CommandCtx<'_>) -> Option<String> {
+    match ctx.chat.platform {
+        Platform::Telegram => Some(ctx.chat.id.clone()),
+        Platform::Discord => ctx.chat.guild_id.clone(),
+    }
+}
+
 /// LIVE ownership probe against the platform API. Returns `Some(is_owner)` when
 /// the invoker is at least an admin of the chat (`is_owner` = they are the actual
 /// group/guild OWNER); `None` when they are NOT an admin, the bot isn't a member,
 /// the token is missing, or the API errors — i.e. every ambiguous case fails
 /// closed and the caller must refuse the bind.
+///
+/// Per-platform id: Telegram uses `ctx.chat.id` (the group id) for
+/// `getChatMember`; Discord uses the GUILD id (`ctx.chat.guild_id`) for
+/// `GET /guilds/{id}` — the channel id would always 404.
 async fn live_chat_owner_check(ctx: &CommandCtx<'_>) -> Option<bool> {
-    let chat_id = ctx.chat.id.as_str();
     let user_id = ctx.principal.platform_id.as_str();
     let client = reqwest::Client::new();
     match ctx.chat.platform {
         Platform::Telegram => {
+            let chat_id = ctx.chat.id.as_str();
             let token = ctx.state.config.oauth.telegram_bot_token.as_deref()?;
             let url = format!(
                 "https://api.telegram.org/bot{token}/getChatMember?chat_id={chat_id}&user_id={user_id}"
@@ -76,8 +94,11 @@ async fn live_chat_owner_check(ctx: &CommandCtx<'_>) -> Option<bool> {
             }
         }
         Platform::Discord => {
+            // Discord probes the GUILD, not the channel. No guild id (DM) →
+            // fail closed.
+            let guild_id = ctx.chat.guild_id.as_deref()?;
             let token = ctx.state.config.oauth.discord_bot_token.as_deref()?;
-            let url = format!("https://discord.com/api/v10/guilds/{chat_id}");
+            let url = format!("https://discord.com/api/v10/guilds/{guild_id}");
             let resp = match client
                 .get(&url)
                 .header("Authorization", format!("Bot {token}"))
@@ -142,6 +163,11 @@ impl Command for BindClan {
         if !ctx.chat.is_group {
             return BotResponse::text("Run this inside your group/guild.").ephemeral();
         }
+        // Binding-scope id (Discord guild id / Telegram chat id). None on Discord
+        // means no guild (DM) — the guild probe needs it, so refuse explicitly.
+        let Some(scope) = scope_id(ctx) else {
+            return BotResponse::text("Run this inside a Discord server.").ephemeral();
+        };
         let Some(uid) = ctx.principal.user_id else {
             return BotResponse::text("Link your Wall account first.").ephemeral();
         };
@@ -177,7 +203,8 @@ impl Command for BindClan {
             return BotResponse::text("You must be an admin of that clan.").ephemeral();
         }
 
-        // 4. LIVE platform ownership check on ctx.chat.id (fails closed).
+        // 4. LIVE platform ownership check — Telegram: chat.id via getChatMember;
+        //    Discord: guild_id via GET /guilds/{id}. Fails closed.
         let Some(is_chat_owner) = live_chat_owner_check(ctx).await else {
             return not_chat_admin(ctx.chat.platform);
         };
@@ -191,7 +218,7 @@ impl Command for BindClan {
         )
         .bind(clan_id)
         .bind(ctx.chat.platform.as_str())
-        .bind(ctx.chat.id.as_str())
+        .bind(scope.as_str())
         .bind(uid)
         .execute(pool)
         .await;
@@ -226,7 +253,7 @@ impl Command for BindClan {
         BotResponse::heading("🔗 Clan bound")
             .push(Block::Fields(vec![
                 ("Clan".into(), clan_label),
-                ("Chat".into(), ctx.chat.id.clone()),
+                ("Chat".into(), scope.clone()),
                 (
                     "Ownership verified".into(),
                     if flipped { "✅ now verified".into() } else { "— (binding only)".into() },
@@ -248,6 +275,11 @@ impl Command for UnbindClan {
         if !ctx.chat.is_group {
             return BotResponse::text("Run this inside your group/guild.").ephemeral();
         }
+        // Same binding-scope id used at bind time (Discord guild id / Telegram
+        // chat id) so unbind matches exactly what bind stored.
+        let Some(scope) = scope_id(ctx) else {
+            return BotResponse::text("Run this inside a Discord server.").ephemeral();
+        };
         let Some(uid) = ctx.principal.user_id else {
             return BotResponse::text("Link your Wall account first.").ephemeral();
         };
@@ -258,7 +290,7 @@ impl Command for UnbindClan {
             "SELECT clan_id FROM clan_bindings WHERE platform=$1 AND chat_id=$2",
         )
         .bind(platform)
-        .bind(ctx.chat.id.as_str())
+        .bind(scope.as_str())
         .fetch_optional(pool)
         .await
         .ok()
@@ -281,7 +313,7 @@ impl Command for UnbindClan {
         // 4. Delete the binding. Ownership stays verified once earned.
         let res = sqlx::query("DELETE FROM clan_bindings WHERE platform=$1 AND chat_id=$2")
             .bind(platform)
-            .bind(ctx.chat.id.as_str())
+            .bind(scope.as_str())
             .execute(pool)
             .await;
         match res {
