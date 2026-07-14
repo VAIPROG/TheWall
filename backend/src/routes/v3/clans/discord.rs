@@ -171,6 +171,8 @@ pub async fn create_from_guild(
     .await
     .or_500()?;
     insert_admin_membership(&state, auth.user_id, clan_id).await?;
+    // Give the clan its chat, exactly like create.rs does (idempotent).
+    crate::routes::v3::chats::clan_chat_id(&state.pool, clan_id).await?;
     Ok(Json(ClanCreated { id: clan_id }))
 }
 
@@ -217,5 +219,7 @@ pub async fn create_from_site(
     .await
     .or_500()?;
     insert_admin_membership(&state, auth.user_id, clan_id).await?;
+    // Give the clan its chat, exactly like create.rs does (idempotent).
+    crate::routes::v3::chats::clan_chat_id(&state.pool, clan_id).await?;
     Ok(Json(ClanCreated { id: clan_id }))
 }
