@@ -172,6 +172,34 @@ async fn handle_message(
 ///     command's args, coerced by `ArgKind`.
 /// A trailing free-text `String` arg collects the REST of the line.
 /// Unknown commands still return with empty args (dispatch replies "unknown").
+///
+/// ## Subcommand schema shape (CONTRACT — Task 5 authors ~18 commands against it)
+///
+/// A subcommand's own (leaf) args MUST be wrapped in a SECOND, inner `Sub`.
+/// The parser only maps leaf args when the selected subcommand's `kind` is
+/// itself `ArgKind::Sub(leaf_args)`. If you write the leaf args as a bare
+/// `ArgKind` (e.g. `Sub([{ name: "roster", kind: ArgKind::Int }])`), the
+/// subcommand is still *selected* but its args come back EMPTY — silently, no
+/// error. Always nest:
+///
+/// ```ignore
+/// // `clanchat read [n]`  and  `template find <q>`
+/// vec![CommandArg {
+///     name: "action".into(),
+///     kind: ArgKind::Sub(vec![
+///         // read  [n:Int]
+///         CommandArg { name: "read".into(), kind: ArgKind::Sub(vec![
+///             CommandArg { name: "n".into(), kind: ArgKind::Int },
+///         ]) },
+///         // find  <q:String>  (trailing String swallows the rest of the line)
+///         CommandArg { name: "find".into(), kind: ArgKind::Sub(vec![
+///             CommandArg { name: "q".into(), kind: ArgKind::String },
+///         ]) },
+///     ]),
+/// }]
+/// ```
+///
+/// A subcommand that takes no args still nests as `kind: ArgKind::Sub(vec![])`.
 fn parse_command(reg: &Registry, text: &str) -> (String, Option<String>, HashMap<String, ArgValue>) {
     let mut tokens = text.split_whitespace();
     let raw = tokens.next().unwrap_or("");
@@ -202,6 +230,10 @@ fn parse_command(reg: &Registry, text: &str) -> (String, Option<String>, HashMap
                     if let ArgKind::Sub(inner) = &s.kind {
                         let remaining: Vec<&str> = it.copied().collect();
                         map_positional(inner, &remaining, &mut args);
+                    } else if it.clone().next().is_some() {
+                        // Sub selected, leftover tokens, but its kind isn't Sub:
+                        // schema author forgot the inner Sub wrapper (see doc above).
+                        tracing::debug!(command = %command, sub = %s.name, "bots::telegram parse: subcommand args ignored — leaf args must be wrapped in an inner ArgKind::Sub");
                     }
                 }
             }
@@ -344,6 +376,19 @@ async fn answer_query(client: &reqwest::Client, token: &str, body: Value) {
 // send / edit helpers (self-contained, with reply_markup support)
 // ---------------------------------------------------------------------------
 
+/// POST a JSON body and check the response. `Ok(())` on 2xx; otherwise
+/// `Err("{status}: {text}")`. Shared by `send`/`edit` so the build-body-then-
+/// POST-then-check pattern lives in one place.
+async fn post_json(client: &reqwest::Client, url: &str, body: Value) -> Result<(), String> {
+    let r = client.post(url).json(&body).send().await.map_err(|e| e.to_string())?;
+    let status = r.status();
+    if status.is_success() {
+        Ok(())
+    } else {
+        Err(format!("{status}: {}", r.text().await.unwrap_or_default()))
+    }
+}
+
 /// Send rich HTML to a chat, with an optional inline keyboard. Falls back to
 /// classic `sendMessage` (parse_mode=HTML, downgraded block tags) if the rich
 /// method is rejected. `reply_markup` is included in BOTH payloads.
@@ -362,11 +407,10 @@ async fn send(
     if let Some(kb) = &keyboard {
         body["reply_markup"] = kb.clone();
     }
-    let r = client.post(&url).json(&body).send().await.map_err(|e| e.to_string())?;
-    if r.status().is_success() {
-        return Ok(());
-    }
-    let rich_err = format!("sendRichMessage {}: {}", r.status(), r.text().await.unwrap_or_default());
+    let rich_err = match post_json(client, &url, body).await {
+        Ok(()) => return Ok(()),
+        Err(e) => format!("sendRichMessage {e}"),
+    };
     tracing::debug!("{rich_err} — falling back to sendMessage");
 
     let plain = downgrade_html(html);
@@ -379,15 +423,9 @@ async fn send(
     if let Some(kb) = &keyboard {
         body["reply_markup"] = kb.clone();
     }
-    let r2 = client.post(&url).json(&body).send().await.map_err(|e| e.to_string())?;
-    if r2.status().is_success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "{rich_err}; fallback sendMessage {}: {}",
-            r2.status(),
-            r2.text().await.unwrap_or_default()
-        ))
+    match post_json(client, &url, body).await {
+        Ok(()) => Ok(()),
+        Err(e) => Err(format!("{rich_err}; fallback sendMessage {e}")),
     }
 }
 
@@ -412,20 +450,55 @@ async fn edit(
     if let Some(kb) = &keyboard {
         body["reply_markup"] = kb.clone();
     }
-    let r = client.post(&url).json(&body).send().await.map_err(|e| e.to_string())?;
-    if r.status().is_success() {
-        Ok(())
-    } else {
-        Err(format!("editMessageText {}: {}", r.status(), r.text().await.unwrap_or_default()))
+    post_json(client, &url, body).await.map_err(|e| format!("editMessageText {e}"))
+}
+
+/// Replace every `<img ...>` (self-closing `/>` or bare `>`) with an
+/// `<a href="URL">URL</a>` link built from its `src="..."` attribute, so the
+/// classic HTML parser accepts it. Tags without a parseable `src` are dropped.
+/// Manual scan (no `regex` dependency in Cargo.toml).
+fn rewrite_img_tags(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(start) = rest.find("<img") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start..];
+        // End of the tag: first '>' after "<img".
+        let Some(gt) = after.find('>') else {
+            // Malformed / truncated tag: emit the remainder verbatim and stop.
+            out.push_str(after);
+            return out;
+        };
+        let tag = &after[..=gt]; // includes trailing '>'
+        if let Some(url) = extract_src(tag) {
+            out.push_str(&format!("<a href=\"{url}\">{url}</a>"));
+        }
+        rest = &after[gt + 1..];
     }
+    out.push_str(rest);
+    out
+}
+
+/// Extract the value of the `src="..."` attribute from a single tag string.
+fn extract_src(tag: &str) -> Option<String> {
+    let idx = tag.find("src=\"")?;
+    let after = &tag[idx + 5..];
+    let end = after.find('"')?;
+    Some(after[..end].to_string())
 }
 
 /// Best-effort downgrade of rich HTML to the classic sendMessage tag subset
 /// (b/i/u/s/code/pre/a/blockquote/tg-spoiler). Block elements become line
 /// breaks; tables collapse to pipe-separated rows. Ported from the legacy
 /// `telegram_rich::downgrade_html` (removed in Task 7).
+///
+/// `<img>` is NOT a valid classic-HTML tag for Telegram's `parse_mode=HTML`
+/// parser, so any `<img src="URL" .../>` emitted by `render_html` for a
+/// `Block::Image` is rewritten to `<a href="URL">URL</a>`. Without this, the
+/// sendMessage fallback and every editMessageText (callbacks always downgrade)
+/// would 400 whenever a response contains an image.
 fn downgrade_html(html: &str) -> String {
-    let mut s = html.to_string();
+    let mut s = rewrite_img_tags(html);
     // Newline-producing closers first.
     for tag in ["</h1>", "</h2>", "</h3>", "</h4>", "</h5>", "</h6>", "</p>", "</li>", "</tr>", "</table>", "</details>", "</summary>", "</footer>", "</figure>", "</figcaption>", "<hr/>", "<hr>"] {
         s = s.replace(tag, "\n");
@@ -443,4 +516,27 @@ fn downgrade_html(html: &str) -> String {
         s = s.replace(tag, "");
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::downgrade_html;
+    use crate::bots::core::response::{BotResponse, Block};
+    use crate::bots::render::telegram::render_html;
+
+    #[test]
+    fn downgrade_strips_img() {
+        let resp = BotResponse::default().push(Block::Image {
+            url: "https://x/y.png".into(),
+            caption: Some("cap".into()),
+            spoiler: true,
+        });
+        let html = render_html(&resp);
+        let plain = downgrade_html(&html);
+        assert!(plain.contains("https://x/y.png"), "url must survive: {plain}");
+        assert!(!plain.contains("<img"), "no <img>: {plain}");
+        assert!(!plain.contains("<figure"), "no <figure>: {plain}");
+        assert!(!plain.contains("<figcaption"), "no <figcaption>: {plain}");
+        assert!(plain.contains("cap"), "caption text kept: {plain}");
+    }
 }
