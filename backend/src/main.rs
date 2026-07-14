@@ -6,6 +6,7 @@ mod discord_commands;
 mod discord_gateway;
 mod error_envelope;
 mod formats;
+mod guild_cache;
 mod http_error;
 mod models;
 mod owner_seed;
@@ -37,6 +38,7 @@ pub struct AppState {
     pub config: AppConfig,
     pub started_at: std::time::SystemTime,
     pub session_cache: std::sync::Arc<crate::session_cache::SessionCache>,
+    pub guild_cache: std::sync::Arc<crate::guild_cache::GuildCache>,
 }
 
 // Re-export config types so the rest of the crate can keep using
@@ -141,6 +143,7 @@ async fn main() {
         config,
         started_at: std::time::SystemTime::now(),
         session_cache: std::sync::Arc::new(crate::session_cache::SessionCache::new()),
+        guild_cache: std::sync::Arc::new(crate::guild_cache::GuildCache::new()),
     };
 
     // Discord gateway: keeps the bot's presence Online and serves slash
