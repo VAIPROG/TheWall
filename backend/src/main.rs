@@ -40,6 +40,7 @@ pub struct AppState {
     pub started_at: std::time::SystemTime,
     pub session_cache: std::sync::Arc<crate::session_cache::SessionCache>,
     pub guild_cache: std::sync::Arc<crate::guild_cache::GuildCache>,
+    pub callback_store: std::sync::Arc<crate::bots::core::callbacks::CallbackStore>,
 }
 
 // Re-export config types so the rest of the crate can keep using
@@ -145,6 +146,7 @@ async fn main() {
         started_at: std::time::SystemTime::now(),
         session_cache: std::sync::Arc::new(crate::session_cache::SessionCache::new()),
         guild_cache: std::sync::Arc::new(crate::guild_cache::GuildCache::new()),
+        callback_store: std::sync::Arc::new(crate::bots::core::callbacks::CallbackStore::new()),
     };
 
     // Discord gateway: keeps the bot's presence Online and serves slash

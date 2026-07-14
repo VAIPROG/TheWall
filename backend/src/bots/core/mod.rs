@@ -4,3 +4,4 @@ pub mod permissions;
 pub mod registry;
 pub mod dispatch;
 pub mod data;
+pub mod callbacks;
