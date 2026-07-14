@@ -18,7 +18,7 @@ mod templates;
 pub use applications::{list_applications, review_application};
 pub use create::create_clan;
 pub use detail::{get_clan, update_clan};
-pub use discord::{owned_guilds, site_suggestion};
+pub use discord::{create_from_guild, create_from_site, owned_guilds, site_suggestion};
 pub use invites::{create_invite, list_invites, revoke_invite};
 pub use join::{apply_for_role, join_clan};
 pub use lifecycle::{disband_clan, leave_clan};

@@ -721,6 +721,14 @@ async fn main() {
             "/api/v3/clans/site-suggestion",
             get(routes::v3::clans::site_suggestion),
         )
+        .route(
+            "/api/v3/clans/from-guild",
+            post(routes::v3::clans::create_from_guild),
+        )
+        .route(
+            "/api/v3/clans/from-site",
+            post(routes::v3::clans::create_from_site),
+        )
         // --- V3 clans: members roster + role/kick hierarchy ------------------
         .route(
             "/api/v3/clans/{id}/members",
