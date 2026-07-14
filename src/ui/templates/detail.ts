@@ -16,7 +16,7 @@ import { confirmDlg, promptDlg } from "../../dialog";
 import { getActiveClient } from "../../backend/index";
 import { decodeAny, primaryLayer } from "../../formats";
 import { applyLayer } from "../../formats/apply-layer";
-import { previewUrl, animatedUrl, exportUrl, shareLink } from "./api";
+import { previewUrl, animatedUrl, exportUrl, shareLink, getUsername } from "./api";
 import { computePercentPainted, formatPct } from "./percent";
 import { openPublish, resetToBrowse } from "./shell";
 import type { AuthorVisibility, Scope } from "./api";
@@ -64,20 +64,28 @@ function docAnimated(doc?: WallDoc | null): boolean {
   return !!doc?.templates?.some((tp) => tp.animation || tp.layers?.some((l) => l.animation));
 }
 
-function authorLabel(tpl: FullTpl): string {
+/**
+ * Display author from `document.author` (privacy-aware): the nickname when
+ * present; otherwise the id to resolve to a username asynchronously; otherwise
+ * Anonymous. Never shows a bare uuid — it resolves or falls back to Anonymous.
+ */
+function authorInfo(tpl: FullTpl): { name: string; resolveId?: string } {
   const anon = t("tplAnonymous") || "Anonymous";
-  // Prefer the document's author (honours author_visibility): object → show the
-  // nickname, "anon"/null → anonymous. Fall back to the row column for older
-  // rows that predate the structured author.
   const da = (tpl.document as { author?: unknown } | null | undefined)?.author;
-  if (da === "anon" || da === null) return anon;
+  if (da === "anon" || da === null) return { name: anon };
   if (da && typeof da === "object") {
     const o = da as { name?: string; id?: string };
-    return o.name || (o.id ? o.id.slice(0, 8) : anon);
+    if (o.name) return { name: o.name };
+    if (o.id) return { name: "…", resolveId: o.id };
+    return { name: anon };
   }
+  // Fall back to the row column for older rows without a structured author.
   const a = tpl.author;
-  if (!a || a === "anon" || a === "anonymous") return anon;
-  return typeof a === "string" ? a : a.username || a.name || (a.id ? a.id.slice(0, 8) : anon);
+  if (!a || a === "anon" || a === "anonymous") return { name: anon };
+  if (typeof a === "string") return { name: a };
+  if (a.username || a.name) return { name: (a.username || a.name) as string };
+  if (a.id) return { name: "…", resolveId: a.id };
+  return { name: anon };
 }
 
 function fmtDate(s?: string): string {
@@ -119,13 +127,16 @@ function render(tpl: FullTpl): string {
 
   // Painted-% row carries an id so onMount can fill it after the async tile diff.
   const paintedRow = `<div class="wd-kv"><span class="wd-kv-k">${esc(t("tplPainted") || "Painted")}</span><span class="wd-kv-v" id="tpl-pct">…</span></div>`;
+  // Author row: nickname if present, else an id-carrying span resolved on mount.
+  const ai = authorInfo(tpl);
+  const authorRow = `<div class="wd-kv"><span class="wd-kv-k">${esc(t("tplAuthor") || "Author")}</span><span class="wd-kv-v" id="tpl-author-val"${ai.resolveId ? ` data-uid="${esc(ai.resolveId)}"` : ""}>${esc(ai.name)}</span></div>`;
   const info = [
     infoRow(t("tplDims") || "Dimensions", w && h ? `${w} × ${h}` : "—"),
     infoRow(t("tplPos") || "Position", `${tpl.x}, ${tpl.y}`),
     infoRow(t("tplScale") || "Scale", `${tpl.scale}×`),
     infoRow(t("tplBundleCount") || "Templates", String(count)),
     infoRow(t("tplVersion") || "Version", `v${tpl.version}`),
-    infoRow(t("tplAuthor") || "Author", authorLabel(tpl)),
+    authorRow,
     infoRow(t("tplCreated") || "Created", fmtDate(tpl.createdAt ?? doc?.createdAt)),
   ].join("");
 
@@ -246,6 +257,15 @@ export function detailScreen(id: string): PanelScreen {
           .catch(() => setPct("—"));
       } else {
         setPct("—");
+      }
+
+      // Resolve the author id → username when only an id is available.
+      const av = $("tpl-author-val");
+      const uid = av?.getAttribute("data-uid");
+      if (av && uid) {
+        void getUsername(uid).then((name) => {
+          av.textContent = name || (t("tplAnonymous") || "Anonymous");
+        });
       }
 
       $("tpl-d-load")?.addEventListener("click", (e) =>

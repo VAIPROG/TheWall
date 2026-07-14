@@ -197,6 +197,18 @@ export async function resolveUsernames(refs: string[]): Promise<ResolveResult> {
   return c.post<ResolveResult>("/users/resolve", { refs });
 }
 
+/** Reverse lookup: a user id → their current username (null if not found). */
+export async function getUsername(id: string): Promise<string | null> {
+  const c = getActiveClient();
+  if (!c || !id) return null;
+  try {
+    const u = await c.get<{ username?: string }>(`/users/${encodeURIComponent(id)}`);
+    return u?.username ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** A shareable site link that autoloads the template. WallDev links use the
  *  `?the_wall_dev=` autoload param; Charity links use `?charity=`. The export
  *  URL carries `?password=` when supplied so a recipient without an account can
