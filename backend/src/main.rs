@@ -712,6 +712,15 @@ async fn main() {
             "/api/v3/clans/{id}",
             get(routes::v3::clans::get_clan).patch(routes::v3::clans::update_clan),
         )
+        // --- V3 clans: Discord owned-guilds + site-clan suggestion ------------
+        .route(
+            "/api/v3/clans/discord/owned-guilds",
+            get(routes::v3::clans::owned_guilds),
+        )
+        .route(
+            "/api/v3/clans/site-suggestion",
+            get(routes::v3::clans::site_suggestion),
+        )
         // --- V3 clans: members roster + role/kick hierarchy ------------------
         .route(
             "/api/v3/clans/{id}/members",
