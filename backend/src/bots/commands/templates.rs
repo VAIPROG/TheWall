@@ -134,30 +134,123 @@ impl Command for Template {
                     spoiler: false,
                 })
             }
-            // ── share: hand back the shareable preview URL ───────────────────
+            // ── share: per-wall WallDev + Charity share links ────────────────
+            // Mirrors the extension's shareLink: {wallOrigin}/?the_wall_dev=
+            // {urlencode({apiBase}/templates/{id}/wall-dev)}. The share link's
+            // ORIGIN must be a WALL SITE (where the extension injects); the
+            // encoded inner URL points at the backend (public_base_url).
             Some("share") => {
                 let id_s = arg_str(ctx, "id").unwrap_or("").trim();
                 let Some(id) = uuid::Uuid::parse_str(id_s).ok() else {
                     return BotResponse::text("Invalid template id.").ephemeral();
                 };
-                let ok: Option<(String,)> = sqlx::query_as(
-                    "SELECT name FROM templates WHERE id=$1 AND status='published' AND scope='public'",
+                // Verify public+published; fetch name + document (for whitelist gating).
+                let row: Option<(String, Option<serde_json::Value>)> = sqlx::query_as(
+                    "SELECT name, document FROM templates WHERE id=$1 AND status='published' AND scope='public'",
                 )
                 .bind(id)
                 .fetch_optional(pool)
                 .await
                 .ok()
                 .flatten();
-                let Some((name,)) = ok else {
+                let Some((name, document)) = row else {
                     return BotResponse::text("No public template with that id.").ephemeral();
                 };
-                BotResponse::heading("🔗 Share")
-                    .push(Block::Text(format!("Shareable link for \"{name}\":")))
-                    .row(ActionRow(vec![Component::Button {
-                        label: "Open preview".into(),
-                        style: BtnStyle::Secondary,
-                        action: Action::Url(preview_url(id)),
-                    }]))
+
+                // Backend base + the two inner (anonymously-openable) endpoints.
+                let base = crate::routes::v3::templates::render::public_base_url(&ctx.state.config);
+                let wall_dev_exp = format!("{base}/api/v3/templates/{id}/wall-dev");
+                let charity_exp = format!("{base}/api/v3/templates/{id}/charity");
+
+                // domainsWhitelist gating (mirror the extension's isAllowedOnDomain).
+                let whitelist: Option<Vec<String>> = document.and_then(|d| {
+                    d.get("domainsWhitelist")
+                        .and_then(|v| v.as_array())
+                        .map(|a| {
+                            a.iter()
+                                .filter_map(|x| x.as_str().map(|s| s.to_lowercase()))
+                                .collect::<Vec<_>>()
+                        })
+                });
+
+                // A wall host `h` matches domain `d` iff h == d || h.ends_with(".d")
+                // after stripping a leading "*." from the whitelist domain.
+                fn host_matches(host: &str, whitelist: &[String]) -> bool {
+                    whitelist.iter().any(|d| {
+                        let d = d.strip_prefix("*.").unwrap_or(d);
+                        host == d || host.ends_with(&format!(".{d}"))
+                    })
+                }
+
+                // Eligible walls: configured wall_sites gated by whitelist (if non-empty).
+                let mut eligible: Vec<(String, String)> = Vec::new(); // (wall_origin, host)
+                for wall in &ctx.state.config.wall_sites {
+                    let Some(host) = url::Url::parse(wall)
+                        .ok()
+                        .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
+                    else {
+                        continue;
+                    };
+                    let allowed = match &whitelist {
+                        Some(wl) if !wl.is_empty() => host_matches(&host, wl),
+                        _ => true,
+                    };
+                    if allowed {
+                        eligible.push((wall.clone(), host));
+                    }
+                }
+
+                if eligible.is_empty() {
+                    return BotResponse::heading("🔗 Share")
+                        .push(Block::Text(
+                            "This template is restricted to domains outside the configured wall list."
+                                .into(),
+                        ))
+                        .push(Block::Text(wall_dev_exp))
+                        .ephemeral();
+                }
+
+                // Build a share URL, using url::Url for correct percent-encoding.
+                fn share_url(wall: &str, param: &str, exp: &str) -> Option<String> {
+                    let mut u = url::Url::parse(wall).ok()?;
+                    u.query_pairs_mut().clear().append_pair(param, exp);
+                    Some(u.to_string())
+                }
+
+                // Discord allows ≤5 rows; cap displayed walls at 5.
+                let total = eligible.len();
+                let capped = total > 5;
+                let shown = if capped { &eligible[..5] } else { &eligible[..] };
+
+                let mut resp = BotResponse::heading(format!("🔗 Share — {name}"))
+                    .push(Block::Text("Открыть шаблон на стене:".into()));
+
+                for (wall, host) in shown {
+                    let mut buttons = Vec::new();
+                    if let Some(u) = share_url(wall, "the_wall_dev", &wall_dev_exp) {
+                        buttons.push(Component::Button {
+                            label: format!("🧱 {host} · WallDev"),
+                            style: BtnStyle::Primary,
+                            action: Action::Url(u),
+                        });
+                    }
+                    if let Some(u) = share_url(wall, "charity", &charity_exp) {
+                        buttons.push(Component::Button {
+                            label: format!("❤️ {host} · Charity"),
+                            style: BtnStyle::Secondary,
+                            action: Action::Url(u),
+                        });
+                    }
+                    if !buttons.is_empty() {
+                        resp = resp.row(ActionRow(buttons));
+                    }
+                }
+
+                if capped {
+                    resp = resp.push(Block::Text(format!("+{} more", total - 5)));
+                }
+                // Raw endpoint for copy-paste.
+                resp.push(Block::Text(wall_dev_exp))
             }
             // ── bare /template: usage ────────────────────────────────────────
             _ => BotResponse::text(

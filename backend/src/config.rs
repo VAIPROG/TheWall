@@ -17,6 +17,8 @@ pub struct AppConfig {
     pub site_url: String,
     pub port: String,
     pub public_base_url: Option<String>,
+    /// Wall front-end origins where the extension runs and consumes ?the_wall_dev= share links (e.g. https://filianislost.com). Configurable via WALL_SITES (comma-separated).
+    pub wall_sites: Vec<String>,
     pub extension_version: Option<String>,
     pub oauth: OAuthConfig,
     pub limits: LimitsConfig,
@@ -38,6 +40,10 @@ impl AppConfig {
                 .unwrap_or_else(|_| "https://filianislost.com".to_string()),
             port: env::var("PORT").unwrap_or_else(|_| "3080".to_string()),
             public_base_url: opt_env("PUBLIC_BASE_URL"),
+            wall_sites: env::var("WALL_SITES").ok()
+                .map(|s| s.split(',').map(|w| w.trim().trim_end_matches('/').to_string()).filter(|w| !w.is_empty()).collect::<Vec<_>>())
+                .filter(|v: &Vec<String>| !v.is_empty())
+                .unwrap_or_else(|| vec!["https://filianislost.com".to_string()]),
             extension_version: opt_env("EXTENSION_VERSION"),
             oauth: OAuthConfig::load(),
             limits: LimitsConfig::load(),
@@ -314,6 +320,7 @@ const KNOWN_ENV_KEYS: &[&str] = &[
     "SITE_URL",
     "RUST_LOG",
     "PUBLIC_BASE_URL",
+    "WALL_SITES",
     "LIMIT_MESSAGE_CHARS",
     "LIMIT_BIO_CHARS",
     "LIMIT_SOCIAL_LABEL",
