@@ -81,33 +81,51 @@ impl Command for Template {
                 if q.is_empty() {
                     return BotResponse::text("Usage: /template find <text>").ephemeral();
                 }
-                // BIND the LIKE pattern — never interpolate user text into SQL.
-                let pat = format!("%{}%", q);
-                let rows = sqlx::query_as::<_, (uuid::Uuid, String, String)>(
-                    "SELECT id, name, scope FROM templates \
-                     WHERE status='published' AND scope='public' AND name ILIKE $1 \
-                     ORDER BY created_at DESC LIMIT 5",
+                // Fuzzy (pg_trgm) search: exact-substring matches are boosted to
+                // the top, then trigram similarity, then recency. `q` is bound
+                // once as $1 — never interpolated into SQL. `%` operator and
+                // similarity/word_similarity come from pg_trgm (migration 045).
+                let rows = sqlx::query_as::<_, (uuid::Uuid, String, f32)>(
+                    "SELECT id, name, GREATEST(similarity(name, $1), word_similarity($1, name)) AS sim \
+                       FROM templates \
+                      WHERE status='published' AND scope='public' \
+                        AND (name ILIKE '%' || $1 || '%' OR name % $1 OR word_similarity($1, name) > 0.3) \
+                      ORDER BY (name ILIKE '%' || $1 || '%') DESC, sim DESC, created_at DESC \
+                      LIMIT 8",
                 )
-                .bind(&pat)
+                .bind(q)
                 .fetch_all(pool)
                 .await
                 .unwrap_or_default();
                 if rows.is_empty() {
-                    return BotResponse::text(format!("No public templates match \"{}\".", q))
-                        .ephemeral();
+                    return BotResponse::text(format!(
+                        "No public templates match \"{}\". Try a shorter or different word.",
+                        q
+                    ))
+                    .ephemeral();
                 }
-                let mut resp = BotResponse::heading("🔎 Templates");
-                for (id, name, _scope) in rows {
+                // Discord caps at 5 button-rows; show ≤5 and note any overflow.
+                let total = rows.len();
+                let shown = if total > 5 { &rows[..5] } else { &rows[..] };
+                let mut resp = BotResponse::heading("🔎 Templates")
+                    .push(Block::Text("Ближайшие совпадения — выбери превью:".into()));
+                for (id, name, _sim) in shown {
                     resp = resp
                         .push(Block::Fields(vec![
-                            ("Name".into(), name),
+                            ("Name".into(), name.clone()),
                             ("Id".into(), id.to_string()),
                         ]))
                         .row(ActionRow(vec![Component::Button {
                             label: "Preview".into(),
                             style: BtnStyle::Primary,
-                            action: Action::Url(preview_url(id)),
+                            action: Action::Url(preview_url(*id)),
                         }]));
+                }
+                if total > 5 {
+                    resp = resp.push(Block::Text(format!(
+                        "…и ещё {} — уточни запрос.",
+                        total - 5
+                    )));
                 }
                 resp
             }
