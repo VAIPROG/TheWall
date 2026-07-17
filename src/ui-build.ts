@@ -12,6 +12,7 @@ import { wireUI } from "./ui-wire";
 import { syncProfile, loadGuilds, refreshNotifications } from "./data";
 import { buildOverlayPane } from "./ui/overlay-tab";
 import { buildTemplatesPane } from "./ui/templates/shell";
+import { buildCommunityPane } from "./ui/community/shell";
 import { buildMailPane } from "./ui/build-mail";
 import { buildSocialPane } from "./ui/build-social";
 import { buildProfilePane } from "./ui/profile-tab";
@@ -38,6 +39,7 @@ export function buildUI(): void {
           <div class="wp-tabs">
               <div class="wp-tab active" data-p="ov">${ic("grid")}${t("tabOverlay")}</div>
               <div class="wp-tab" data-p="tp">${ic("disk")}${t("tabTpl")}</div>
+              <div class="wp-tab" data-p="co">${ic("chat")}${t("tabCommunity")}</div>
               <div class="wp-tab" data-p="ma">${ic("bell")}Mail</div>
               <div class="wp-tab" data-p="so">${ic("globe")}${t("tabSocial")}</div>
               <div class="wp-tab" data-p="pr">${ic("user")}${t("tabProfile")}</div>
@@ -51,6 +53,8 @@ export function buildUI(): void {
               ${buildOverlayPane()}
               <!-- TEMPLATES (V3 super-tab: browse / detail / publish / share) -->
               ${buildTemplatesPane()}
+              <!-- COMMUNITY -->
+              ${buildCommunityPane()}
               <!-- MAIL -->
               ${buildMailPane()}
               <!-- SOCIAL -->

@@ -4,6 +4,7 @@ export { wireOverlay, applyScalePct } from "./overlay-tab";
 export { wireProfile } from "./profile-tab";
 export { wireSettings } from "./settings-tab";
 export { wireTemplates } from "./templates/shell";
+export { wireCommunity } from "./community/shell";
 export * from "./paint";
 export { wireWindowChrome } from "./window-chrome";
 export { loadAchievementList } from "./achievements-tab";
@@ -13,6 +14,7 @@ import { wireLinks } from "../links-wire";
 import { wireWindowChrome } from "./window-chrome";
 import { wireOverlay } from "./overlay-tab";
 import { wireTemplates } from "./templates/shell";
+import { wireCommunity } from "./community/shell";
 import { wireProfile } from "./profile-tab";
 import { wireChats } from "./chats";
 import { wireSettings } from "./settings-tab";
@@ -46,6 +48,9 @@ export function wireExtensionUI(win: HTMLElement): void {
 
   // templates tab
   wireTemplates(win);
+
+  // community tab
+  wireCommunity(win);
 
   // social tab
   // Wall snapshot — fetch every tile from ws.filianislost.com/tiles, stitch
