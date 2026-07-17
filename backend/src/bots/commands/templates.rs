@@ -88,7 +88,7 @@ impl Command for Template {
                 let rows = sqlx::query_as::<_, (uuid::Uuid, String, f32)>(
                     "SELECT id, name, GREATEST(similarity(name, $1), word_similarity($1, name)) AS sim \
                        FROM templates \
-                      WHERE status='published' AND scope='public' \
+                      WHERE status='approved' AND scope='public' \
                         AND (name ILIKE '%' || $1 || '%' OR name % $1 OR word_similarity($1, name) > 0.3) \
                       ORDER BY (name ILIKE '%' || $1 || '%') DESC, sim DESC, created_at DESC \
                       LIMIT 8",
@@ -136,7 +136,7 @@ impl Command for Template {
                     return BotResponse::text("Invalid template id.").ephemeral();
                 };
                 let ok: Option<(String,)> = sqlx::query_as(
-                    "SELECT name FROM templates WHERE id=$1 AND status='published' AND scope='public'",
+                    "SELECT name FROM templates WHERE id=$1 AND status='approved' AND scope='public'",
                 )
                 .bind(id)
                 .fetch_optional(pool)
@@ -162,9 +162,9 @@ impl Command for Template {
                 let Some(id) = uuid::Uuid::parse_str(id_s).ok() else {
                     return BotResponse::text("Invalid template id.").ephemeral();
                 };
-                // Verify public+published; fetch name + document (for whitelist gating).
+                // Verify public+approved; fetch name + document (for whitelist gating).
                 let row: Option<(String, Option<serde_json::Value>)> = sqlx::query_as(
-                    "SELECT name, document FROM templates WHERE id=$1 AND status='published' AND scope='public'",
+                    "SELECT name, document FROM templates WHERE id=$1 AND status='approved' AND scope='public'",
                 )
                 .bind(id)
                 .fetch_optional(pool)
