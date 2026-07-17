@@ -6,10 +6,12 @@
  */
 import { PanelStack, type PanelScreen } from "../kit/panel-stack";
 import { $ } from "../../helpers";
+import { hubScreen } from "./hub";
+import type { ChatRef } from "./api";
 
-// Placeholder chat reference. Task 2's api.ts will own the real `ChatRef`; the
-// shell will import it from there once it exists.
-export type ChatRef = { kind: string; chatId?: string; userRef?: string };
+// Re-export the real ChatRef (owned by api.ts) so existing importers of the
+// shell's `ChatRef` keep working.
+export type { ChatRef };
 
 // Screen factories. Hub/Thread/Clan/Browse get their real implementations in
 // later slices; kept behind this indirection so the shell + navigation can be
@@ -24,11 +26,7 @@ export interface StackScreens {
 export function makeStackScreens(): StackScreens {
   // Real screens land in Tasks 3–6; import them here as they arrive.
   return {
-    hub: () => ({
-      title: "Community",
-      render: () => `<div id="comm-hub" class="wd-stub"></div>`,
-      onMount: () => {},
-    }),
+    hub: hubScreen,
     thread: (_ref: ChatRef) => ({
       title: "Thread",
       render: () => `<div id="comm-thread" class="wd-stub"></div>`,

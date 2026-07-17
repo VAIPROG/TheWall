@@ -208,5 +208,31 @@ export function kitStyles(): string {
 .wd-notes { margin:0; padding-left:16px; font-size:11px; display:flex; flex-direction:column; gap:2px; }
 .wd-bundle { margin:0; padding-left:18px; font-size:11px; }
 .wd-tpl-id { font:10px monospace; color:var(--sub); text-align:center; margin-top:4px; word-break:break-all; user-select:all; opacity:.7; }
+
+/* --- stubs (remaining Community screens land in Tasks 4–6) --- */
+.wd-stub { padding:12px; color:var(--sub); font-size:11px; text-align:center; }
+
+/* --- Community Hub --- */
+.wd-comm-hub { display:flex; flex-direction:column; gap:8px; }
+/* My-clan card: a clickable card row (avatar/name + member count + badge). */
+.wd-comm-clan { display:flex; align-items:center; gap:8px; cursor:pointer; }
+.wd-comm-clan:hover { filter:brightness(1.05); }
+.wd-comm-clan-body { flex:1; min-width:0; }
+.wd-comm-clan-name { font-weight:bold; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wd-comm-clan-sub { font-size:10px; color:var(--sub); display:flex; align-items:center; gap:4px; }
+.wd-comm-clan-arr { color:var(--sub); margin-left:auto; }
+/* Chat rows reuse .wd-list/.wd-row; add clickability + an unread pill. */
+.wd-comm-chat { cursor:pointer; }
+.wd-comm-chat:hover { background:var(--group); }
+.wd-comm-chat .wd-comm-unread {
+  flex:none; font-size:9px; padding:1px 5px; color:#fff; background:var(--accent);
+  border-radius:8px; min-width:14px; text-align:center;
+}
+.wd-comm-actions { display:flex; gap:6px; }
+.wd-comm-actions .wd-btn { flex:1; }
+/* Info card links. */
+.wd-comm-info { display:flex; flex-direction:column; gap:3px; }
+.wd-comm-info a { color:var(--accent); font-size:11px; text-decoration:none; }
+.wd-comm-info a:hover { text-decoration:underline; }
 `;
 }
