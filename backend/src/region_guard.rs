@@ -19,7 +19,7 @@ use tokio::time::{MissedTickBehavior, interval};
 use uuid::Uuid;
 
 use crate::sites::{Source, config_for};
-use crate::telegram_rich::{esc, send_rich_html};
+use crate::bots::outbound::{esc, send_rich_html};
 use crate::{NotifyTargets, OAuthConfig};
 
 const TICK: Duration = Duration::from_secs(60);
@@ -206,6 +206,16 @@ async fn alert(
             }
         }
     }
+
+    // Additive: fan out to all bot_subscriptions of kind 'region' (self-contained
+    // plain sender; admin telegram + clan_alert mailbox above are untouched).
+    let sub_title = format!("🛡 Region {}", r.name);
+    let sub_body = format!(
+        "{} — {:.1}% broken",
+        if violated { "UNDER ATTACK" } else { "recovered" },
+        broken_pct
+    );
+    crate::bots::outbound::deliver_kind(pool, client, oauth, "region", &sub_title, &sub_body).await;
 }
 
 fn decode_data_url(url: &str) -> Result<image::DynamicImage, String> {

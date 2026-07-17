@@ -14,7 +14,7 @@ use tokio::time::{MissedTickBehavior, interval};
 use uuid::Uuid;
 
 use crate::OAuthConfig;
-use crate::telegram_rich::{esc, send_rich_html};
+use crate::bots::outbound::{esc, send_rich_html};
 
 const TICK: Duration = Duration::from_secs(10);
 const BATCH: i64 = 20;
@@ -67,6 +67,7 @@ fn dc_refill_message(note: &str) -> String {
 #[derive(Debug, sqlx::FromRow)]
 struct DueReminder {
     id: Uuid,
+    user_id: Uuid,
     note: String,
     channel: String,
     telegram_user_id: Option<String>,
@@ -94,7 +95,7 @@ async fn tick(
     oauth: &OAuthConfig,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let due: Vec<DueReminder> = sqlx::query_as(
-        r#"SELECT r.id, r.note, r.channel,
+        r#"SELECT r.id, r.user_id, r.note, r.channel,
                   u.telegram_user_id, u.discord_id, u.username
              FROM paint_reminders r
              JOIN users u ON u.id = r.user_id
@@ -111,6 +112,23 @@ async fn tick(
         if let Err(ref e) = delivered {
             tracing::warn!("reminder {} for {}: {e}", r.id, r.username);
         }
+        // Additive: also fan out to any bot_subscriptions of kind 'paint' for
+        // this user (self-contained plain sender; existing deliver() untouched).
+        let sub_body = if r.note.is_empty() {
+            "Your paint has refilled."
+        } else {
+            r.note.as_str()
+        };
+        crate::bots::outbound::deliver_user_kind(
+            pool,
+            client,
+            oauth,
+            r.user_id,
+            "paint",
+            "🎨 Paint ready",
+            sub_body,
+        )
+        .await;
         let _ =
             sqlx::query("UPDATE paint_reminders SET sent = TRUE, sent_at = NOW() WHERE id = $1")
                 .bind(r.id)

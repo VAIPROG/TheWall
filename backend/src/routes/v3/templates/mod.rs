@@ -9,7 +9,7 @@ mod export;
 pub mod patch_apply;
 mod pin;
 mod read;
-mod render;
+pub(crate) mod render;
 mod report;
 mod update;
 mod verify;

@@ -1,6 +1,6 @@
 [package]
 name = "the-wall-backend"
-version = "6.2.8"
+version = "6.3.0"
 edition = "2024"
 
 [dependencies]
@@ -16,6 +16,7 @@ jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.13", features = ["json", "multipart"] }
+async-trait = "0.1"
 url = "2"
 dotenvy = "0.15"
 base64 = "0.22"
