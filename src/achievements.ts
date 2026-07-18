@@ -124,9 +124,23 @@ export async function listMine(): Promise<AchievementRow[]> {
     return getCached<AchievementRow[]>("ach:mine", CACHE_TTL_PROFILE_MS) || [];
   }
   try {
-    const fresh = await api(client).achievements.listMine() as unknown as AchievementRow[];
-    setCached("ach:mine", fresh);
-    return fresh;
+    // The endpoint returns a WRAPPER shape ({ achievement, grantedAt, ... }),
+    // not a bare AchievementRow[]. Flatten each item to the row the UI reads
+    // (title/category/points/iconUrl/…), lifting the grant time to `unlockedAt`.
+    // `iconUrl` is optional on the catalog but required on the row → default "".
+    const raw = await api(client).achievements.listMine();
+    const mapped: AchievementRow[] = (raw || []).map((it) => ({
+      id: it.achievement.id,
+      title: it.achievement.title,
+      description: it.achievement.description,
+      iconUrl: it.achievement.iconUrl ?? "",
+      category: it.achievement.category,
+      points: it.achievement.points,
+      secret: it.achievement.secret,
+      unlockedAt: it.grantedAt ?? null,
+    }));
+    setCached("ach:mine", mapped);
+    return mapped;
   } catch (e: any) {
     log.warn("ACHIEVE", "listMine failed: " + errMsg(e));
     return getCached<AchievementRow[]>("ach:mine", CACHE_TTL_PROFILE_MS) || [];
