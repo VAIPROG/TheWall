@@ -600,10 +600,6 @@ export async function myClan(): Promise<ClanSummary | null> {
   return page?.items?.find((cl) => cl.viewer?.membershipStatus === "member") ?? null;
 }
 
-/** Avatar URL for a user id. Mirrors the `src/helpers.ts` convention
- *  (`${base}/avatar?userId=`) where `base` is the client's **root** URL (the
- *  avatar route lives under `/api`, not `/api/v3`). No `?session=` — the route
- *  is public (profile-modal / settings-tab both use it without a session). */
 /** Resolve a user's username from a user id/ref (best-effort — for DM row/peer
  *  titles). Returns null when not connected, empty ref, or on any error so the
  *  caller can fall back to the raw ref. */
@@ -618,6 +614,10 @@ export async function getUsername(ref: string): Promise<string | null> {
   }
 }
 
+/** Avatar URL for a user id. Mirrors the `src/helpers.ts` convention
+ *  (`${base}/avatar?userId=`) where `base` is the client's **root** URL (the
+ *  avatar route lives under `/api`, not `/api/v3`). No `?session=` — the route
+ *  is public (profile-modal / settings-tab both use it without a session). */
 export function avatarUrl(userId: string): string {
   // Public avatar URL for an <img> (no request fired here → no auth needed);
   // use the raw active client, not authedClient(), so avatars still resolve.
