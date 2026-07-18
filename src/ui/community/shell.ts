@@ -70,3 +70,11 @@ export function openBrowse(): void {
 export function resetToHub(): void {
   if (stack) stack.reset(screens.hub());
 }
+
+/** Re-run the current screen's load (re-render + onMount). Called when the
+ *  Community tab gains focus so data (which may have failed/no-op'd at startup
+ *  before login) is (re)fetched now that the client is authenticated. Preserves
+ *  the drill-in position, unlike {@link resetToHub}. */
+export function refreshCommunity(): void {
+  stack?.refresh();
+}

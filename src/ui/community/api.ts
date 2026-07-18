@@ -9,6 +9,16 @@
  */
 import { getActiveClient } from "../../backend/index";
 
+/** Active backend client — but ONLY when it actually carries an auth token.
+ *  Every Community endpoint is auth-required, so returning a token-less client
+ *  (which `getActiveClient()` does before login — e.g. when the Hub auto-loads
+ *  at startup) would fire requests with NO `Authorization` header. Treat "no
+ *  token" as "not connected" so every Community request is authenticated. */
+function authedClient() {
+  const active = getActiveClient();
+  return active && active.token ? active : null;
+}
+
 // ---------------------------------------------------------------------------
 // Chat types
 // ---------------------------------------------------------------------------
@@ -271,13 +281,13 @@ export interface ListMessagesOpts {
 }
 
 export async function listChats(clanId?: string): Promise<ChatSummary[]> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return [];
   return c.get<ChatSummary[]>("/chats", clanId ? { clanId } : undefined);
 }
 
 export async function getChat(id: string): Promise<ChatDetail | null> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return null;
   return c.get<ChatDetail>(`/chats/${encodeURIComponent(id)}`);
 }
@@ -286,7 +296,7 @@ export async function getChat(id: string): Promise<ChatDetail | null> {
  *  path takes before/after/limit cursors; DM/modmail return a ChatDetailView,
  *  from which we surface `recentMessages`. */
 export async function listMessages(ref: ChatRef, opts: ListMessagesOpts = {}): Promise<Message[]> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return [];
   const { list } = chatEndpoints(ref);
   if (ref.kind === "clan") {
@@ -301,7 +311,7 @@ export async function listMessages(ref: ChatRef, opts: ListMessagesOpts = {}): P
 }
 
 export async function sendMessage(ref: ChatRef, content: string, replyToId?: string): Promise<Message> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.post<Message>(chatEndpoints(ref).send, { content, replyToId });
 }
@@ -309,7 +319,7 @@ export async function sendMessage(ref: ChatRef, content: string, replyToId?: str
 /** Mark a chat read. Only clan chats expose a `/read` endpoint; DM/modmail
  *  no-op (read-state is server-managed on fetch). */
 export async function markRead(ref: ChatRef, messageId?: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   const { read } = chatEndpoints(ref);
   if (!read) return;
@@ -322,7 +332,7 @@ export async function editMessage(
   content: string,
   expectedVersion?: number,
 ): Promise<Message> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.patch<Message>(
     `/chats/${encodeURIComponent(cid)}/messages/${encodeURIComponent(mid)}`,
@@ -331,14 +341,14 @@ export async function editMessage(
 }
 
 export async function deleteMessage(cid: string, mid: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   await c.delete(`/chats/${encodeURIComponent(cid)}/messages/${encodeURIComponent(mid)}`);
 }
 
 /** Add (`on=true`) or remove a reaction. Emoji is URL-encoded into the path. */
 export async function react(cid: string, mid: string, emoji: string, on: boolean): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   const path = `/chats/${encodeURIComponent(cid)}/messages/${encodeURIComponent(mid)}/reactions/${encodeURIComponent(emoji)}`;
   if (on) await c.put(path);
@@ -346,7 +356,7 @@ export async function react(cid: string, mid: string, emoji: string, on: boolean
 }
 
 export async function reportMessage(cid: string, mid: string, reason: string, evidence?: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   await c.post(
     `/chats/${encodeURIComponent(cid)}/messages/${encodeURIComponent(mid)}/report`,
@@ -355,7 +365,7 @@ export async function reportMessage(cid: string, mid: string, reason: string, ev
 }
 
 export async function pinMessage(cid: string, mid: string, on: boolean): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   const path = `/chats/${encodeURIComponent(cid)}/messages/${encodeURIComponent(mid)}/pin`;
   if (on) await c.post(path);
@@ -375,31 +385,31 @@ export interface ClanListQuery {
 }
 
 export async function listClans(query: ClanListQuery = {}): Promise<Page<ClanSummary>> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return { items: [], page: 1, perPage: 0, total: 0, totalPages: 0 };
   return c.get<Page<ClanSummary>>("/clans", { ...query });
 }
 
 export async function getClan(id: string): Promise<ClanDetail | null> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return null;
   return c.get<ClanDetail>(`/clans/${encodeURIComponent(id)}`);
 }
 
 export async function createClan(name: string, description?: string): Promise<ClanDetail> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.post<ClanDetail>("/clans/new", { name, description });
 }
 
 export async function updateClan(id: string, patch: Record<string, unknown>): Promise<ClanDetail> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.patch<ClanDetail>(`/clans/${encodeURIComponent(id)}`, patch);
 }
 
 export async function listMembers(id: string, page?: number, perPage?: number): Promise<Page<ClanMember>> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return { items: [], page: 1, perPage: 0, total: 0, totalPages: 0 };
   return c.get<Page<ClanMember>>(`/clans/${encodeURIComponent(id)}/members`, { page, perPage });
 }
@@ -409,7 +419,7 @@ export async function setMemberRole(
   uid: string,
   role: "member" | "moderator" | "admin",
 ): Promise<ClanMember> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.patch<ClanMember>(
     `/clans/${encodeURIComponent(cid)}/members/${encodeURIComponent(uid)}`,
@@ -418,25 +428,25 @@ export async function setMemberRole(
 }
 
 export async function kickMember(cid: string, uid: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   await c.delete(`/clans/${encodeURIComponent(cid)}/members/${encodeURIComponent(uid)}`);
 }
 
 export async function leaveClan(id: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   await c.post(`/clans/${encodeURIComponent(id)}/leave`);
 }
 
 export async function disbandClan(id: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   await c.post(`/clans/${encodeURIComponent(id)}/disband`, { confirm: true });
 }
 
 export async function listInvites(id: string): Promise<ClanInvite[]> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return [];
   return c.get<ClanInvite[]>(`/clans/${encodeURIComponent(id)}/invites`);
 }
@@ -448,31 +458,31 @@ export interface CreateInviteBody {
 }
 
 export async function createInvite(id: string, body: CreateInviteBody = {}): Promise<ClanInvite> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.post<ClanInvite>(`/clans/${encodeURIComponent(id)}/invites`, body);
 }
 
 export async function revokeInvite(cid: string, iid: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   await c.delete(`/clans/${encodeURIComponent(cid)}/invites/${encodeURIComponent(iid)}`);
 }
 
 export async function joinClan(id: string, inviteCode?: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   await c.post(`/clans/${encodeURIComponent(id)}/join`, { inviteCode });
 }
 
 export async function applyForRole(cid: string, role: string, message?: string): Promise<void> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return;
   await c.post(`/clans/${encodeURIComponent(cid)}/apply/${encodeURIComponent(role)}`, { message });
 }
 
 export async function listApplications(id: string): Promise<ClanApplication[]> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return [];
   return c.get<ClanApplication[]>(`/clans/${encodeURIComponent(id)}/applications`);
 }
@@ -483,7 +493,7 @@ export async function reviewApplication(
   decision: "approve" | "reject",
   reason?: string,
 ): Promise<ClanApplication> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.post<ClanApplication>(
     `/clans/${encodeURIComponent(cid)}/applications/${encodeURIComponent(aid)}/review`,
@@ -492,13 +502,13 @@ export async function reviewApplication(
 }
 
 export async function getSettings(id: string): Promise<ClanSettings | null> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return null;
   return c.get<ClanSettings>(`/clans/${encodeURIComponent(id)}/settings`);
 }
 
 export async function updateSettings(id: string, patch: Record<string, unknown>): Promise<ClanSettings> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.patch<ClanSettings>(`/clans/${encodeURIComponent(id)}/settings`, patch);
 }
@@ -508,7 +518,7 @@ export async function updateSettings(id: string, patch: Record<string, unknown>)
 // ---------------------------------------------------------------------------
 
 export async function ownedGuilds(): Promise<OwnedGuild[]> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return [];
   return c.get<OwnedGuild[]>("/clans/discord/owned-guilds");
 }
@@ -516,7 +526,7 @@ export async function ownedGuilds(): Promise<OwnedGuild[]> {
 /** The caller's stored site-clan suggestion, or null when the backend returns
  *  204 (the client normalises an empty body to null). */
 export async function siteSuggestion(): Promise<SiteSuggestion | null> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return null;
   return (await c.get<SiteSuggestion | null>("/clans/site-suggestion")) ?? null;
 }
@@ -528,7 +538,7 @@ export interface FromGuildBody {
 }
 
 export async function createFromGuild(body: FromGuildBody): Promise<{ id: string }> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.post<{ id: string }>("/clans/from-guild", body);
 }
@@ -536,7 +546,7 @@ export async function createFromGuild(body: FromGuildBody): Promise<{ id: string
 /** POST /clans/from-site — takes NO body; the server uses the caller's stored
  *  suggestion row (confirmed in backend/src/routes/v3/clans/discord.rs). */
 export async function createFromSite(): Promise<{ id: string }> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.post<{ id: string }>("/clans/from-site");
 }
@@ -548,7 +558,7 @@ export const createManual = createClan;
  *  clan's bound guild against the caller's owned-guild cache (confirmed in
  *  discord.rs). */
 export async function verifyOwnership(id: string): Promise<{ id: string }> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) throw new Error("not connected");
   return c.post<{ id: string }>(`/clans/${encodeURIComponent(id)}/verify-ownership`);
 }
@@ -561,7 +571,7 @@ export async function verifyOwnership(id: string): Promise<{ id: string }> {
  *  clan id/membership, so we scan the clans list (perPage=100) and return the
  *  first whose viewer is a confirmed member. */
 export async function myClan(): Promise<ClanSummary | null> {
-  const c = getActiveClient();
+  const c = authedClient();
   if (!c) return null;
   const page = await c.get<Page<ClanSummary>>("/clans", { perPage: 100 });
   return page?.items?.find((cl) => cl.viewer?.membershipStatus === "member") ?? null;
@@ -572,6 +582,8 @@ export async function myClan(): Promise<ClanSummary | null> {
  *  avatar route lives under `/api`, not `/api/v3`). No `?session=` — the route
  *  is public (profile-modal / settings-tab both use it without a session). */
 export function avatarUrl(userId: string): string {
+  // Public avatar URL for an <img> (no request fired here → no auth needed);
+  // use the raw active client, not authedClient(), so avatars still resolve.
   const c = getActiveClient();
   if (!c) return "";
   return `${c.rootUrl}/avatar?userId=${encodeURIComponent(userId)}`;

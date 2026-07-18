@@ -22,6 +22,7 @@ import {
   loadAdminNotifs,
 } from "./admin-ui";
 import { loadAchievementList } from "./achievements-tab";
+import { refreshCommunity } from "./community/shell";
 
 export function wireWindowChrome(win: HTMLElement): void {
   // tab switching
@@ -40,6 +41,12 @@ export function wireWindowChrome(win: HTMLElement): void {
       if ((tab as HTMLElement).dataset.p === "tp") {
         loadTemplates().catch(() => {});
         loadPublicTemplates().catch(() => {});
+      }
+      if ((tab as HTMLElement).dataset.p === "co") {
+        // Re-fetch on focus: the Community stack mounts once at startup (often
+        // before login), so its first load can no-op without a token. Refresh
+        // now that the client is authenticated.
+        refreshCommunity();
       }
       if ((tab as HTMLElement).dataset.p === "ad") {
         loadAdminUsers().catch(() => {});
