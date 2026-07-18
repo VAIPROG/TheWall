@@ -214,13 +214,6 @@ export function kitStyles(): string {
 
 /* --- Community Hub --- */
 .wd-comm-hub { display:flex; flex-direction:column; gap:8px; }
-/* My-clan card: a clickable card row (avatar/name + member count + badge). */
-.wd-comm-clan { display:flex; align-items:center; gap:8px; cursor:pointer; }
-.wd-comm-clan:hover { filter:brightness(1.05); }
-.wd-comm-clan-body { flex:1; min-width:0; }
-.wd-comm-clan-name { font-weight:bold; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.wd-comm-clan-sub { font-size:10px; color:var(--sub); display:flex; align-items:center; gap:4px; }
-.wd-comm-clan-arr { color:var(--sub); margin-left:auto; }
 /* Chat rows reuse .wd-list/.wd-row; add clickability + an unread pill. */
 .wd-comm-chat { cursor:pointer; }
 .wd-comm-chat:hover { background:var(--group); }
@@ -319,8 +312,6 @@ export function kitStyles(): string {
 .wd-comm-br-row { cursor:pointer; }
 .wd-comm-br-row:hover .wd-clancard { background:var(--group); }
 .wd-comm-br-foot { display:flex; align-items:center; gap:6px; padding:4px 0 2px; }
-.wd-comm-br-name { font-weight:bold; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.wd-comm-br-tag { color:var(--sub); font-weight:normal; }
 .wd-comm-br-meta { font-size:10px; color:var(--sub); }
 .wd-comm-br-chooser { display:flex; flex-direction:column; gap:8px; }
 .wd-comm-br-note { font-size:11px; color:var(--txt); margin-bottom:4px; }
