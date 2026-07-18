@@ -62,7 +62,12 @@ import { t, pluralize } from "./i18n";
   w.__nativeConfirm = w.confirm;
   w.__nativePrompt = w.prompt;
   w.alert = (msg: any) => {
-    errorDlg(String(msg));
+    // Page code (the site's own error paths included) sometimes calls
+    // `alert(err.message)` with the message missing — native alert would show
+    // the literal "undefined", and in our Win95 Error dialog that reads as an
+    // extension bug. Map nullish/empty to a generic line instead.
+    const text = msg == null ? "" : String(msg);
+    errorDlg(text.trim() ? text : "Unknown error (no message provided — see console)");
   };
   w.confirm = (msg: any) => {
     return confirmDlg(String(msg)) as any;

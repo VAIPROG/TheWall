@@ -233,10 +233,25 @@ export function kitStyles(): string {
 .wd-comm-info-discord { display:flex; gap:8px; font-size:11px; color:var(--sub); }
 
 /* ---- Thread screen (message list + composer) ---- */
-.wd-comm-thread { display:flex; flex-direction:column; height:100%; min-height:0; gap:6px; }
+/* Flex-fill chain: .wp-content is a max-height scroll box (the resize grip
+   sets its max-height inline) whose children are all auto-height, so a bare
+   height:100% on the thread never resolved — long threads pushed the
+   composer below the fold and the whole pane scrolled instead of the message
+   list. Bound the chain top-down (Chrome-only extension, so :has() is fine):
+   content → community pane → stack → screen each flex + min-height:0, and the
+   screen scrolls for non-thread screens (hub/clan/browse) since .wd-stack
+   clips overflow. */
+.wp-content:has(> .wp-pane[data-p="co"].active) { display:flex; flex-direction:column; }
+.wp-pane[data-p="co"].active { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+.wp-pane[data-p="co"].active > .wd-stack { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+#comm-stack .wd-stack-screen { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow-y:auto; }
+#comm-stack > .wd-stack-back { flex:none; } /* back header must never shrink */
+#comm-stack .wd-stack-screen > * { flex:none; }
+#comm-stack .wd-stack-screen > .wd-comm-thread { flex:1 1 auto; min-height:0; }
+.wd-comm-thread { display:flex; flex-direction:column; min-height:0; gap:6px; }
 .wd-comm-msglist {
-  /* flex-fill + min-height:0 lets the list track the resizable window (the grip
-     sets .wp-content max-height) while the composer stays pinned below. */
+  /* flex-fill + min-height:0 lets the list track the resizable window while
+     the composer stays pinned below. */
   flex:1 1 auto; min-height:0; overflow-y:auto;
   display:flex; flex-direction:column; gap:6px; padding:2px;
 }
@@ -244,7 +259,7 @@ export function kitStyles(): string {
 .wd-comm-msg { display:flex; flex-direction:column; gap:2px; }
 .wd-comm-msg-head { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--sub); }
 .wd-comm-msg-av { width:16px; height:16px; border-radius:50%; flex:none; object-fit:cover; }
-.wd-comm-msg-name { font-weight:bold; color:var(--txt); }
+.wd-comm-msg-name { font-weight:bold; color:var(--text); }
 .wd-comm-msg-time { color:var(--sub); }
 .wd-comm-msg-edited { font-style:italic; }
 .wd-comm-msg-body { font-size:12px; overflow-wrap:anywhere; word-break:break-word; white-space:pre-wrap; }
@@ -254,7 +269,7 @@ export function kitStyles(): string {
 .wd-comm-reacts { display:flex; flex-wrap:wrap; gap:4px; margin-top:1px; }
 .wd-comm-react {
   font-size:10px; line-height:1; padding:2px 5px; cursor:pointer;
-  border:1px solid var(--dark); background:var(--group); color:var(--txt);
+  border:1px solid var(--dark); background:var(--group); color:var(--text);
   display:inline-flex; align-items:center; gap:3px;
 }
 .wd-comm-react:hover { filter:brightness(1.08); }
@@ -319,7 +334,7 @@ export function kitStyles(): string {
 .wd-comm-br-foot { display:flex; align-items:center; gap:6px; padding:4px 0 2px; }
 .wd-comm-br-meta { font-size:10px; color:var(--sub); }
 .wd-comm-br-chooser { display:flex; flex-direction:column; gap:8px; }
-.wd-comm-br-note { font-size:11px; color:var(--txt); margin-bottom:4px; }
+.wd-comm-br-note { font-size:11px; color:var(--text); margin-bottom:4px; }
 .wd-comm-br-muted { color:var(--sub); }
 .wd-comm-br-suggest { font-size:12px; font-weight:bold; margin-bottom:4px; }
 /* ---- Advanced clan card (banner + overlaid avatar + stat chips; Hub full / browse compact) ---- */
