@@ -29,13 +29,15 @@ import {
   reportMessage,
   pinMessage,
   getChat,
+  messagesFingerprint,
+  isGlobalModerator,
   type ChatRef,
   type Message,
 } from "./api";
 import { renderMessage } from "./render";
 
 // ---------------------------------------------------------------------------
-// Poll teardown (MODULE-level single timer).
+// Poll teardown (MODULE-level single timer + teardown).
 //
 // PanelStack has no teardown hook: pushing/popping a screen replaces the stack
 // container's innerHTML, which detaches this thread's DOM. So instead of an
@@ -43,12 +45,25 @@ import { renderMessage } from "./render";
 // checks whether `#comm-msgs` is still in the document. Once the user navigates
 // away (or a new thread re-mounts and calls stopPoll first), the element is
 // gone and the next tick clears the timer. One timer max, ever.
+//
+// `threadTeardown` rides along: the mentions autocomplete reparents its suggest
+// node to document.body and binds window resize/scroll(capture) listeners, so
+// it MUST be torn down whenever the poll dies. Previously only the tick's
+// detach path did that — a stack.refresh() (every Community-tab click) ran
+// stopPoll() in the next onMount BEFORE the old tick could fire, leaking one
+// capture-phase window scroll listener + one orphaned body node per refresh.
+// Those stale listeners fire on every page scroll — a real sluggishness source.
 // ---------------------------------------------------------------------------
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let threadTeardown: (() => void) | null = null;
 function stopPoll(): void {
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
+  }
+  if (threadTeardown) {
+    threadTeardown();
+    threadTeardown = null;
   }
 }
 
@@ -98,6 +113,10 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
       let msgs: Message[] = [];
       let canModerate = false;
       let inFlight = false;
+      // Fingerprint of what #comm-msgs currently shows (null = not message
+      // HTML, e.g. loading/error state → next paint always renders). Painting
+      // recreates every animated-emote <img>, so unchanged polls must skip.
+      let paintedKey: string | null = null;
       // The CONCRETE chat id (read/react/edit/pin routes are Uuid-only). Clan
       // refs carry it; global/DM/modmail refs resolve it from the first loaded
       // (or sent) message. Null until then — read-state simply waits.
@@ -107,12 +126,9 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
       let lastReadMsgId: string | null = null;
 
       // Global chat + own-modmail moderation is gated on the caller's GLOBAL
-      // role (clan threads derive it from the chat detail below). Field name
-      // drifted across backend versions — mirror settings-tab's defensive read.
-      const me = c?.me as { globalRole?: string; global_role?: string; role?: string } | undefined;
-      const globalRole = String(me?.globalRole || me?.global_role || me?.role || "").toLowerCase();
+      // role (clan threads derive it from the chat detail below).
       if (ref.kind === "global" || ref.kind === "modmail") {
-        canModerate = globalRole === "moderator" || globalRole === "admin" || globalRole === "owner";
+        canModerate = isGlobalModerator();
       }
 
       /** Resolve `cid` from the loaded messages and mark the thread read once
@@ -126,9 +142,16 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
       };
 
       // --- render one batch into #comm-msgs, preserving scroll-at-bottom ---
+      // Skips the innerHTML swap entirely when nothing visible changed since
+      // the last paint (canModerate is part of the key — it gates the action
+      // buttons, so a role resolving late repaints once). Without this, the 5s
+      // poll rebuilt the whole list every tick, re-decoding every animated
+      // emote <img> and thrashing layout — the emote-lag root cause.
       const paint = (list: Message[]): void => {
         const box = $("comm-msgs");
         if (!box) return;
+        const key = `${canModerate ? "m" : "-"}|${meId ?? ""}|${messagesFingerprint(list)}`;
+        if (key === paintedKey) return;
         // Was the user pinned near the bottom before we re-render? If so, keep
         // them there; otherwise leave their scroll position untouched.
         const nearBottom =
@@ -137,6 +160,7 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
         box.innerHTML = list.length
           ? list.map((m) => renderMessage(m, { meId, canModerate, emotes: replaceEmotes }, labels)).join("")
           : `<div class="wd-empty">${esc(t("commNoMessages"))}</div>`;
+        paintedKey = key;
         if (nearBottom) box.scrollTop = box.scrollHeight;
       };
 
@@ -148,6 +172,7 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
         // connect from Settings and come back; never reload the whole page).
         if (!getActiveClient()?.token) {
           box.innerHTML = `${errorState(t("commConnectFirst"))}<div class="wd-comm-actions" style="margin-top:6px"><button class="wd-btn" id="comm-retry" type="button">${esc(t("commRetry"))}</button></div>`;
+          paintedKey = null; // box no longer shows message HTML
           $("comm-retry")?.addEventListener("click", () => void load());
           return;
         }
@@ -158,6 +183,7 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
           // reading — only surface the error state when nothing is on screen.
           if (msgs.length) return;
           box.innerHTML = `${errorState(t("commLoadErr"))}<div class="wd-comm-actions" style="margin-top:6px"><button class="wd-btn" id="comm-retry" type="button">${esc(t("commRetry"))}</button></div>`;
+          paintedKey = null; // box no longer shows message HTML
           $("comm-retry")?.addEventListener("click", () => void load());
           return;
         }
@@ -174,7 +200,8 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
           .then((detail) => {
             const role = detail?.viewer?.role;
             canModerate = role === "moderator" || role === "admin" || role === "owner";
-            if (canModerate && msgs.length) paint(msgs);
+            // canModerate is part of the paint key — repaints only on change.
+            if (msgs.length) paint(msgs);
           })
           .catch(() => {});
       }
@@ -194,20 +221,31 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
       // unmount — attachMentions reparents suggestEl to document.body and binds
       // window resize/scroll listeners; without destroy() those leak per open.
       const mentions = (ta && suggestEl) ? attachMentions(ta, suggestEl, async () => []) : null;
+      // Registered module-level so EVERY stopPoll() path tears it down —
+      // including a re-mount (stack.refresh / another thread opening) that
+      // kills the timer before the tick's detach path could run. destroy()
+      // drops the window listeners but does NOT remove the body-reparented
+      // suggest node, so remove() it too or orphans accumulate.
+      threadTeardown = () => {
+        mentions?.destroy();
+        suggestEl?.remove();
+      };
 
       // --- 5s poll while mounted (self-clears on navigate-away) ---
       const tick = async (): Promise<void> => {
         const list = document.getElementById("comm-msgs");
         if (!list) {
-          // Screen popped/replaced → element gone → self-clear. Mirror the poll
-          // teardown for the mentions handle: destroy() drops the window
-          // listeners but does NOT remove the body-reparented suggest node, so
-          // remove() it too or orphans accumulate.
+          // Screen popped/replaced → element gone → self-clear (stopPoll also
+          // runs the registered mentions teardown).
           stopPoll();
-          mentions?.destroy();
-          suggestEl?.remove();
           return;
         }
+        // Community pane hidden (user is on another top-level tab, or the
+        // window is closed)? The thread stays mounted, so the element is still
+        // in the document — but polling + repainting an invisible list burned
+        // network and CPU forever in the background. Pause; switching back to
+        // the tab re-mounts via refreshCommunity() (fresh load) anyway.
+        if (!list.offsetParent) return;
         if (inFlight) return; // single-in-flight guard
         inFlight = true;
         try {

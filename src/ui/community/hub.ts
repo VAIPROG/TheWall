@@ -22,6 +22,7 @@ import {
   getUsername,
   getUserId,
   getModmailThread,
+  isGlobalModerator,
   type ChatSummary,
   type ChatRef,
   type ClanSummary,
@@ -70,15 +71,17 @@ function rowTitle(c: ChatSummary): string {
   return chatTitle(c);
 }
 
-/** Whether the signed-in user is a global moderator+ (gates the modmail triage
- *  affordance only — the backend enforces the real permission). Field name
- *  drifted across backend versions; mirror settings-tab's defensive read. */
-function isGlobalMod(): boolean {
-  const me = getActiveClient()?.me as
-    | { globalRole?: string; global_role?: string; role?: string }
-    | undefined;
-  const r = String(me?.globalRole || me?.global_role || me?.role || "").toLowerCase();
-  return r === "moderator" || r === "admin" || r === "owner";
+// Teardown for the DM-compose mentions autocomplete, module-level so a
+// RE-MOUNT (stack.refresh on every Community-tab click) can drop the previous
+// mount's handle. attachMentions reparents the suggest node to document.body
+// and binds window resize/scroll(capture) listeners; before this, re-mounting
+// with the composer open leaked one of each per refresh.
+let hubMentionsTeardown: (() => void) | null = null;
+function teardownHubMentions(): void {
+  if (hubMentionsTeardown) {
+    hubMentionsTeardown();
+    hubMentionsTeardown = null;
+  }
 }
 
 /** My-clan card body (or an empty-state when the user has no clan). Uses the
@@ -157,7 +160,7 @@ export function hubScreen(): PanelScreen {
         <div id="comm-myclan">${card(loading())}</div>
         <div class="wd-comm-chats-head">
           <span class="wd-legend grow">${esc(t("commChats"))}</span>
-          ${isGlobalMod() ? `<button class="wd-btn wd-btn--sm" id="comm-modmail-triage" type="button" title="${esc(t("commModmailTriageHint"))}">🛡 ${esc(t("commModmailTriage"))}</button>` : ""}
+          ${isGlobalModerator() ? `<button class="wd-btn wd-btn--sm" id="comm-modmail-triage" type="button" title="${esc(t("commModmailTriageHint"))}">🛡 ${esc(t("commModmailTriage"))}</button>` : ""}
           <button class="wd-btn wd-btn--sm" id="comm-new-dm" type="button">✉ ${esc(t("commNewMessage"))}</button>
         </div>
         <div id="comm-dm-compose" class="wd-comm-dm-compose" hidden>
@@ -174,6 +177,11 @@ export function hubScreen(): PanelScreen {
         ${renderInfo()}
       </div>`,
     onMount: () => {
+      // Drop any previous mount's compose-mentions handle first: a re-mount
+      // (refreshCommunity on tab focus) replaces the composer DOM, but the old
+      // handle's window listeners + body-reparented node would survive it.
+      teardownHubMentions();
+
       const load = async () => {
         const clanBox = $("comm-myclan");
         const chatBox = $("comm-chats");
@@ -264,12 +272,18 @@ export function hubScreen(): PanelScreen {
       const composeBox = $("comm-dm-compose");
       const toInput = $("comm-dm-to") as HTMLInputElement | null;
       let dmMentions: { destroy(): void } | null = null;
+      // The exact suggest node the handle was attached to — teardown must
+      // remove THIS element (it gets reparented to document.body, and an id
+      // lookup after a re-mount could hit the fresh in-composer node instead).
+      let dmSuggestEl: HTMLElement | null = null;
 
       const teardownMentions = () => {
         dmMentions?.destroy();
         dmMentions = null;
         // destroy() drops window listeners but not the body-reparented node.
-        $("comm-dm-suggest")?.remove();
+        dmSuggestEl?.remove();
+        dmSuggestEl = null;
+        hubMentionsTeardown = null;
       };
 
       const openDm = async (): Promise<void> => {
@@ -319,6 +333,8 @@ export function hubScreen(): PanelScreen {
           // attachMentions is typed for a textarea but only uses value +
           // selectionStart/End, which <input> supports; the cast is safe.
           dmMentions = attachMentions(toInput as unknown as HTMLTextAreaElement, suggestEl, async () => []);
+          dmSuggestEl = suggestEl;
+          hubMentionsTeardown = teardownMentions;
         }
         toInput?.focus();
       });

@@ -12,6 +12,10 @@ import {
   chatTitle,
   peerOf,
   chronological,
+  messagesFingerprint,
+  roleFromMe,
+  takedownBody,
+  TAKEDOWN_FIELDS,
   type ChatSummary,
   type Message,
 } from "../../src/ui/community/api";
@@ -150,6 +154,83 @@ assert.ok(chatTitle(summary({ type: "global" })).includes("Global"));
   // No active client in bare Bun → these return "" ; assert callable + string type.
   assert.strictEqual(typeof clanAvatarUrl("abc"), "string");
   assert.strictEqual(typeof clanBannerUrl("abc"), "string");
+}
+
+// ── messagesFingerprint: skip-repaint key for the thread's 5s poll ───────────
+{
+  const m = (over: Partial<Message>): Message =>
+    ({
+      id: "m1",
+      chatId: "c1",
+      content: "hi",
+      editCount: 0,
+      isSystem: false,
+      isDeleted: false,
+      version: 1,
+      createdAt: "2026-07-18T12:00:00Z",
+      reactions: [],
+      ...over,
+    }) as Message;
+
+  // Same visible content → same fingerprint (this is what lets the poll skip).
+  assert.strictEqual(messagesFingerprint([m({})]), messagesFingerprint([m({})]));
+  assert.strictEqual(messagesFingerprint([]), "");
+
+  const base = messagesFingerprint([m({})]);
+  // Every renderable change must alter the fingerprint:
+  assert.notStrictEqual(messagesFingerprint([m({ version: 2 })]), base, "edit bumps version");
+  assert.notStrictEqual(messagesFingerprint([m({ editedAt: "2026-07-18T12:01:00Z" })]), base, "edited flag");
+  assert.notStrictEqual(messagesFingerprint([m({ isDeleted: true })]), base, "deleted flag");
+  assert.notStrictEqual(
+    messagesFingerprint([m({ reactions: [{ emoji: "👍", count: 1, reactedByMe: false }] })]),
+    base,
+    "new reaction",
+  );
+  assert.notStrictEqual(
+    messagesFingerprint([m({ reactions: [{ emoji: "👍", count: 1, reactedByMe: true }] })]),
+    messagesFingerprint([m({ reactions: [{ emoji: "👍", count: 1, reactedByMe: false }] })]),
+    "reactedByMe toggles the chip state",
+  );
+  assert.notStrictEqual(
+    messagesFingerprint([m({}), m({ id: "m2" })]),
+    base,
+    "appended message",
+  );
+  // Content is NOT part of the key on purpose: content can only change via an
+  // edit, which bumps version/editedAt — hashing bodies would just cost CPU.
+}
+
+// ── roleFromMe: defensive global-role read across backend field drift ────────
+{
+  assert.strictEqual(roleFromMe({ globalRole: "Admin" }), "admin");
+  assert.strictEqual(roleFromMe({ global_role: "OWNER" }), "owner");
+  assert.strictEqual(roleFromMe({ role: "moderator" }), "moderator");
+  // Precedence: globalRole > global_role > role.
+  assert.strictEqual(roleFromMe({ globalRole: "user", role: "admin" }), "user");
+  assert.strictEqual(roleFromMe({}), "");
+  assert.strictEqual(roleFromMe(undefined), "");
+  assert.strictEqual(roleFromMe(null), "");
+}
+
+// ── takedownBody: mirrors the backend validation exactly ─────────────────────
+{
+  // Happy path: known fields, trimmed reason, valid action.
+  assert.deepStrictEqual(takedownBody(["avatar", "tag"], "strip", "  spam  "), {
+    fields: ["avatar", "tag"],
+    action: "strip",
+    reason: "spam",
+  });
+  // Every advertised field is accepted.
+  assert.ok(takedownBody([...TAKEDOWN_FIELDS], "strip_and_lock", "r"));
+  // Rejections (backend would 400 these):
+  assert.strictEqual(takedownBody([], "strip", "r"), null, "no fields");
+  assert.strictEqual(takedownBody(["name"], "strip", "r"), null, "unknown field");
+  assert.strictEqual(takedownBody(["avatar", "nope"], "strip", "r"), null, "mixed unknown field");
+  assert.strictEqual(takedownBody(["avatar"], "strip", "   "), null, "blank reason");
+  assert.strictEqual(takedownBody(["avatar"], "strip", "x".repeat(1001)), null, "reason > 1000");
+  assert.strictEqual(takedownBody(["avatar"], "nuke", "r"), null, "bad action");
+  // Boundary: exactly 1000 chars is fine.
+  assert.ok(takedownBody(["avatar"], "strip", "x".repeat(1000)));
 }
 
 console.log("community-api: OK");

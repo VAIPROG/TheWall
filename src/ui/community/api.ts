@@ -121,6 +121,15 @@ export interface ClanStats {
   onlineCount?: number | null;
 }
 
+/** Global-moderation lock state on a clan (`ClanView.moderation`; only present
+ *  while at least one field is locked — backend omits it otherwise). */
+export interface ClanModeration {
+  lockedFields: string[];
+  lockedBy?: string | null;
+  lockedAt?: string | null;
+  reason?: string | null;
+}
+
 /** A clan as it appears in list results and detail. `ClanSummary` and
  *  `ClanDetail` share the same wire shape (`ClanView`); the alias documents
  *  intent at call sites. */
@@ -144,6 +153,7 @@ export interface ClanSummary {
   ownerVerifiedVia?: string | null;
   ownerVerifiedAt?: string | null;
   viewer?: ClanViewer;
+  moderation?: ClanModeration | null;
 }
 
 export type ClanDetail = ClanSummary;
@@ -311,6 +321,97 @@ export function chatTitle(c: ChatSummary): string {
     default:
       return c.topic?.trim() || "Chat";
   }
+}
+
+/** Compact change-fingerprint of a rendered message list (pure — unit-tested).
+ *  Covers everything `renderMessage` paints: id, version (bumps on edit),
+ *  edited/deleted flags and the reaction chips. The thread screen compares
+ *  fingerprints across its 5s poll and SKIPS the innerHTML re-render when
+ *  nothing changed — re-painting recreates every animated-emote `<img>` (decode
+ *  + layout thrash every poll), which is what made emotes lag. */
+export function messagesFingerprint(list: Message[]): string {
+  return list
+    .map(
+      (m) =>
+        `${m.id}:${m.version}:${m.editedAt ?? ""}:${m.isDeleted ? 1 : 0}:` +
+        m.reactions.map((r) => `${r.emoji}=${r.count}${r.reactedByMe ? "*" : ""}`).join(","),
+    )
+    .join("|");
+}
+
+/** Normalised global-role string from a `me` payload (pure — unit-tested).
+ *  The field name drifted across backend versions (`globalRole` on V3,
+ *  `global_role` on rich /v2/auth/me, bare `role` on legacy bootstraps), so
+ *  every screen used to re-implement this defensive read — now shared. */
+export function roleFromMe(
+  me: { globalRole?: string; global_role?: string; role?: string } | null | undefined,
+): string {
+  return String(me?.globalRole || me?.global_role || me?.role || "").toLowerCase();
+}
+
+/** Whether the signed-in user is a global moderator+ (UX gating only — the
+ *  backend enforces the real permission on every route). */
+export function isGlobalModerator(): boolean {
+  const r = roleFromMe(getActiveClient()?.me as Parameters<typeof roleFromMe>[0]);
+  return r === "moderator" || r === "admin" || r === "owner";
+}
+
+/** Whether the signed-in user is a global admin+ (UX gating only). */
+export function isGlobalAdmin(): boolean {
+  const r = roleFromMe(getActiveClient()?.me as Parameters<typeof roleFromMe>[0]);
+  return r === "admin" || r === "owner";
+}
+
+// ---------------------------------------------------------------------------
+// Clan global-moderation (takedown / unlock) — moderator+ only
+// ---------------------------------------------------------------------------
+
+/** The presentation fields a global moderator can strip/lock (mirrors the
+ *  backend `LOCKABLE_FIELDS` in moderation/clans.rs). */
+export const TAKEDOWN_FIELDS = ["avatar", "banner", "description", "tag", "discoverable"] as const;
+export type TakedownField = (typeof TAKEDOWN_FIELDS)[number];
+export type TakedownAction = "strip" | "strip_and_lock";
+
+export interface ClanTakedownBody {
+  fields: string[];
+  action: TakedownAction;
+  reason: string;
+}
+
+/** Validate + build a takedown request body (pure — unit-tested). Mirrors the
+ *  backend checks (non-empty known fields, reason 1–1000 chars, action enum) so
+ *  a bad form fails locally with a clear signal instead of a 400. Returns null
+ *  when invalid. */
+export function takedownBody(
+  fields: string[],
+  action: string,
+  reason: string,
+): ClanTakedownBody | null {
+  const clean = fields.filter((f): f is TakedownField =>
+    (TAKEDOWN_FIELDS as readonly string[]).includes(f),
+  );
+  const r = reason.trim();
+  if (!clean.length || clean.length !== fields.length) return null;
+  if (!r || r.length > 1000) return null;
+  if (action !== "strip" && action !== "strip_and_lock") return null;
+  return { fields: clean, action, reason: r };
+}
+
+/** POST /moderation/clans/{id}/takedown — strip (and optionally lock)
+ *  presentation fields. Global moderator+ only; returns the updated ClanView. */
+export async function takedownClan(id: string, body: ClanTakedownBody): Promise<ClanDetail> {
+  const c = authedClient();
+  if (!c) throw new Error("not connected");
+  return c.post<ClanDetail>(`/moderation/clans/${encodeURIComponent(id)}/takedown`, body);
+}
+
+/** POST /moderation/clans/{id}/unlock — release moderation locks on the given
+ *  fields (backend requires a non-empty `fields` list; pass the currently
+ *  locked ones from `ClanDetail.moderation.lockedFields`). */
+export async function unlockClan(id: string, fields: string[], reason?: string): Promise<ClanDetail> {
+  const c = authedClient();
+  if (!c) throw new Error("not connected");
+  return c.post<ClanDetail>(`/moderation/clans/${encodeURIComponent(id)}/unlock`, { fields, reason });
 }
 
 // ---------------------------------------------------------------------------

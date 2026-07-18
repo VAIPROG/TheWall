@@ -93,7 +93,7 @@ export function renderMessage(m: Message, ctx: RenderCtx = {}, labels: ActionLab
   // Avatar (only when we have an author id). The v6.4.0 avatar endpoint never
   // 404s (falls back to a seeded identicon), so no onerror chain is needed.
   const avatar = m.authorId
-    ? `<img class="wd-comm-msg-av" src="${esc(avatarUrl(m.authorId))}" alt="">`
+    ? `<img class="wd-comm-msg-av" src="${esc(avatarUrl(m.authorId))}" alt="" loading="lazy" decoding="async">`
     : "";
 
   const name = esc(m.authorUsername ?? "…");

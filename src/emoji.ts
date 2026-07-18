@@ -184,7 +184,10 @@ export function getEmotesGrouped(): Map<string, Map<string, string>> {
 }
 
 function imgTag(id: string, name: string): string {
-  return `<img src="https://cdn.7tv.app/emote/${id}/1x.webp" alt=":${name}:" class="wd-emote" loading="lazy">`;
+  // decoding="async" keeps (animated-webp) emote decode off the main paint
+  // path; height matches the .wd-emote CSS so layout doesn't shift when the
+  // image arrives. 1x is the smallest 7TV rendition.
+  return `<img src="https://cdn.7tv.app/emote/${id}/1x.webp" alt=":${name}:" class="wd-emote" loading="lazy" decoding="async" height="20">`;
 }
 
 export function replaceEmotes(html: string): string {
