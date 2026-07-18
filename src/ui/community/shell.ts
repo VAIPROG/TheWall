@@ -9,15 +9,15 @@ import { $ } from "../../helpers";
 import { hubScreen } from "./hub";
 import { threadScreen } from "./thread";
 import { clanScreen } from "./clan";
+import { browseScreen } from "./browse";
 import type { ChatRef } from "./api";
 
 // Re-export the real ChatRef (owned by api.ts) so existing importers of the
 // shell's `ChatRef` keep working.
 export type { ChatRef };
 
-// Screen factories. Hub/Thread/Clan/Browse get their real implementations in
-// later slices; kept behind this indirection so the shell + navigation can be
-// built and tested first.
+// Screen factories, kept behind this indirection so the shell + navigation can
+// be built and tested independently of the screens.
 export interface StackScreens {
   hub: () => PanelScreen;
   thread: (ref: ChatRef, title: string) => PanelScreen;
@@ -26,16 +26,11 @@ export interface StackScreens {
 }
 
 export function makeStackScreens(): StackScreens {
-  // Real screens land in Tasks 3–6; import them here as they arrive.
   return {
     hub: hubScreen,
     thread: (ref: ChatRef, title: string) => threadScreen(ref, title),
     clan: (id: string) => clanScreen(id),
-    browse: () => ({
-      title: "Browse",
-      render: () => `<div id="comm-browse" class="wd-stub"></div>`,
-      onMount: () => {},
-    }),
+    browse: browseScreen,
   };
 }
 

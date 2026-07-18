@@ -300,5 +300,19 @@ export function kitStyles(): string {
 /* Trailing action row (Load more / Save / Create invite). */
 .wd-clan-more { margin-top:5px; }
 .wd-clan-danger { display:flex; gap:6px; flex-wrap:wrap; }
+/* ---- Community browse + create-clan chooser (reuses .wd-list/.wd-row/.wd-clan-fld) ---- */
+.wd-comm-browse { display:flex; flex-direction:column; gap:6px; }
+.wd-comm-br-bar { display:flex; align-items:center; gap:6px; }
+.wd-comm-br-search { flex:1; min-width:0; font:11px "MS Sans Serif",Tahoma,sans-serif; box-sizing:border-box; }
+.wd-comm-br-row { cursor:pointer; }
+.wd-comm-br-row:hover { background:var(--group); }
+.wd-comm-br-av { width:24px; height:24px; }
+.wd-comm-br-name { font-weight:bold; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wd-comm-br-tag { color:var(--sub); font-weight:normal; }
+.wd-comm-br-meta { font-size:10px; color:var(--sub); }
+.wd-comm-br-chooser { display:flex; flex-direction:column; gap:8px; }
+.wd-comm-br-note { font-size:11px; color:var(--txt); margin-bottom:4px; }
+.wd-comm-br-muted { color:var(--sub); }
+.wd-comm-br-suggest { font-size:12px; font-weight:bold; margin-bottom:4px; }
 `;
 }
