@@ -303,18 +303,19 @@ function render(cl: ClanDetail): string {
   if (v?.canManageMembers) segItems.push({ value: "requests", label: t("clanTabRequests") || "Requests" });
   if (v?.canManageSettings) segItems.push({ value: "settings", label: t("clanTabSettings") || "Settings" });
 
-  // Requests = invites + applications; Settings = form + danger zone (Leave /
-  // Disband). Danger is member-only, but any settings-manager is a member.
+  // Requests = invites + applications (admin only). Settings = the settings form
+  // (admin only). The Danger zone (Leave / Disband) lives in the always-visible
+  // Overview and is gated on membership — leaving a clan is a member action, not
+  // an admin one; Disband stays owner-only (inside renderDanger).
   const requests = v?.canManageMembers ? renderInvites() + renderApplications() : "";
-  const settingsBody = v?.canManageSettings
-    ? renderSettings(cl) + (isMember ? renderDanger(cl) : "")
-    : "";
+  const settingsBody = v?.canManageSettings ? renderSettings(cl) : "";
+  const danger = isMember ? renderDanger(cl) : "";
 
   return `
     ${clanCard(cl, { context: "manage" })}
     <div id="comm-clan-subnav">${segmented(segItems, "overview")}</div>
     <div class="wd-tpl-detail">
-      <div class="wd-clan-sub is-on" id="comm-clan-sub-overview">${renderOverview(cl)}</div>
+      <div class="wd-clan-sub is-on" id="comm-clan-sub-overview">${renderOverview(cl)}${danger}</div>
       <div class="wd-clan-sub" id="comm-clan-sub-members">${renderRoster(cl)}</div>
       <div class="wd-clan-sub" id="comm-clan-sub-requests">${requests}</div>
       <div class="wd-clan-sub" id="comm-clan-sub-settings">${settingsBody}</div>
