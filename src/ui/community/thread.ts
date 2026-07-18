@@ -17,6 +17,7 @@ import { toast } from "../../notify";
 import { confirmDlg, promptDlg } from "../../dialog";
 import { getActiveClient } from "../../backend/index";
 import { openEmojiPicker } from "../../emoji-picker";
+import { replaceEmotes } from "../../emoji";
 import { attachMentions } from "../../mentions";
 import {
   listMessages,
@@ -134,7 +135,7 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
           box.scrollHeight - box.scrollTop - box.clientHeight < 40;
         const labels = actionLabels();
         box.innerHTML = list.length
-          ? list.map((m) => renderMessage(m, { meId, canModerate }, labels)).join("")
+          ? list.map((m) => renderMessage(m, { meId, canModerate, emotes: replaceEmotes }, labels)).join("")
           : `<div class="wd-empty">${esc(t("commNoMessages"))}</div>`;
         if (nearBottom) box.scrollTop = box.scrollHeight;
       };

@@ -17,6 +17,13 @@ export interface RenderCtx {
   meId?: string;
   /** Whether the viewer can moderate this chat (pin/others' actions). */
   canModerate?: boolean;
+  /**
+   * Optional 7TV emote replacer, applied to the already-escaped message body
+   * HTML (turns `:emote:` shortcodes into `<img class="wd-emote">`). Injected
+   * by the DOM host (`thread.ts` passes `replaceEmotes`) so this module stays
+   * pure + bare-Bun import-safe; defaults to identity when absent.
+   */
+  emotes?: (html: string) => string;
 }
 
 /** Compact, locale-aware timestamp. Pure: falls back to "" on a bad date. */
@@ -94,9 +101,13 @@ export function renderMessage(m: Message, ctx: RenderCtx = {}, labels: ActionLab
   const edited = m.editedAt ? ` <span class="wd-comm-msg-edited">${esc(L.edited)}</span>` : "";
 
   // Body: deleted messages get a muted placeholder (never the raw content).
+  // Live messages: markdown → mentions → emotes, all on already-escaped HTML
+  // (mdToHtml starts with esc). The emote pass is injected (identity default)
+  // so :emote: shortcodes inside text render as <img class="wd-emote">.
+  const emotes = ctx.emotes ?? ((h: string) => h);
   const body = m.isDeleted
     ? `<div class="wd-comm-msg-body is-deleted">${esc(L.deleted)}</div>`
-    : `<div class="wd-comm-msg-body">${renderMentions(mdToHtml(m.content))}</div>`;
+    : `<div class="wd-comm-msg-body">${emotes(renderMentions(mdToHtml(m.content)))}</div>`;
 
   // Reactions row.
   const reactions =

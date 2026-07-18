@@ -60,6 +60,18 @@ function msg(over: Partial<Message> = {}): Message {
   assert.ok(html.includes("&lt;script&gt;"), "author name escaped");
 }
 
+// --- emotes: the injected replacer runs on the (mentions+markdown) body ---
+{
+  // Stub replacer turns `:kek:` into an <img class="wd-emote"> (as the real
+  // 7TV pass does), proving render.ts applies ctx.emotes to the body HTML.
+  const emotes = (h: string) => h.replace(/:kek:/g, '<img class="wd-emote" alt="kek">');
+  const html = renderMessage(msg({ content: "lol :kek: nice" }), { emotes });
+  assert.ok(html.includes('<img class="wd-emote"'), "emote shortcode replaced");
+  assert.ok(!html.includes(":kek:"), "raw shortcode consumed");
+  // Default (no emotes fn): shortcode stays literal — pure identity fallback.
+  assert.ok(renderMessage(msg({ content: "lol :kek:" })).includes(":kek:"), "identity default keeps text");
+}
+
 // --- deleted message: placeholder, no raw content, no edit/delete ---
 {
   const html = renderMessage(
