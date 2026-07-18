@@ -234,5 +234,9 @@ export function kitStyles(): string {
 .wd-comm-info { display:flex; flex-direction:column; gap:3px; }
 .wd-comm-info a { color:var(--accent); font-size:11px; text-decoration:none; }
 .wd-comm-info a:hover { text-decoration:underline; }
+/* Donate note: quieter, sits under the author link. */
+.wd-comm-info-note { color:var(--sub); font-size:10px; margin:0 0 2px; }
+/* Two Discord links side by side. */
+.wd-comm-info-discord { display:flex; gap:8px; font-size:11px; color:var(--sub); }
 `;
 }

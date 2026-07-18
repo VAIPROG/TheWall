@@ -22,8 +22,10 @@ import { openClan, openThread, openBrowse } from "./shell";
 
 // External community links (from landing/about.html — authoritative).
 const AUTHOR_URL = "https://vai-rice.space";
+const WIKI_URL = "https://snackers.vai-rice.space";
 const GITHUB_URL = "https://github.com/Vadim-Khristenko";
 const X_URL = "https://x.com/VAI_PROG";
+const DISCORD_SNACKERS_URL = "https://discord.gg/filian";
 const DISCORD_URL = "https://discord.gg/snackersru";
 
 // Loaded state, kept module-level (like browse.ts `rows`) so delegated row
@@ -60,7 +62,7 @@ function renderClan(): string {
 
 /** Chats list body (or an empty-state when there are none). */
 function renderChats(): string {
-  if (!chats.length) return emptyState(t("commChats"), "💬");
+  if (!chats.length) return emptyState(t("commNoChats"), "💬");
   const rows = chats
     .map((c) => {
       const unread =
@@ -79,9 +81,15 @@ function renderInfo(): string {
     `<a href="${href}" target="_blank" rel="noopener">${esc(label)}</a>`;
   const body = `<div class="wd-comm-info">
       ${link(AUTHOR_URL, `${t("commInfoAuthor")}: vai-rice.space`)}
+      <span class="wd-comm-info-note">${esc(t("commInfoDonateNote"))}</span>
+      ${link(WIKI_URL, t("commInfoWiki"))}
       ${link(GITHUB_URL, `${t("commInfoGitHub")}: Vadim-Khristenko`)}
       ${link(X_URL, `${t("commInfoX")}: @VAI_PROG`)}
-      ${link(DISCORD_URL, `Discord: ${t("commInfoDiscord")}`)}
+      <div class="wd-comm-info-discord">
+        Discord:
+        ${link(DISCORD_SNACKERS_URL, t("commInfoDiscordSnackers"))}
+        ${link(DISCORD_URL, t("commInfoDiscord"))}
+      </div>
     </div>`;
   return card(`<div class="wd-legend">${esc(t("commInfoTitle"))}</div>${body}`);
 }
@@ -91,11 +99,11 @@ export function hubScreen(): PanelScreen {
     title: "Community",
     render: () => `
       <div id="comm-hub" class="wd-comm-hub">
-        <div id="comm-myclan">${card(loading(), "wd-comm-clan-card")}</div>
+        <div id="comm-myclan">${card(loading())}</div>
         <div id="comm-chats">${loading()}</div>
         <div class="wd-comm-actions">
-          <button class="wd-btn wd-btn--primary" id="comm-browse">${esc(t("commBrowse"))}</button>
-          <button class="wd-btn" id="comm-create">${esc(t("commCreateClan"))}</button>
+          ${button(t("commBrowse"), { variant: "primary", id: "comm-browse" })}
+          ${button(t("commCreateClan"), { id: "comm-create" })}
         </div>
         ${renderInfo()}
       </div>`,
