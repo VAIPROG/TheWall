@@ -11,7 +11,7 @@
  * (`group()`/`button()`, `confirmDlg`/`promptDlg`, `toast`).
  */
 import type { PanelScreen } from "../kit/panel-stack";
-import { badge, button, group, loading, errorState, emptyState } from "../kit/primitives";
+import { button, group, loading, errorState, emptyState } from "../kit/primitives";
 import { $, esc } from "../../helpers";
 import { t } from "../../i18n";
 import { toast } from "../../notify";
@@ -25,11 +25,11 @@ import {
   siteSuggestion,
   createFromGuild,
   createFromSite,
-  clanAvatarUrl,
   type ClanSummary,
   type OwnedGuild,
   type SiteSuggestion,
 } from "./api";
+import { clanCard } from "./card";
 import { openClan } from "./shell";
 
 // Landing origin for the Discord-connect handoff (mirrors links-wire.ts). The
@@ -67,28 +67,26 @@ function joinLabel(policy?: string | null): string {
 // List rendering
 // ---------------------------------------------------------------------------
 
-/** One clan row: avatar, name + tag, verified badge, member count + policy,
- *  and a policy-aware Join/Apply button. Row body (not the button) drills in. */
+/** One clan row: the shared advanced clan card (compact — banner + avatar +
+ *  name/tag/verified + stat chips), a policy meta line, and a policy-aware
+ *  Join/Apply button. The row container carries `data-open` so a row click (but
+ *  NOT a `[data-join]` button click, which the delegation checks first) drills
+ *  into the read-only clan preview. */
 function renderRow(cl: ClanSummary): string {
-  const av = clanAvatarUrl(cl.id);
-  const ver = cl.ownerVerified ? badge(t("commVerified") || "verified", "owner") : "";
-  const tag = cl.tag ? `<span class="wd-comm-br-tag">[${esc(cl.tag)}]</span>` : "";
-  const count = cl.stats?.memberCount ?? cl.memberCount ?? 0;
   const policy = cl.joinPolicy;
-  const meta = `${esc(t("commMembers", { n: count }))} · ${esc(policyLabel(policy))}`;
+  const meta = `${esc(policyLabel(policy))}`;
   const join = button(joinLabel(policy), {
     size: "sm",
     variant: "primary",
     attrs: { "data-join": cl.id, "data-policy": policy || "open" },
   });
   return `
-    <div class="wd-row wd-comm-br-row" data-open="${esc(cl.id)}" role="button" tabindex="0">
-      <img class="wd-thumb wd-comm-br-av" width="24" height="24" src="${esc(av)}" alt="">
-      <div class="grow">
-        <div class="wd-comm-br-name">${esc(cl.name)} ${tag} ${ver}</div>
-        <div class="wd-comm-br-meta">${meta}</div>
+    <div class="wd-comm-br-row" data-open="${esc(cl.id)}" role="button" tabindex="0">
+      ${clanCard(cl, { context: "browse" })}
+      <div class="wd-comm-br-foot">
+        <span class="wd-comm-br-meta grow">${meta}</span>
+        ${join}
       </div>
-      ${join}
     </div>`;
 }
 

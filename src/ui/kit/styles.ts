@@ -317,8 +317,8 @@ export function kitStyles(): string {
 .wd-comm-br-bar { display:flex; align-items:center; gap:6px; }
 .wd-comm-br-search { flex:1; min-width:0; font:11px "MS Sans Serif",Tahoma,sans-serif; box-sizing:border-box; }
 .wd-comm-br-row { cursor:pointer; }
-.wd-comm-br-row:hover { background:var(--group); }
-.wd-comm-br-av { width:24px; height:24px; }
+.wd-comm-br-row:hover .wd-clancard { background:var(--group); }
+.wd-comm-br-foot { display:flex; align-items:center; gap:6px; padding:4px 0 2px; }
 .wd-comm-br-name { font-weight:bold; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wd-comm-br-tag { color:var(--sub); font-weight:normal; }
 .wd-comm-br-meta { font-size:10px; color:var(--sub); }
@@ -326,5 +326,16 @@ export function kitStyles(): string {
 .wd-comm-br-note { font-size:11px; color:var(--txt); margin-bottom:4px; }
 .wd-comm-br-muted { color:var(--sub); }
 .wd-comm-br-suggest { font-size:12px; font-weight:bold; margin-bottom:4px; }
+/* ---- Advanced clan card (banner + overlaid avatar + stat chips; Hub full / browse compact) ---- */
+.wd-clancard { position:relative; border:2px solid; border-color:var(--dark) var(--light) var(--light) var(--dark); background:var(--field); overflow:hidden; }
+.wd-clancard-banner { height:56px; background-size:cover; background-position:center; background-color:var(--group); }
+.wd-clancard--compact .wd-clancard-banner { height:34px; }
+.wd-clancard-av { position:absolute; left:8px; top:34px; border:2px solid var(--field); background:var(--group); }
+.wd-clancard--compact .wd-clancard-av { top:16px; width:32px; height:32px; }
+.wd-clancard-body { padding:8px 8px 8px 56px; }
+.wd-clancard-name { font-weight:bold; font-size:12px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.wd-clancard-tag { color:var(--sub); font-weight:normal; }
+.wd-clancard-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; font-size:10px; color:var(--sub); }
+.wd-clancard-chip { white-space:nowrap; }
 `;
 }

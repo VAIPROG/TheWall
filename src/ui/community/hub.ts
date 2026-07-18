@@ -7,7 +7,7 @@
  * container's innerHTML through loading() → content or errorState()).
  */
 import type { PanelScreen } from "../kit/panel-stack";
-import { card, badge, button, loading, errorState, emptyState } from "../kit/primitives";
+import { card, button, loading, errorState, emptyState } from "../kit/primitives";
 import { $, esc } from "../../helpers";
 import { t } from "../../i18n";
 import { toast } from "../../notify";
@@ -23,6 +23,7 @@ import {
   type ChatRef,
   type ClanSummary,
 } from "./api";
+import { clanCard } from "./card";
 import { openClan, openThread, openBrowse } from "./shell";
 
 // External community links (from landing/about.html — authoritative).
@@ -66,18 +67,12 @@ function rowTitle(c: ChatSummary): string {
   return chatTitle(c);
 }
 
-/** My-clan card body (or an empty-state when the user has no clan). */
+/** My-clan card body (or an empty-state when the user has no clan). Uses the
+ *  shared advanced clan card (banner + avatar + stat chips); the card's
+ *  `data-clan` root carries the id for the delegated open-clan click below. */
 function renderClan(): string {
   if (!clan) return emptyState(t("commNoClan"), "🏳️");
-  const ver = clan.ownerVerified ? badge(t("commVerified"), "owner") : "";
-  return `
-    <div class="wd-comm-clan" role="button" tabindex="0">
-      <div class="wd-comm-clan-body">
-        <div class="wd-comm-clan-name">${esc(clan.name)}</div>
-        <div class="wd-comm-clan-sub">${esc(t("commMembers", { n: clan.memberCount }))}${ver}</div>
-      </div>
-      <span class="wd-comm-clan-arr" aria-hidden="true">›</span>
-    </div>`;
+  return clanCard(clan, { context: "hub" });
 }
 
 /** Chats list body (or an empty-state when there are none). DM row labels carry
@@ -183,7 +178,7 @@ export function hubScreen(): PanelScreen {
       // My-clan card → open the clan (only when one is loaded). Delegated on the
       // container, which is recreated fresh each mount (no listener build-up).
       $("comm-myclan")?.addEventListener("click", () => {
-        if (clan && ($("comm-myclan")?.querySelector(".wd-comm-clan"))) {
+        if (clan && ($("comm-myclan")?.querySelector(".wd-clancard"))) {
           teardownMentions(); // leaving the Hub → drop any open compose mentions
           openClan(clan.id);
         }
