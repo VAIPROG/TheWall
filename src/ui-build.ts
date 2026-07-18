@@ -13,9 +13,7 @@ import { syncProfile, refreshNotifications } from "./data";
 import { buildOverlayPane } from "./ui/overlay-tab";
 import { buildTemplatesPane } from "./ui/templates/shell";
 import { buildCommunityPane } from "./ui/community/shell";
-import { buildMailPane } from "./ui/build-mail";
 import { buildProfilePane } from "./ui/profile-tab";
-import { buildAchievementsPane } from "./ui/achievements-tab";
 import { buildSettingsPane } from "./ui/settings-tab";
 import { buildAdminPane } from "./ui/admin";
 
@@ -38,9 +36,7 @@ export function buildUI(): void {
               <div class="wp-tab active" data-p="ov">${ic("grid")}${t("tabOverlay")}</div>
               <div class="wp-tab" data-p="tp">${ic("disk")}${t("tabTpl")}</div>
               <div class="wp-tab" data-p="co">${ic("chat")}${t("tabCommunity")}</div>
-              <div class="wp-tab" data-p="ma">${ic("bell")}Mail</div>
               <div class="wp-tab" data-p="pr">${ic("user")}${t("tabProfile")}</div>
-              <div class="wp-tab" data-p="ah">${ic("star")}${t("achTabTitle")}</div>
               <div class="wp-tab" data-p="se">${ic("gear")}${t("tabSettings")}</div>
               <div class="wp-tab" data-p="ad" id="tab-admin" style="display:none">${ic("shield")}Admin</div>
           </div>
@@ -51,12 +47,8 @@ export function buildUI(): void {
               ${buildTemplatesPane()}
               <!-- COMMUNITY -->
               ${buildCommunityPane()}
-              <!-- MAIL -->
-              ${buildMailPane()}
-              <!-- PROFILE -->
+              <!-- PROFILE (super-tab: Profile / Mail / Achievements sub-nav) -->
               ${buildProfilePane()}
-              <!-- ACHIEVEMENTS -->
-              ${buildAchievementsPane()}
               <!-- SETTINGS -->
               ${buildSettingsPane()}
               <!-- ADMIN (hidden unless role=admin/owner) -->

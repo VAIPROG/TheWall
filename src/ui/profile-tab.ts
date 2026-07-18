@@ -20,6 +20,10 @@ function ptRoot(): string {
 import { markAllRead, syncProfile, resetAvatar } from "../data";
 import { importShare } from "../share";
 import { openCursorShop } from "../open-cursor-shop";
+import { segmented } from "./kit/primitives";
+import { buildMailContent } from "./build-mail";
+import { loadNotifications, loadChatList } from "../mail";
+import { buildAchievementsContent, loadAchievementList } from "./achievements-tab";
 import {
   updatePaintCurrent,
   updateProfilePaintLine,
@@ -32,6 +36,30 @@ export function wireProfile(_win: HTMLElement): void {
   // in favour of the mailbox-level mark-all-read on the Mail tab. Kept
   // null-safe so older builds with the button still wire up cleanly.
   $("btn-markread")?.addEventListener("click", markAllRead);
+
+  // ----------- Profile super-tab: segmented sub-nav (Profile/Mail/Ach) -------
+  // Mail + Achievements were standalone tabs; they now live as sub-sections of
+  // the Profile pane. The sub-nav toggles which `#profile-sub-*` is visible and
+  // fires the relevant load on demand (their wiring — wireMailUI / the mail
+  // poll / loadAchievementList — is reused unchanged, just re-pointed here).
+  const subnav = $("profile-subnav");
+  subnav?.querySelectorAll<HTMLElement>("[data-seg]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const seg = btn.dataset.seg || "profile";
+      subnav
+        .querySelectorAll<HTMLElement>("[data-seg]")
+        .forEach((x) => x.classList.toggle("is-on", x === btn));
+      ["profile", "mail", "ach"].forEach((s) =>
+        $(`profile-sub-${s}`)?.classList.toggle("is-on", s === seg),
+      );
+      if (seg === "mail") {
+        loadNotifications();
+        loadChatList();
+      } else if (seg === "ach") {
+        loadAchievementList().catch(() => {});
+      }
+    });
+  });
 
   // ----------- Profile: bio + social links (inline-editable cards) -----------
 
@@ -439,6 +467,15 @@ export function wireProfile(_win: HTMLElement): void {
 
 export function buildProfilePane(): string {
   return `<div class="wp-pane" data-p="pr">
+              <div id="profile-subnav">${segmented(
+                [
+                  { value: "profile", label: t("tabProfile") },
+                  { value: "mail", label: t("tabMail") },
+                  { value: "ach", label: t("achTabTitle") },
+                ],
+                "profile",
+              )}</div>
+              <div id="profile-sub-profile" class="wd-profile-sub is-on">
                   <div class="wp-group"><div class="wp-legend">${ic("user")}${t("tabProfile")}</div>
                       <div id="profile-card"><div style="padding:6px">${t("syncing")}</div></div></div>
                   <div class="wp-group"><div class="wp-legend">${ic("bolt")}${t("profilePaintHeading")}</div>
@@ -476,5 +513,8 @@ export function buildProfilePane(): string {
                       <button class="wp-btn" id="btn-avatar-refresh-discord">${ic("discord")}Refresh Discord avatar cache</button>
                       <div class="wp-note" style="color:var(--sub)">${t("avatarNote")}</div>
                   </div>
-              </div>`;
+              </div>
+              <div id="profile-sub-mail" class="wd-profile-sub">${buildMailContent()}</div>
+              <div id="profile-sub-ach" class="wd-profile-sub">${buildAchievementsContent()}</div>
+          </div>`;
 }

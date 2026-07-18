@@ -8,7 +8,6 @@ import {
 import { $ } from "../helpers";
 import { log } from "../log";
 import { mountReopener } from "../reopen";
-import { loadNotifications, loadChatList } from "../mail";
 import {
   loadTemplates,
   loadPublicTemplates,
@@ -21,7 +20,6 @@ import {
   loadAdminTemplates,
   loadAdminNotifs,
 } from "./admin-ui";
-import { loadAchievementList } from "./achievements-tab";
 import { refreshCommunity } from "./community/shell";
 
 export function wireWindowChrome(win: HTMLElement): void {
@@ -58,11 +56,6 @@ export function wireWindowChrome(win: HTMLElement): void {
         syncProfile().catch(() => {});
         refreshNotifications().catch(() => {});
         document.dispatchEvent(new CustomEvent("wd:tab-open-pr"));
-      }
-      if ((tab as HTMLElement).dataset.p === "ah") {
-        // Achievements now live in their own tab so the Profile pane stays
-        // focused on identity / coins / paint actions.
-        loadAchievementList().catch(() => {});
       }
     }),
   );
@@ -166,10 +159,5 @@ export function wireWindowChrome(win: HTMLElement): void {
   $("wp-close")!.addEventListener("click", () => {
     win.style.display = "none";
     mountReopener();
-  });
-
-  // Load mail when user clicks the mail tab
-  document.querySelectorAll('.wp-tab[data-p="ma"]').forEach((b) => {
-    b.addEventListener("click", () => { loadNotifications(); loadChatList(); });
   });
 }

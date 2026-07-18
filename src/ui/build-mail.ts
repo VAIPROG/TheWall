@@ -2,9 +2,12 @@ import { ic } from "../icons";
 import { t } from "../i18n";
 import { esc } from "../helpers";
 
-export function buildMailPane(): string {
-  return `<div class="wp-pane" data-p="ma">
-                  <div class="wp-group">
+// Inner content of the Mail sub-section (no `.wp-pane` wrapper) — Mail is now
+// folded into the Profile super-tab, so this html is embedded inside
+// `#profile-sub-mail` rather than mounting a standalone pane. All ids are kept
+// intact so wireMailUI()/loadNotifications() bind exactly as before.
+export function buildMailContent(): string {
+  return `<div class="wp-group">
                       <div class="wp-legend">${ic("bell")}Inbox <span id="mail-unread-count" style="font-weight:normal;color:var(--accent);margin-left:4px"></span></div>
                       <div class="wp-tabbar" id="mail-filters" style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap">
                           <button class="wp-btn active" data-mail-kind="" style="flex:1;min-width:54px;padding:2px 6px;margin:0">All</button>
@@ -25,6 +28,5 @@ export function buildMailPane(): string {
                       <button class="wp-btn primary" id="btn-dm-send" style="width:100%">${ic("send")}Send DM</button>
                       <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("mailDmHint")}</div>
                       <div id="dm-mention-suggest" class="wp-mention-suggest"></div>
-                  </div>
-              </div>`;
+                  </div>`;
 }

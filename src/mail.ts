@@ -231,7 +231,10 @@ let mailTimer: number | null = null;
 export function startMailPolling(): void {
   if (mailTimer != null) return;
   mailTimer = window.setInterval(() => {
-    if (document.querySelector('.wp-pane[data-p="ma"].active')) loadNotifications();
+    // Mail now lives inside the Profile super-tab — only poll when the Profile
+    // pane is active AND its Mail sub-section is the visible one.
+    if (document.querySelector('.wp-pane[data-p="pr"].active #profile-sub-mail.is-on'))
+      loadNotifications();
   }, 30_000);
 }
 
