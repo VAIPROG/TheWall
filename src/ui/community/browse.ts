@@ -201,22 +201,6 @@ export function browseScreen(): PanelScreen {
           return;
         }
         b.innerHTML = renderList();
-        wireList();
-      };
-
-      // Delegated clicks on the fresh list container (Join button vs row body).
-      const wireList = (): void => {
-        const b = body();
-        if (!b) return;
-        b.addEventListener("click", (e) => {
-          const joinBtn = (e.target as HTMLElement).closest<HTMLElement>("[data-join]");
-          if (joinBtn?.dataset.join) {
-            void doJoin(joinBtn.dataset.join, joinBtn.dataset.policy || "open");
-            return;
-          }
-          const row = (e.target as HTMLElement).closest<HTMLElement>("[data-open]");
-          if (row?.dataset.open) openClan(row.dataset.open);
-        });
       };
 
       const doJoin = async (id: string, policy: string): Promise<void> => {
@@ -344,6 +328,21 @@ export function browseScreen(): PanelScreen {
       });
       $("comm-br-reload")?.addEventListener("click", () => void load());
       $("comm-br-create")?.addEventListener("click", () => void openChooser());
+
+      // Delegated clicks bound ONCE on the persistent #comm-br-body (it survives
+      // every innerHTML swap, so re-binding per load() would stack listeners and
+      // fire Join/openClan N times). In chooser mode there are no [data-join]/
+      // [data-open] targets, so this no-ops there; chooser controls are wired by
+      // id in wireChooser(). Mirrors templates/browse.ts's once-in-onMount bind.
+      $("comm-br-body")?.addEventListener("click", (e) => {
+        const joinBtn = (e.target as HTMLElement).closest<HTMLElement>("[data-join]");
+        if (joinBtn?.dataset.join) {
+          void doJoin(joinBtn.dataset.join, joinBtn.dataset.policy || "open");
+          return;
+        }
+        const row = (e.target as HTMLElement).closest<HTMLElement>("[data-open]");
+        if (row?.dataset.open) openClan(row.dataset.open);
+      });
 
       void load();
     },
