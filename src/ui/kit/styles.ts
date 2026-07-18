@@ -305,6 +305,11 @@ export function kitStyles(): string {
 /* Trailing action row (Load more / Save / Create invite). */
 .wd-clan-more { margin-top:5px; }
 .wd-clan-danger { display:flex; gap:6px; flex-wrap:wrap; }
+/* ---- Clan page: segmented sub-nav (Overview/Members/Requests/Settings) + Media ---- */
+.wd-clan-sub { display:none; }
+.wd-clan-sub.is-on { display:block; }
+#comm-clan-subnav { margin:8px 0; }
+.wd-clan-media { display:flex; flex-direction:column; gap:6px; }
 /* ---- Community browse + create-clan chooser (reuses .wd-list/.wd-row/.wd-clan-fld) ---- */
 .wd-comm-browse { display:flex; flex-direction:column; gap:6px; }
 .wd-comm-br-bar { display:flex; align-items:center; gap:6px; }

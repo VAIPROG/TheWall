@@ -11,9 +11,10 @@
  * gating is never a security boundary — only a nicety.
  */
 import type { PanelScreen } from "../kit/panel-stack";
-import { badge, button, group, loading, errorState, emptyState } from "../kit/primitives";
+import { badge, button, group, loading, errorState, emptyState, segmented } from "../kit/primitives";
 import { $, esc } from "../../helpers";
 import { t } from "../../i18n";
+import { ic } from "../../icons";
 import { toast } from "../../notify";
 import { confirmDlg } from "../../dialog";
 import { getActiveClient } from "../../backend/index";
@@ -33,6 +34,10 @@ import {
   leaveClan,
   disbandClan,
   avatarUrl,
+  uploadClanAvatar,
+  deleteClanAvatar,
+  uploadClanBanner,
+  deleteClanBanner,
   type ClanDetail,
   type ClanMember,
   type ClanInvite,
@@ -41,6 +46,7 @@ import {
   type ClanRole,
   type Page,
 } from "./api";
+import { clanCard } from "./card";
 import { resetToHub } from "./shell";
 
 // ---------------------------------------------------------------------------
@@ -82,9 +88,27 @@ function infoRow(label: string, value: string): string {
 // Section renderers (small helpers, like detail.ts extracts render fragments).
 // ---------------------------------------------------------------------------
 
-/** Header: name, verified-owner badge (+ binding source), and an info grid. */
-function renderHeader(cl: ClanDetail): string {
-  const ver = cl.ownerVerified ? badge(`✓ ${t("clanVerifiedOwner") || "Verified owner"}`, "owner") : "";
+/** Admin-only media block (clan avatar + banner upload / remove). Rendered
+ *  inside Overview only when the viewer may manage settings. */
+function renderMedia(): string {
+  return `<div class="wp-group"><div class="wp-legend">${ic("brush")}${esc(t("clanMedia") || "Media")}</div>
+  <div class="wd-clan-media">
+    <label class="wd-clan-fld"><span>${esc(t("clanAvatarLbl") || "Clan avatar")}</span>
+      <input type="file" id="clan-av-file" accept="image/*" class="wp-input"></label>
+    <label class="wd-clan-fld"><span>${esc(t("clanBannerLbl") || "Clan banner")}</span>
+      <input type="file" id="clan-bn-file" accept="image/*" class="wp-input"></label>
+    <div class="wd-clan-more">
+      ${button(t("clanMediaRemoveAv") || "Remove avatar", { size: "sm", id: "clan-av-del" })}
+      ${button(t("clanMediaRemoveBn") || "Remove banner", { size: "sm", id: "clan-bn-del" })}
+    </div>
+  </div>
+</div>`;
+}
+
+/** Overview: verified-owner binding source (`ownerVerifiedVia`), description,
+ *  and an info grid — plus the admin-only Media block. The clanCard header
+ *  already covers name / tag / verified badge / stat chips. */
+function renderOverview(cl: ClanDetail): string {
   const via =
     cl.ownerVerified && cl.ownerVerifiedVia
       ? `<span class="wd-clan-via">${esc((t("clanVia") || "via") + " " + cl.ownerVerifiedVia)}</span>`
@@ -103,13 +127,14 @@ function renderHeader(cl: ClanDetail): string {
   const desc = cl.description
     ? `<div class="wd-clan-desc">${esc(cl.description)}</div>`
     : "";
+  const media = cl.viewer?.canManageSettings ? renderMedia() : "";
   return `
     <div class="wd-clan-head">
-      <h3 class="wd-tpl-title">${esc(cl.name)}</h3>
-      <div class="wd-tpl-pills">${ver}${via}</div>
+      ${via ? `<div class="wd-tpl-pills">${via}</div>` : ""}
       ${desc}
     </div>
-    ${group(t("clanInfo") || "Info", `<div class="wd-kvgrid">${info}</div>`)}`;
+    ${group(t("clanInfo") || "Info", `<div class="wd-kvgrid">${info}</div>`)}
+    ${media}`;
 }
 
 /** One roster row. Role `<select>` + Kick appear only when the viewer may
@@ -262,16 +287,38 @@ function rankOf(role: ClanRole | string): number {
   }
 }
 
-/** Compose the whole screen body from the loaded state. */
+/** Compose the whole screen body: the advanced clanCard header + a role-gated
+ *  segmented sub-nav (Overview / Members / Requests / Settings) with one
+ *  sub-section shown at a time. Mirrors the profile-tab sub-nav idiom. */
 function render(cl: ClanDetail): string {
   const v = cl.viewer;
   const isMember = v?.membershipStatus === "member";
-  const parts: string[] = [renderHeader(cl), renderRoster(cl)];
-  if (v?.canManageMembers) parts.push(renderInvites(), renderApplications());
-  if (v?.canManageSettings) parts.push(renderSettings(cl));
-  // Leave/Danger only for members (non-members see a read-only header + roster).
-  if (isMember) parts.push(renderDanger(cl));
-  return `<div class="wd-tpl-detail">${parts.join("")}</div>`;
+
+  // Sub-nav items: Overview + Members always; Requests / Settings only when the
+  // viewer is permitted (backend still enforces every mutation regardless).
+  const segItems: Array<{ value: string; label: string }> = [
+    { value: "overview", label: t("clanTabOverview") || "Overview" },
+    { value: "members", label: t("clanTabMembers") || "Members" },
+  ];
+  if (v?.canManageMembers) segItems.push({ value: "requests", label: t("clanTabRequests") || "Requests" });
+  if (v?.canManageSettings) segItems.push({ value: "settings", label: t("clanTabSettings") || "Settings" });
+
+  // Requests = invites + applications; Settings = form + danger zone (Leave /
+  // Disband). Danger is member-only, but any settings-manager is a member.
+  const requests = v?.canManageMembers ? renderInvites() + renderApplications() : "";
+  const settingsBody = v?.canManageSettings
+    ? renderSettings(cl) + (isMember ? renderDanger(cl) : "")
+    : "";
+
+  return `
+    ${clanCard(cl, { context: "manage" })}
+    <div id="comm-clan-subnav">${segmented(segItems, "overview")}</div>
+    <div class="wd-tpl-detail">
+      <div class="wd-clan-sub is-on" id="comm-clan-sub-overview">${renderOverview(cl)}</div>
+      <div class="wd-clan-sub" id="comm-clan-sub-members">${renderRoster(cl)}</div>
+      <div class="wd-clan-sub" id="comm-clan-sub-requests">${requests}</div>
+      <div class="wd-clan-sub" id="comm-clan-sub-settings">${settingsBody}</div>
+    </div>`;
 }
 
 export function clanScreen(id: string): PanelScreen {
@@ -330,7 +377,87 @@ export function clanScreen(id: string): PanelScreen {
       const wire = (): void => {
         if (!clan) return;
 
-        // Roster: "Load more" appends the next page (keeps prior rows).
+        // Sub-nav: toggle `is-on` on the segmented buttons AND on the matching
+        // `#comm-clan-sub-<seg>` section (mirrors wireProfile exactly). All
+        // sections are already rendered, so switching needs no data fetch.
+        const subnav = $("comm-clan-subnav");
+        subnav?.querySelectorAll<HTMLElement>("[data-seg]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const seg = btn.dataset.seg || "overview";
+            subnav
+              .querySelectorAll<HTMLElement>("[data-seg]")
+              .forEach((x) => x.classList.toggle("is-on", x === btn));
+            ["overview", "members", "requests", "settings"].forEach((s) =>
+              $(`comm-clan-sub-${s}`)?.classList.toggle("is-on", s === seg),
+            );
+          });
+        });
+
+        // Media (admin-only): file inputs upload the clan avatar / banner;
+        // remove buttons confirm then delete. Each ends in load() so the card
+        // header re-fetches the new image (stable public URL, short backend
+        // cache). Mirrors profile-tab's FileReader.readAsDataURL upload.
+        const pickAndUpload = (
+          fileId: string,
+          up: (id: string, dataUrl: string) => Promise<void>,
+          okMsg: string,
+        ) => {
+          const inp = $(fileId) as HTMLInputElement | null;
+          inp?.addEventListener("change", () => {
+            const f = inp.files?.[0];
+            if (!f) return;
+            if (f.size > 10 * 1024 * 1024) {
+              toast(t("clanMedia") || "Media", t("clanMediaTooLarge") || "Image too large.");
+              inp.value = "";
+              return;
+            }
+            const rd = new FileReader();
+            rd.onload = async () => {
+              try {
+                await up(id, String(rd.result));
+                toast(t("clanMedia") || "Media", okMsg);
+                await load();
+              } catch {
+                toast(t("clanMedia") || "Media", t("commActionFail") || "Action failed.");
+              }
+            };
+            rd.readAsDataURL(f);
+          });
+        };
+        pickAndUpload("clan-av-file", uploadClanAvatar, t("clanAvatarLbl") || "Clan avatar");
+        pickAndUpload("clan-bn-file", uploadClanBanner, t("clanBannerLbl") || "Clan banner");
+        $("clan-av-del")?.addEventListener("click", async () => {
+          const ok = await confirmDlg(
+            t("clanMediaRemoveAv") || "Remove avatar?",
+            t("clanMedia") || "Media",
+          );
+          if (!ok) return;
+          try {
+            await deleteClanAvatar(id);
+            toast(t("clanMedia") || "Media", t("clanMediaRemoveAv") || "Avatar removed.");
+            await load();
+          } catch {
+            toast(t("clanMedia") || "Media", t("commActionFail") || "Action failed.");
+          }
+        });
+        $("clan-bn-del")?.addEventListener("click", async () => {
+          const ok = await confirmDlg(
+            t("clanMediaRemoveBn") || "Remove banner?",
+            t("clanMedia") || "Media",
+          );
+          if (!ok) return;
+          try {
+            await deleteClanBanner(id);
+            toast(t("clanMedia") || "Media", t("clanMediaRemoveBn") || "Banner removed.");
+            await load();
+          } catch {
+            toast(t("clanMedia") || "Media", t("commActionFail") || "Action failed.");
+          }
+        });
+
+        // Roster: "Load more" appends the next page (keeps prior rows). The
+        // wholesale re-render resets the sub-nav to Overview, so re-activate the
+        // Members section afterwards (the user was there to click Load more).
         $("clan-roster-more")?.addEventListener("click", async () => {
           try {
             const next = await listMembers(id, memberPage + 1, memberPerPage);
@@ -339,6 +466,12 @@ export function clanScreen(id: string): PanelScreen {
             memberTotal = next.total;
             if (clan) root.innerHTML = render(clan);
             wire();
+            $("comm-clan-subnav")
+              ?.querySelectorAll<HTMLElement>("[data-seg]")
+              .forEach((x) => x.classList.toggle("is-on", x.dataset.seg === "members"));
+            ["overview", "members", "requests", "settings"].forEach((s) =>
+              $(`comm-clan-sub-${s}`)?.classList.toggle("is-on", s === "members"),
+            );
           } catch {
             toast(t("commClanManage") || "Clan", t("commActionFail") || "Action failed.");
           }
