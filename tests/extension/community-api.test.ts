@@ -8,6 +8,7 @@
  */
 import assert from "node:assert";
 import { chatEndpoints, chatTitle, peerOf, type ChatSummary } from "../../src/ui/community/api";
+import { clanAvatarUrl, clanBannerUrl } from "../../src/ui/community/api";
 
 // ── chatEndpoints: clan ──────────────────────────────────────────────────────
 {
@@ -90,6 +91,13 @@ assert.ok(chatTitle(summary({ type: "global" })).includes("Global"));
 {
   assert.ok(chatTitle({ id: "x", type: "global" } as any).includes("Global"));
   assert.ok(chatTitle({ id: "x", type: "modmail" } as any).includes("Modmail"));
+}
+
+// ── clan media URLs: callable + string in bare Bun (no active client → "") ────
+{
+  // No active client in bare Bun → these return "" ; assert callable + string type.
+  assert.strictEqual(typeof clanAvatarUrl("abc"), "string");
+  assert.strictEqual(typeof clanBannerUrl("abc"), "string");
 }
 
 console.log("community-api: OK");

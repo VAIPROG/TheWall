@@ -25,7 +25,7 @@ import {
   siteSuggestion,
   createFromGuild,
   createFromSite,
-  avatarUrl,
+  clanAvatarUrl,
   type ClanSummary,
   type OwnedGuild,
   type SiteSuggestion,
@@ -70,7 +70,7 @@ function joinLabel(policy?: string | null): string {
 /** One clan row: avatar, name + tag, verified badge, member count + policy,
  *  and a policy-aware Join/Apply button. Row body (not the button) drills in. */
 function renderRow(cl: ClanSummary): string {
-  const av = cl.avatarUrl || avatarUrl(cl.ownerId || cl.id);
+  const av = clanAvatarUrl(cl.id);
   const ver = cl.ownerVerified ? badge(t("commVerified") || "verified", "owner") : "";
   const tag = cl.tag ? `<span class="wd-comm-br-tag">[${esc(cl.tag)}]</span>` : "";
   const count = cl.stats?.memberCount ?? cl.memberCount ?? 0;
@@ -83,7 +83,7 @@ function renderRow(cl: ClanSummary): string {
   });
   return `
     <div class="wd-row wd-comm-br-row" data-open="${esc(cl.id)}" role="button" tabindex="0">
-      <img class="wd-thumb wd-comm-br-av" width="24" height="24" src="${esc(av)}" alt="" onerror="this.style.visibility='hidden'">
+      <img class="wd-thumb wd-comm-br-av" width="24" height="24" src="${esc(av)}" alt="">
       <div class="grow">
         <div class="wd-comm-br-name">${esc(cl.name)} ${tag} ${ver}</div>
         <div class="wd-comm-br-meta">${meta}</div>

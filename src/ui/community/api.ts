@@ -590,14 +590,15 @@ export async function verifyOwnership(id: string): Promise<{ id: string }> {
 // Derived helpers
 // ---------------------------------------------------------------------------
 
-/** The caller's own clan, or null. `UserSelf` (GET /users/me) does NOT carry a
- *  clan id/membership, so we scan the clans list (perPage=100) and return the
- *  first whose viewer is a confirmed member. */
+/** The caller's clan via GET /clans/mine (active memberships ∪ owned; usually
+ *  0–1). Prefer an owned clan, else the first. null when none / not connected. */
 export async function myClan(): Promise<ClanSummary | null> {
   const c = authedClient();
   if (!c) return null;
-  const page = await c.get<Page<ClanSummary>>("/clans", { perPage: 100 });
-  return page?.items?.find((cl) => cl.viewer?.membershipStatus === "member") ?? null;
+  const mine = await c.get<ClanSummary[]>("/clans/mine");
+  if (!mine.length) return null;
+  const me = c.me?.id;
+  return mine.find((cl) => cl.ownerId && cl.ownerId === me) ?? mine[0];
 }
 
 /** Resolve a user's username from a user id/ref (best-effort — for DM row/peer
@@ -614,14 +615,53 @@ export async function getUsername(ref: string): Promise<string | null> {
   }
 }
 
-/** Avatar URL for a user id. Mirrors the `src/helpers.ts` convention
- *  (`${base}/avatar?userId=`) where `base` is the client's **root** URL (the
- *  avatar route lives under `/api`, not `/api/v3`). No `?session=` — the route
- *  is public (profile-modal / settings-tab both use it without a session). */
-export function avatarUrl(userId: string): string {
+/** Public avatar URL for a user id/ref, served by the v6.4.0 endpoint that never
+ *  404s (custom → linked Discord → seeded identicon). Safe as a bare `<img>` src
+ *  — no auth needed, no onerror fallback required. */
+export function avatarUrl(ref: string): string {
   // Public avatar URL for an <img> (no request fired here → no auth needed);
   // use the raw active client, not authedClient(), so avatars still resolve.
   const c = getActiveClient();
   if (!c) return "";
-  return `${c.rootUrl}/avatar?userId=${encodeURIComponent(userId)}`;
+  return `${c.url}/users/${encodeURIComponent(ref)}/avatar`;
+}
+
+/** Public clan-avatar image URL (v6.4.0 serve, never 404s → identicon fallback). */
+export function clanAvatarUrl(id: string): string {
+  const c = getActiveClient();
+  return c ? `${c.url}/clans/${encodeURIComponent(id)}/avatar` : "";
+}
+
+/** Public clan-banner image URL (v6.4.0 serve, never 404s → gradient fallback). */
+export function clanBannerUrl(id: string): string {
+  const c = getActiveClient();
+  return c ? `${c.url}/clans/${encodeURIComponent(id)}/banner` : "";
+}
+
+/** Upload a clan avatar (clan-admin only). `dataUrl` is a `data:` URL image. */
+export async function uploadClanAvatar(id: string, dataUrl: string): Promise<void> {
+  const c = authedClient();
+  if (!c) throw new Error("not connected");
+  await c.post(`/clans/${encodeURIComponent(id)}/avatar`, { image: dataUrl });
+}
+
+/** Reset a clan avatar to the identicon fallback (clan-admin only). */
+export async function deleteClanAvatar(id: string): Promise<void> {
+  const c = authedClient();
+  if (!c) return;
+  await c.delete(`/clans/${encodeURIComponent(id)}/avatar`);
+}
+
+/** Upload a clan banner (clan-admin only). `dataUrl` is a `data:` URL image. */
+export async function uploadClanBanner(id: string, dataUrl: string): Promise<void> {
+  const c = authedClient();
+  if (!c) throw new Error("not connected");
+  await c.post(`/clans/${encodeURIComponent(id)}/banner`, { image: dataUrl });
+}
+
+/** Reset a clan banner to the gradient fallback (clan-admin only). */
+export async function deleteClanBanner(id: string): Promise<void> {
+  const c = authedClient();
+  if (!c) return;
+  await c.delete(`/clans/${encodeURIComponent(id)}/banner`);
 }

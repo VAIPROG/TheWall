@@ -83,10 +83,10 @@ export function renderMessage(m: Message, ctx: RenderCtx = {}, labels: ActionLab
   const L = { ...DEFAULT_LABELS, ...labels };
   const isMine = !!ctx.meId && m.authorId === ctx.meId;
 
-  // Avatar (only when we have an author id). onerror hides a broken image
-  // rather than showing the browser's broken-image glyph.
+  // Avatar (only when we have an author id). The v6.4.0 avatar endpoint never
+  // 404s (falls back to a seeded identicon), so no onerror chain is needed.
   const avatar = m.authorId
-    ? `<img class="wd-comm-msg-av" src="${esc(avatarUrl(m.authorId))}" alt="" onerror="this.style.visibility='hidden'">`
+    ? `<img class="wd-comm-msg-av" src="${esc(avatarUrl(m.authorId))}" alt="">`
     : "";
 
   const name = esc(m.authorUsername ?? "…");

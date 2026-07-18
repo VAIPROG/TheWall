@@ -139,7 +139,7 @@ function renderMemberRow(cl: ClanDetail, m: ClanMember): string {
   }
   return `
     <div class="wd-row wd-clan-member">
-      <img class="wd-thumb wd-clan-av" width="20" height="20" src="${esc(av)}" alt="" onerror="this.style.visibility='hidden'">
+      <img class="wd-thumb wd-clan-av" width="20" height="20" src="${esc(av)}" alt="">
       <span class="grow">${name} ${roleBadge}</span>
       ${controls}
     </div>`;
