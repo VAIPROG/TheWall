@@ -16,7 +16,7 @@ use crate::{
     routes::v3::utils::chat_messages,
 };
 
-use super::resolve::{can_access_chat, dm_key_for};
+use super::resolve::can_access_chat;
 
 #[derive(Debug, Deserialize)]
 pub struct ChatListQuery {
@@ -72,17 +72,19 @@ pub async fn list_chats(
     };
     chats.extend(clan_chats);
 
-    // DM chats where the user is one of the two participants.
-    // Use an exact match on the canonical dm_key to avoid prefix/suffix bugs.
-    let dm_key_1 = dm_key_for(auth.user_id, uuid::Uuid::nil());
-    let dm_key_2 = dm_key_for(uuid::Uuid::nil(), auth.user_id);
+    // DM chats where the user is one of the two participants. `dm_key` is the
+    // canonical "min:max" uuid pair, so match the caller exactly on either
+    // side. (The previous version compared against `dm_key_for(user, nil)` —
+    // a key that only a DM with the nil uuid could ever have, so users' DM
+    // threads never appeared in this list.)
+    let uid_str = auth.user_id.to_string();
     let dm_chats: Vec<ChatV3> = sqlx::query_as(
         "SELECT id, type, clan_id, dm_key, topic, slowmode_seconds, created_at, opener_id \
          FROM chats \
-         WHERE type = 'dm' AND (dm_key = $1 OR dm_key = $2)"
+         WHERE type = 'dm' \
+           AND (split_part(dm_key, ':', 1) = $1 OR split_part(dm_key, ':', 2) = $1)"
     )
-    .bind(&dm_key_1)
-    .bind(&dm_key_2)
+    .bind(&uid_str)
     .fetch_all(&state.pool)
     .await
     .or_500()?;

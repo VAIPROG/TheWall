@@ -16,7 +16,7 @@ use crate::{
     models::ChatReadRequest,
 };
 
-use super::resolve::{can_access_chat, load_chat};
+use super::resolve::{can_access_chat, load_chat, resolve_chat_selector};
 
 // ---------------------------------------------------------------------------
 // POST /api/v3/chats/{chat_id}/read
@@ -25,9 +25,13 @@ use super::resolve::{can_access_chat, load_chat};
 pub async fn mark_read(
     auth: AuthUser,
     State(state): State<AppState>,
-    Path(chat_id): Path<Uuid>,
+    Path(chat_sel): Path<String>,
     Json(body): Json<ChatReadRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    // Accept the same `{id | "global"}` selector as the sibling message routes
+    // (a bare `Path<Uuid>` rejected `/chats/global/read` with a 400).
+    let chat_id = resolve_chat_selector(&state.pool, &chat_sel).await?;
+
     // Load and access-check the chat.
     let chat = load_chat(&state.pool, chat_id)
         .await?
