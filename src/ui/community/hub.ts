@@ -183,7 +183,10 @@ export function hubScreen(): PanelScreen {
       // My-clan card → open the clan (only when one is loaded). Delegated on the
       // container, which is recreated fresh each mount (no listener build-up).
       $("comm-myclan")?.addEventListener("click", () => {
-        if (clan && ($("comm-myclan")?.querySelector(".wd-comm-clan"))) openClan(clan.id);
+        if (clan && ($("comm-myclan")?.querySelector(".wd-comm-clan"))) {
+          teardownMentions(); // leaving the Hub → drop any open compose mentions
+          openClan(clan.id);
+        }
       });
 
       // Chat rows → look the summary up by data-chat id and open its Thread.
@@ -198,8 +201,11 @@ export function hubScreen(): PanelScreen {
       });
 
       // Browse / Create both land in Browse (create is reached from its chooser).
-      $("comm-browse")?.addEventListener("click", openBrowse);
-      $("comm-create")?.addEventListener("click", openBrowse);
+      // Leaving the Hub (stack.push wipes it) → drop any open compose mentions
+      // first, else the body-reparented #comm-dm-suggest + window listeners leak.
+      const goBrowse = () => { teardownMentions(); openBrowse(); };
+      $("comm-browse")?.addEventListener("click", goBrowse);
+      $("comm-create")?.addEventListener("click", goBrowse);
 
       // --- "New message" compose: reveal an inline username → open-DM box. ---
       // attachMentions reparents #comm-dm-suggest to document.body and binds
