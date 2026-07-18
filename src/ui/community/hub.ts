@@ -141,7 +141,7 @@ export function hubScreen(): PanelScreen {
         const id = row?.dataset.chat;
         if (!id) return;
         const c = chats.find((x) => x.id === id);
-        if (c) openThread(refOf(c));
+        if (c) openThread(refOf(c), chatTitle(c));
       });
 
       // Browse / Create both land in Browse (create is reached from its chooser).

@@ -238,5 +238,44 @@ export function kitStyles(): string {
 .wd-comm-info-note { color:var(--sub); font-size:10px; margin:0 0 2px; }
 /* Two Discord links side by side. */
 .wd-comm-info-discord { display:flex; gap:8px; font-size:11px; color:var(--sub); }
+
+/* ---- Thread screen (message list + composer) ---- */
+.wd-comm-thread { display:flex; flex-direction:column; height:100%; min-height:0; gap:6px; }
+.wd-comm-msglist {
+  flex:1; min-height:120px; max-height:52vh; overflow-y:auto;
+  display:flex; flex-direction:column; gap:6px; padding:2px;
+}
+/* One message row. */
+.wd-comm-msg { display:flex; flex-direction:column; gap:2px; }
+.wd-comm-msg-head { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--sub); }
+.wd-comm-msg-av { width:16px; height:16px; border-radius:50%; flex:none; object-fit:cover; }
+.wd-comm-msg-name { font-weight:bold; color:var(--txt); }
+.wd-comm-msg-time { color:var(--sub); }
+.wd-comm-msg-edited { font-style:italic; }
+.wd-comm-msg-body { font-size:12px; word-break:break-word; white-space:pre-wrap; }
+.wd-comm-msg-body.is-deleted { color:var(--sub); font-style:italic; }
+.wd-comm-msg-body code { background:var(--group); padding:0 2px; }
+/* Reaction chips. */
+.wd-comm-reacts { display:flex; flex-wrap:wrap; gap:4px; margin-top:1px; }
+.wd-comm-react {
+  font-size:10px; line-height:1; padding:2px 5px; cursor:pointer;
+  border:1px solid var(--dark); background:var(--group); color:var(--txt);
+  display:inline-flex; align-items:center; gap:3px;
+}
+.wd-comm-react:hover { filter:brightness(1.08); }
+.wd-comm-react.is-on { background:var(--accent); color:#fff; border-color:var(--accent); }
+.wd-comm-react-n { font-variant-numeric:tabular-nums; }
+/* Per-message action buttons (edit/delete/report/pin). */
+.wd-comm-acts { display:flex; gap:6px; margin-top:1px; }
+.wd-comm-act {
+  font-size:9px; color:var(--sub); background:none; border:0; cursor:pointer; padding:0;
+}
+.wd-comm-act:hover { color:var(--accent); text-decoration:underline; }
+/* Inline edit. */
+.wd-comm-edit-ta { width:100%; }
+.wd-comm-edit-actions { display:flex; gap:6px; margin-top:4px; }
+/* Composer: textarea + emoji + send. */
+.wd-comm-composer { display:flex; align-items:flex-end; gap:6px; flex:none; }
+.wd-comm-input { flex:1; resize:vertical; min-height:34px; }
 `;
 }

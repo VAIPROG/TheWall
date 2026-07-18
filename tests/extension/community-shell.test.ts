@@ -9,7 +9,7 @@ import { makeStackScreens, buildCommunityPane } from "../../src/ui/community/she
 // --- screen factories: hub / thread / clan / browse ---
 {
   const s = makeStackScreens();
-  const thread = s.thread({ kind: "clan", chatId: "x" });
+  const thread = s.thread({ kind: "clan", chatId: "x" }, "Clan chat");
   const clan = s.clan("abc");
   const browse = s.browse();
   assert.strictEqual(typeof s.hub().render, "function");
@@ -18,10 +18,10 @@ import { makeStackScreens, buildCommunityPane } from "../../src/ui/community/she
   assert.strictEqual(typeof browse.render, "function");
   // Each stub render hosts its own drill-in container.
   assert.ok(s.hub().render().includes("comm-hub"), "hub render hosts the hub container");
-  assert.ok(thread.render().includes("comm-thread"), "thread render hosts the thread container");
+  assert.ok(thread.render().includes("comm-msgs"), "thread render hosts the message list container");
   assert.ok(clan.render().includes("comm-clan"), "clan render hosts the clan container");
   assert.ok(browse.render().includes("comm-browse"), "browse render hosts the browse container");
-  assert.strictEqual(thread.title, "Thread");
+  assert.strictEqual(thread.title, "Clan chat");
   assert.strictEqual(clan.title, "Clan");
   assert.strictEqual(browse.title, "Browse");
 }

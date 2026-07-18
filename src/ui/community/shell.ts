@@ -7,6 +7,7 @@
 import { PanelStack, type PanelScreen } from "../kit/panel-stack";
 import { $ } from "../../helpers";
 import { hubScreen } from "./hub";
+import { threadScreen } from "./thread";
 import type { ChatRef } from "./api";
 
 // Re-export the real ChatRef (owned by api.ts) so existing importers of the
@@ -18,7 +19,7 @@ export type { ChatRef };
 // built and tested first.
 export interface StackScreens {
   hub: () => PanelScreen;
-  thread: (ref: ChatRef) => PanelScreen;
+  thread: (ref: ChatRef, title: string) => PanelScreen;
   clan: (id: string) => PanelScreen;
   browse: () => PanelScreen;
 }
@@ -27,11 +28,7 @@ export function makeStackScreens(): StackScreens {
   // Real screens land in Tasks 3–6; import them here as they arrive.
   return {
     hub: hubScreen,
-    thread: (_ref: ChatRef) => ({
-      title: "Thread",
-      render: () => `<div id="comm-thread" class="wd-stub"></div>`,
-      onMount: () => {},
-    }),
+    thread: (ref: ChatRef, title: string) => threadScreen(ref, title),
     clan: (_id: string) => ({
       title: "Clan",
       render: () => `<div id="comm-clan" class="wd-stub"></div>`,
@@ -63,8 +60,8 @@ export function wireCommunity(_win: HTMLElement): void {
 }
 
 /** Push the Thread screen for a chat ref (used by Hub rows). */
-export function openThread(ref: ChatRef): void {
-  stack?.push(screens.thread(ref));
+export function openThread(ref: ChatRef, title = ""): void {
+  stack?.push(screens.thread(ref, title));
 }
 
 /** Push the Clan screen for a clan id. */
