@@ -379,7 +379,7 @@ export function wireProfile(_win: HTMLElement): void {
   });
 
   // Avatar
-  $("avatar-upload")!.addEventListener("change", (e: Event) => {
+  $("avatar-upload")?.addEventListener("change", (e: Event) => {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (!f) return;
     const client = getActiveClient();
@@ -400,7 +400,7 @@ export function wireProfile(_win: HTMLElement): void {
     };
     rd.readAsDataURL(f);
   });
-  $("btn-avatar-reset")!.addEventListener("click", () => resetAvatar());
+  $("btn-avatar-reset")?.addEventListener("click", () => resetAvatar());
   $("btn-avatar-refresh-discord")?.addEventListener("click", async () => {
     const me = getMe();
     if (!me || !me.discord_id) {

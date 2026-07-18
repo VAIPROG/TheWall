@@ -11,7 +11,7 @@
  * (`group()`/`button()`, `confirmDlg`/`promptDlg`, `toast`).
  */
 import type { PanelScreen } from "../kit/panel-stack";
-import { button, group, loading, errorState, emptyState } from "../kit/primitives";
+import { button, iconButton, group, loading, errorState, emptyState } from "../kit/primitives";
 import { $, esc } from "../../helpers";
 import { t } from "../../i18n";
 import { toast } from "../../notify";
@@ -173,8 +173,8 @@ export function browseScreen(): PanelScreen {
         <div class="wd-comm-br-bar">
           <input id="comm-br-search" class="wd-comm-br-search" type="text"
             placeholder="${esc(t("commBrowseSearch") || "Search clans…")}" value="${esc(search)}">
-          <button class="wd-btn wd-btn--sm" id="comm-br-reload" title="${esc(t("commRetry") || "Reload")}">↻</button>
-          ${button(`＋ ${t("commCreateClan") || "Create clan"}`, { size: "sm", variant: "primary", id: "comm-br-create" })}
+          ${iconButton("refresh", { id: "comm-br-reload", title: t("commRetry") || "Reload" })}
+          ${button(t("commCreateClan") || "Create clan", { size: "sm", variant: "primary", icon: "plus", id: "comm-br-create" })}
         </div>
         <div id="comm-br-body">${loading()}</div>
       </div>`,
@@ -182,15 +182,21 @@ export function browseScreen(): PanelScreen {
       const body = () => $("comm-br-body");
 
       // --- list mode -------------------------------------------------------
+      // Monotonic sequence: a stale (slower, older) response must not paint
+      // over a newer one — only the latest load() call may touch the DOM.
+      let loadSeq = 0;
       const load = async (): Promise<void> => {
         mode = "list";
+        const seq = ++loadSeq;
         const b = body();
         if (!b) return;
         b.innerHTML = loading();
         try {
           const page = await listClans({ search: search.trim() || undefined, perPage: 50 });
+          if (seq !== loadSeq) return; // superseded by a newer search
           rows = page.items;
         } catch {
+          if (seq !== loadSeq) return;
           b.innerHTML = `${errorState(t("commBrowseErr") || "Failed to load clans.")}<div class="wd-clan-more">${button(
             t("commRetry") || "Retry",
             { size: "sm", id: "comm-br-retry" },
@@ -242,6 +248,7 @@ export function browseScreen(): PanelScreen {
 
       const openChooser = async (): Promise<void> => {
         mode = "chooser";
+        loadSeq++; // invalidate any in-flight list load so it can't overwrite the chooser
         guilds = null;
         sug = undefined;
         renderChooser();
@@ -320,9 +327,16 @@ export function browseScreen(): PanelScreen {
       };
 
       // --- top bar (persistent — wired once on mount) ----------------------
+      // Debounced: firing a /clans search per keystroke spammed the backend
+      // and let slow early responses race (an older, larger result could land
+      // after — and overwrite — the newer, narrower one).
+      let searchTimer: ReturnType<typeof setTimeout> | null = null;
       $("comm-br-search")?.addEventListener("input", (e) => {
         search = (e.target as HTMLInputElement).value;
-        if (mode === "list") void load();
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          if (mode === "list") void load();
+        }, 250);
       });
       $("comm-br-reload")?.addEventListener("click", () => void load());
       $("comm-br-create")?.addEventListener("click", () => void openChooser());
