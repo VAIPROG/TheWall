@@ -242,7 +242,9 @@ export function kitStyles(): string {
 /* ---- Thread screen (message list + composer) ---- */
 .wd-comm-thread { display:flex; flex-direction:column; height:100%; min-height:0; gap:6px; }
 .wd-comm-msglist {
-  flex:1; min-height:120px; max-height:52vh; overflow-y:auto;
+  /* flex-fill + min-height:0 lets the list track the resizable window (the grip
+     sets .wp-content max-height) while the composer stays pinned below. */
+  flex:1 1 auto; min-height:0; overflow-y:auto;
   display:flex; flex-direction:column; gap:6px; padding:2px;
 }
 /* One message row. */
@@ -252,7 +254,7 @@ export function kitStyles(): string {
 .wd-comm-msg-name { font-weight:bold; color:var(--txt); }
 .wd-comm-msg-time { color:var(--sub); }
 .wd-comm-msg-edited { font-style:italic; }
-.wd-comm-msg-body { font-size:12px; word-break:break-word; white-space:pre-wrap; }
+.wd-comm-msg-body { font-size:12px; overflow-wrap:anywhere; word-break:break-word; white-space:pre-wrap; }
 .wd-comm-msg-body.is-deleted { color:var(--sub); font-style:italic; }
 .wd-comm-msg-body code { background:var(--group); padding:0 2px; }
 /* Reaction chips. */
@@ -277,6 +279,16 @@ export function kitStyles(): string {
 /* Composer: textarea + emoji + send. */
 .wd-comm-composer { display:flex; align-items:flex-end; gap:6px; flex:none; }
 .wd-comm-input { flex:1; resize:vertical; min-height:34px; }
+/* Hub: chats header + "New message" inline compose. */
+.wd-comm-chats-head { display:flex; align-items:center; gap:6px; }
+.wd-comm-dm-compose { display:flex; align-items:center; gap:6px; }
+.wd-comm-dm-compose .wp-input { flex:1; min-width:0; }
+.wd-comm-chat-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Compact (narrow window): shrink avatars + tighten message rows. */
+@media (max-width: 360px) {
+  .wd-comm-msg-av { width:14px; height:14px; }
+  .wd-comm-msg { gap:1px; }
+}
 
 /* ---- Clan management drill-in (reuses .wd-tpl-detail / .wd-kv* / .wd-list) ---- */
 .wd-clan-head { display:flex; flex-direction:column; gap:4px; }

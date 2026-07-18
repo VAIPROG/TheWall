@@ -8,6 +8,7 @@
  * fields the Community screens (Tasks 3–6) actually use (YAGNI).
  */
 import { getActiveClient } from "../../backend/index";
+import { t } from "../../i18n";
 
 /** Active backend client — but ONLY when it actually carries an auth token.
  *  Every Community endpoint is auth-required, so returning a token-less client
@@ -227,11 +228,12 @@ export interface SiteSuggestion {
 export type ChatRef =
   | { kind: "clan"; chatId: string }
   | { kind: "dm"; userRef: string }
-  | { kind: "modmail" };
+  | { kind: "modmail" }
+  | { kind: "global" };
 
 /** Resolve a ChatRef to its V3 message endpoints (pure — unit-tested).
- *  Only clan chats have a distinct `/read` endpoint; DM/modmail read-state is
- *  handled server-side on fetch, so `read` is undefined for those. */
+ *  Clan and global chats have a distinct `/read` endpoint; DM/modmail read-state
+ *  is handled server-side on fetch, so `read` is undefined for those. */
 export function chatEndpoints(ref: ChatRef): { list: string; send: string; read?: string } {
   if (ref.kind === "clan")
     return {
@@ -244,7 +246,28 @@ export function chatEndpoints(ref: ChatRef): { list: string; send: string; read?
       list: `/dm/${encodeURIComponent(ref.userRef)}`,
       send: `/dm/${encodeURIComponent(ref.userRef)}`,
     };
+  // The site-wide global chat is a first-class kind with its own /read — it is
+  // NOT modmail (conflating them opened the modmail endpoint for a global row).
+  if (ref.kind === "global")
+    return {
+      list: `/chats/global/messages`,
+      send: `/chats/global/messages`,
+      read: `/chats/global/read`,
+    };
+  // modmail (fallback): fixed path, read-state server-managed on fetch.
   return { list: `/chats/global/modmail`, send: `/chats/global/modmail` };
+}
+
+/** The peer's user id in a DM `dmKey` ("uuidA:uuidB", canonical) — the one that
+ *  isn't `meId`. Returns null for a malformed/absent key. Pure (unit-tested). */
+export function peerOf(dmKey: string | undefined, meId: string | undefined): string | null {
+  if (!dmKey || !meId) return null;
+  const parts = dmKey.split(":");
+  if (parts.length !== 2) return null;
+  const [a, b] = parts;
+  if (a === meId) return b;
+  if (b === meId) return a;
+  return null;
 }
 
 /** Derive a human display title from a chat summary (pure — unit-tested).
@@ -262,9 +285,9 @@ export function chatTitle(c: ChatSummary): string {
     case "dm":
       return c.topic?.trim() || "Direct message";
     case "modmail":
-      return "Modmail";
+      return "🛡 " + (t("commModmail") || "Modmail");
     case "global":
-      return c.topic?.trim() || "Global";
+      return c.topic?.trim() || "🌐 " + (t("commGlobalChat") || "Global");
     default:
       return c.topic?.trim() || "Chat";
   }
@@ -581,6 +604,20 @@ export async function myClan(): Promise<ClanSummary | null> {
  *  (`${base}/avatar?userId=`) where `base` is the client's **root** URL (the
  *  avatar route lives under `/api`, not `/api/v3`). No `?session=` — the route
  *  is public (profile-modal / settings-tab both use it without a session). */
+/** Resolve a user's username from a user id/ref (best-effort — for DM row/peer
+ *  titles). Returns null when not connected, empty ref, or on any error so the
+ *  caller can fall back to the raw ref. */
+export async function getUsername(ref: string): Promise<string | null> {
+  const c = authedClient();
+  if (!c || !ref) return null;
+  try {
+    const u = await c.get<{ username?: string }>(`/users/${encodeURIComponent(ref)}`);
+    return u?.username ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function avatarUrl(userId: string): string {
   // Public avatar URL for an <img> (no request fired here → no auth needed);
   // use the raw active client, not authedClient(), so avatars still resolve.

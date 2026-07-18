@@ -10,10 +10,15 @@ import type { PanelScreen } from "../kit/panel-stack";
 import { card, badge, button, loading, errorState, emptyState } from "../kit/primitives";
 import { $, esc } from "../../helpers";
 import { t } from "../../i18n";
+import { toast } from "../../notify";
+import { attachMentions } from "../../mentions";
+import { getActiveClient } from "../../backend/index";
 import {
   myClan,
   listChats,
   chatTitle,
+  peerOf,
+  getUsername,
   type ChatSummary,
   type ChatRef,
   type ClanSummary,
@@ -33,17 +38,32 @@ const DISCORD_URL = "https://discord.gg/snackersru";
 let clan: ClanSummary | null = null;
 let chats: ChatSummary[] = [];
 
+// Resolved DM peer usernames, keyed by the DM chat row id. Populated lazily
+// after render (getUsername is async) so DM rows can show a friendly name and
+// openThread can pass it through as the thread title.
+const peerName = new Map<string, string>();
+
 /** Derive a ChatRef from a chat summary (for openThread on a row click).
  *  - clan   → { kind:"clan", chatId }
- *  - dm     → { kind:"dm", userRef }. `dmKey` is an opaque, canonically-ordered
- *             id pair (not a single peer id), so it can't cleanly yield the peer
- *             here; we pass `dmKey` (or the chat id) through as the ref and let
- *             Task 4's Thread resolve the actual peer from ChatDetail.
- *  - modmail/global → { kind:"modmail" } */
+ *  - global → { kind:"global" }   (site-wide chat — NOT modmail)
+ *  - modmail→ { kind:"modmail" }
+ *  - dm     → { kind:"dm", userRef }. `dmKey` is the canonical "uuidA:uuidB"
+ *             participant pair; the peer is the one that isn't me. Fall back to
+ *             the raw dmKey / chat id if we can't resolve me/the peer. */
 function refOf(c: ChatSummary): ChatRef {
   if (c.type === "clan") return { kind: "clan", chatId: c.id };
-  if (c.type === "dm") return { kind: "dm", userRef: c.dmKey ?? c.id };
-  return { kind: "modmail" };
+  if (c.type === "global") return { kind: "global" };
+  if (c.type === "modmail") return { kind: "modmail" };
+  const me = getActiveClient()?.me?.id;
+  const peer = peerOf(c.dmKey ?? undefined, me);
+  return { kind: "dm", userRef: peer ?? c.dmKey ?? c.id };
+}
+
+/** Best display title for a row: for a DM, the resolved peer username when we
+ *  have it, else the generic `chatTitle`. */
+function rowTitle(c: ChatSummary): string {
+  if (c.type === "dm") return peerName.get(c.id) || chatTitle(c);
+  return chatTitle(c);
 }
 
 /** My-clan card body (or an empty-state when the user has no clan). */
@@ -60,7 +80,9 @@ function renderClan(): string {
     </div>`;
 }
 
-/** Chats list body (or an empty-state when there are none). */
+/** Chats list body (or an empty-state when there are none). DM row labels carry
+ *  a `.wd-comm-chat-label` span so the async peer-name resolver can update them
+ *  in place after render. */
 function renderChats(): string {
   if (!chats.length) return emptyState(t("commNoChats"), "💬");
   const rows = chats
@@ -69,10 +91,28 @@ function renderChats(): string {
         c.unreadCount > 0
           ? `<span class="wd-comm-unread" title="${esc(t("commUnread"))}">${esc(String(c.unreadCount))}</span>`
           : "";
-      return `<div class="wd-row wd-comm-chat" data-chat="${esc(c.id)}" role="button" tabindex="0"><span class="grow">${esc(chatTitle(c))}</span>${unread}</div>`;
+      return `<div class="wd-row wd-comm-chat" data-chat="${esc(c.id)}" role="button" tabindex="0"><span class="grow wd-comm-chat-label">${esc(rowTitle(c))}</span>${unread}</div>`;
     })
     .join("");
   return `<div class="wd-list wd-list--scroll">${rows}</div>`;
+}
+
+/** Resolve DM peer usernames for the rendered rows and patch their labels in
+ *  place. Best-effort: any failure leaves the generic title untouched. Skips
+ *  rows already resolved. */
+function resolveDmPeers(): void {
+  const me = getActiveClient()?.me?.id;
+  for (const c of chats) {
+    if (c.type !== "dm" || peerName.has(c.id)) continue;
+    const peer = peerOf(c.dmKey ?? undefined, me);
+    if (!peer) continue;
+    void getUsername(peer).then((name) => {
+      if (!name) return;
+      peerName.set(c.id, name);
+      const row = document.querySelector<HTMLElement>(`.wd-comm-chat[data-chat="${CSS.escape(c.id)}"] .wd-comm-chat-label`);
+      if (row) row.textContent = name;
+    });
+  }
 }
 
 /** Static "about / community" card at the foot of the Hub. */
@@ -100,6 +140,16 @@ export function hubScreen(): PanelScreen {
     render: () => `
       <div id="comm-hub" class="wd-comm-hub">
         <div id="comm-myclan">${card(loading())}</div>
+        <div class="wd-comm-chats-head">
+          <span class="wd-legend grow">${esc(t("commChats"))}</span>
+          <button class="wd-btn wd-btn--sm" id="comm-new-dm" type="button">✉ ${esc(t("commNewMessage"))}</button>
+        </div>
+        <div id="comm-dm-compose" class="wd-comm-dm-compose" hidden>
+          <input id="comm-dm-to" class="wp-input" type="text" autocomplete="off"
+            placeholder="${esc(t("commDmTo"))}" />
+          <button class="wd-btn wd-btn--primary wd-btn--sm" id="comm-dm-go" type="button">${esc(t("commSend"))}</button>
+          <div id="comm-dm-suggest" class="wp-mention-suggest"></div>
+        </div>
         <div id="comm-chats">${loading()}</div>
         <div class="wd-comm-actions">
           ${button(t("commBrowse"), { variant: "primary", id: "comm-browse" })}
@@ -127,6 +177,7 @@ export function hubScreen(): PanelScreen {
         }
         clanBox.innerHTML = card(renderClan());
         chatBox.innerHTML = renderChats();
+        resolveDmPeers(); // patch DM row labels with peer usernames (async)
       };
 
       // My-clan card → open the clan (only when one is loaded). Delegated on the
@@ -141,12 +192,77 @@ export function hubScreen(): PanelScreen {
         const id = row?.dataset.chat;
         if (!id) return;
         const c = chats.find((x) => x.id === id);
-        if (c) openThread(refOf(c), chatTitle(c));
+        if (!c) return;
+        teardownMentions(); // leaving the Hub → drop any open compose mentions
+        openThread(refOf(c), rowTitle(c));
       });
 
       // Browse / Create both land in Browse (create is reached from its chooser).
       $("comm-browse")?.addEventListener("click", openBrowse);
       $("comm-create")?.addEventListener("click", openBrowse);
+
+      // --- "New message" compose: reveal an inline username → open-DM box. ---
+      // attachMentions reparents #comm-dm-suggest to document.body and binds
+      // window listeners, so we keep the handle and tear it down whenever we hide
+      // the composer (and re-attach on the next reveal) — no orphaned body node /
+      // duplicate ids / leaked listeners across repeated open/close.
+      const composeBox = $("comm-dm-compose");
+      const toInput = $("comm-dm-to") as HTMLInputElement | null;
+      let dmMentions: { destroy(): void } | null = null;
+
+      const teardownMentions = () => {
+        dmMentions?.destroy();
+        dmMentions = null;
+        // destroy() drops window listeners but not the body-reparented node.
+        $("comm-dm-suggest")?.remove();
+      };
+
+      const openDm = () => {
+        const raw = (toInput?.value ?? "").trim().replace(/^@+/, "").trim();
+        if (!raw) {
+          toast(t("commNewMessage"), t("commDmUnknownUser"));
+          return;
+        }
+        // The DM send endpoint (/dm/{userRef}) get-or-creates the thread, so a
+        // bare username works as the ref; the peer name doubles as the title.
+        teardownMentions(); // leaving the Hub → drop the compose mentions handle
+        openThread({ kind: "dm", userRef: raw }, raw);
+      };
+
+      $("comm-new-dm")?.addEventListener("click", () => {
+        if (!composeBox) return;
+        // Toggle: currently visible → hide + tear the mentions handle down.
+        if (!composeBox.hasAttribute("hidden")) {
+          composeBox.setAttribute("hidden", "");
+          teardownMentions();
+          return;
+        }
+        // Reveal → (re)attach mentions to a fresh suggest node. teardownMentions
+        // removes the body-reparented #comm-dm-suggest, so on a second open we
+        // recreate it inside the composer before re-attaching.
+        composeBox.removeAttribute("hidden");
+        let suggestEl = $("comm-dm-suggest");
+        if (!suggestEl) {
+          suggestEl = document.createElement("div");
+          suggestEl.id = "comm-dm-suggest";
+          suggestEl.className = "wp-mention-suggest";
+          composeBox.appendChild(suggestEl);
+        }
+        if (toInput && !dmMentions) {
+          // attachMentions is typed for a textarea but only uses value +
+          // selectionStart/End, which <input> supports; the cast is safe.
+          dmMentions = attachMentions(toInput as unknown as HTMLTextAreaElement, suggestEl, async () => []);
+        }
+        toInput?.focus();
+      });
+
+      $("comm-dm-go")?.addEventListener("click", openDm);
+      toInput?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          openDm();
+        }
+      });
 
       void load();
     },

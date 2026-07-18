@@ -7,7 +7,7 @@
  * Run: bun tests/extension/community-api.test.ts
  */
 import assert from "node:assert";
-import { chatEndpoints, chatTitle, type ChatSummary } from "../../src/ui/community/api";
+import { chatEndpoints, chatTitle, peerOf, type ChatSummary } from "../../src/ui/community/api";
 
 // ── chatEndpoints: clan ──────────────────────────────────────────────────────
 {
@@ -63,9 +63,33 @@ assert.strictEqual(chatTitle(summary({ type: "clan" })), "Clan chat");
 assert.strictEqual(chatTitle(summary({ type: "dm", topic: "alice" })), "alice");
 assert.strictEqual(chatTitle(summary({ type: "dm", dmKey: "id1:id2" })), "Direct message");
 
-// modmail / global
-assert.strictEqual(chatTitle(summary({ type: "modmail" })), "Modmail");
-assert.strictEqual(chatTitle(summary({ type: "global" })), "Global");
-assert.strictEqual(chatTitle(summary({ type: "global", topic: "Announcements" })), "Announcements");
+// modmail / global — now localised (t()) with a leading marker glyph, so match
+// on the substring rather than the exact string.
+assert.ok(chatTitle(summary({ type: "modmail" })).includes("Modmail"));
+assert.ok(chatTitle(summary({ type: "global" })).includes("Global"));
+
+// ── chatEndpoints: global (distinct from modmail) ────────────────────────────
+{
+  const g = chatEndpoints({ kind: "global" });
+  assert.strictEqual(g.list, "/chats/global/messages");
+  assert.strictEqual(g.send, "/chats/global/messages");
+  assert.strictEqual(g.read, "/chats/global/read");
+}
+
+// ── peerOf: the uuid in the dm_key that isn't me ─────────────────────────────
+{
+  const me = "11111111-1111-1111-1111-111111111111";
+  const other = "22222222-2222-2222-2222-222222222222";
+  assert.strictEqual(peerOf(`${me}:${other}`, me), other);
+  assert.strictEqual(peerOf(`${other}:${me}`, me), other);
+  assert.strictEqual(peerOf("bad", me), null);
+  assert.strictEqual(peerOf(undefined, me), null);
+}
+
+// ── chatTitle for global + modmail (localised, with a marker glyph) ──────────
+{
+  assert.ok(chatTitle({ id: "x", type: "global" } as any).includes("Global"));
+  assert.ok(chatTitle({ id: "x", type: "modmail" } as any).includes("Modmail"));
+}
 
 console.log("community-api: OK");

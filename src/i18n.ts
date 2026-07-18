@@ -254,6 +254,11 @@ export const DICT: Record<string, Record<string, string>> = {
     commCreateOk: "Clan created.",
     commCreateNameLen: "Name must be 2–32 characters.",
     /* ---------- Community thread (chat / DM / modmail) ---------- */
+    commGlobalChat: "Global",
+    commModmail: "Modmail",
+    commNewMessage: "New message",
+    commDmTo: "To @username…",
+    commDmUnknownUser: "Unknown user",
     commThread: "Thread",
     commNoMessages: "No messages yet. Say hello!",
     commComposerPh: "markdown: **bold** *italic* `code` :emote: @user",
@@ -874,6 +879,11 @@ export const DICT: Record<string, Record<string, string>> = {
     commCreateOk: "Клан создан.",
     commCreateNameLen: "Название должно быть 2–32 символа.",
     /* ---------- Ветка чата (чат / ЛС / модпочта) ---------- */
+    commGlobalChat: "Глобальный",
+    commModmail: "Модпочта",
+    commNewMessage: "Новое сообщение",
+    commDmTo: "Кому @username…",
+    commDmUnknownUser: "Пользователь не найден",
     commThread: "Чат",
     commNoMessages: "Сообщений пока нет. Напиши первым!",
     commComposerPh: "markdown: **жирный** *курсив* `код` :emote: @user",
