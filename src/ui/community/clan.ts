@@ -133,7 +133,11 @@ function renderOverview(cl: ClanDetail): string {
   const desc = cl.description
     ? `<div class="wd-clan-desc">${esc(cl.description)}</div>`
     : "";
-  const media = cl.viewer?.canManageSettings ? renderMedia() : "";
+  // Media (avatar/banner) is editable by clan admins AND server (global)
+  // admins — the backend's require_clan_admin folds global admins into
+  // effective_clan_role, so both are permitted (regular members are not:
+  // canManageSettings is false for them and isGlobalAdmin() is false too).
+  const media = cl.viewer?.canManageSettings || isGlobalAdmin() ? renderMedia() : "";
   // Direct clan-chat access for members. ALWAYS rendered for a member — legacy
   // clans (created before clan chats shipped) have `chatId: null`, which used
   // to silently hide the button; the click handler now re-resolves the chat id
