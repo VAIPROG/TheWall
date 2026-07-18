@@ -9,6 +9,7 @@
 import type { PanelScreen } from "../kit/panel-stack";
 import { card, button, loading, errorState, emptyState } from "../kit/primitives";
 import { $, esc } from "../../helpers";
+import { ic } from "../../icons";
 import { t } from "../../i18n";
 import { toast } from "../../notify";
 import { promptDlg } from "../../dialog";
@@ -17,6 +18,7 @@ import { getActiveClient } from "../../backend/index";
 import {
   myClan,
   listChats,
+  chatOrder,
   chatTitle,
   peerOf,
   getUsername,
@@ -92,9 +94,26 @@ function renderClan(): string {
   return clanCard(clan, { context: "hub" });
 }
 
-/** Chats list body (or an empty-state when there are none). DM row labels carry
- *  a `.wd-comm-chat-label` span so the async peer-name resolver can update them
- *  in place after render. */
+/** Leading per-type SVG icon for a chat row (crisp Win95 glyphs, not emoji):
+ *  modmail → shield, global → globe, clan → the fused chat+shield clan mark,
+ *  dm → person. Trusted `ic()` markup — never esc()'d. */
+function chatIcon(kind: ChatSummary["type"]): string {
+  switch (kind) {
+    case "modmail":
+      return ic("shield");
+    case "global":
+      return ic("globe");
+    case "clan":
+      return ic("clanChat");
+    default:
+      return ic("user"); // dm — a person, distinct from the "mail" compose btn
+  }
+}
+
+/** Chats list body (or an empty-state when there are none). Rows come
+ *  pre-ordered by `chatOrder` (modmail → global → clan → dm). DM row labels
+ *  carry a `.wd-comm-chat-label` span so the async peer-name resolver can
+ *  update them in place after render. */
 function renderChats(): string {
   if (!chats.length) return emptyState(t("commNoChats"), "💬");
   const rows = chats
@@ -103,16 +122,17 @@ function renderChats(): string {
         c.unreadCount > 0
           ? `<span class="wd-comm-unread" title="${esc(t("commUnread"))}">${esc(String(c.unreadCount))}</span>`
           : "";
-      return `<div class="wd-row wd-comm-chat" data-chat="${esc(c.id)}" role="button" tabindex="0"><span class="grow wd-comm-chat-label">${esc(rowTitle(c))}</span>${unread}</div>`;
+      return `<div class="wd-row wd-comm-chat" data-chat="${esc(c.id)}" role="button" tabindex="0">${chatIcon(c.type)}<span class="grow wd-comm-chat-label">${esc(rowTitle(c))}</span>${unread}</div>`;
     })
     .join("");
   // A modmail row only exists once the thread has been created server-side, so
   // without this starter a user has NO way to first contact the staff. Only
-  // shown when we actually have data (chats non-empty ⇒ connected).
+  // shown when we actually have data (chats non-empty ⇒ connected). It IS
+  // modmail, so it sits at the TOP — same slot the real row takes in chatOrder.
   const starter = chats.some((c) => c.type === "modmail")
     ? ""
-    : `<div class="wd-row wd-comm-chat" data-modmail="1" role="button" tabindex="0"><span class="grow wd-comm-chat-label">🛡 ${esc(t("commModmail"))} · ${esc(t("commModmailStart"))}</span></div>`;
-  return `<div class="wd-list wd-list--scroll">${rows}${starter}</div>`;
+    : `<div class="wd-row wd-comm-chat" data-modmail="1" role="button" tabindex="0">${ic("shield")}<span class="grow wd-comm-chat-label">${esc(t("commModmail"))} · ${esc(t("commModmailStart"))}</span></div>`;
+  return `<div class="wd-list wd-list--scroll">${starter}${rows}</div>`;
 }
 
 /** Resolve DM peer usernames for the rendered rows and patch their labels in
@@ -133,20 +153,28 @@ function resolveDmPeers(): void {
   }
 }
 
-/** Static "about / community" card at the foot of the Hub. */
+/** Static "about / community" card at the foot of the Hub — a Win95 "About"
+ *  box. Author + donate lead in a sunken group well (the donate note is the
+ *  emphasised line — it funds the projects), then the wiki / GitHub / X links,
+ *  each with a small leading SVG, and the two Discord servers as beveled
+ *  link-buttons. URLs are authoritative (landing/about.html); icon markup from
+ *  `ic()` is trusted, labels are esc()'d. */
 function renderInfo(): string {
-  const link = (href: string, label: string) =>
-    `<a href="${href}" target="_blank" rel="noopener">${esc(label)}</a>`;
+  const link = (href: string, icon: string, label: string) =>
+    `<a class="wd-comm-info-link" href="${href}" target="_blank" rel="noopener">${ic(icon)}<span>${esc(label)}</span></a>`;
+  const dbtn = (href: string, label: string) =>
+    `<a class="wd-btn wd-btn--sm wd-comm-info-dbtn" href="${href}" target="_blank" rel="noopener">${ic("discord")}${esc(label)}</a>`;
   const body = `<div class="wd-comm-info">
-      ${link(AUTHOR_URL, `${t("commInfoAuthor")}: vai-rice.space`)}
-      <span class="wd-comm-info-note">${esc(t("commInfoDonateNote"))}</span>
-      ${link(WIKI_URL, t("commInfoWiki"))}
-      ${link(GITHUB_URL, `${t("commInfoGitHub")}: Vadim-Khristenko`)}
-      ${link(X_URL, `${t("commInfoX")}: @VAI_PROG`)}
+      <div class="wd-comm-info-author">
+        ${link(AUTHOR_URL, "globe", `${t("commInfoAuthor")}: vai-rice.space`)}
+        <div class="wd-comm-info-note">${esc(t("commInfoDonateNote"))}</div>
+      </div>
+      ${link(WIKI_URL, "star", t("commInfoWiki"))}
+      ${link(GITHUB_URL, "github", `${t("commInfoGitHub")}: Vadim-Khristenko`)}
+      ${link(X_URL, "xcom", `${t("commInfoX")}: @VAI_PROG`)}
       <div class="wd-comm-info-discord">
-        Discord:
-        ${link(DISCORD_SNACKERS_URL, t("commInfoDiscordSnackers"))}
-        ${link(DISCORD_URL, t("commInfoDiscord"))}
+        ${dbtn(DISCORD_SNACKERS_URL, t("commInfoDiscordSnackers"))}
+        ${dbtn(DISCORD_URL, t("commInfoDiscord"))}
       </div>
     </div>`;
   return card(`<div class="wd-legend">${esc(t("commInfoTitle"))}</div>${body}`);
@@ -160,8 +188,8 @@ export function hubScreen(): PanelScreen {
         <div id="comm-myclan">${card(loading())}</div>
         <div class="wd-comm-chats-head">
           <span class="wd-legend grow">${esc(t("commChats"))}</span>
-          ${isGlobalModerator() ? `<button class="wd-btn wd-btn--sm" id="comm-modmail-triage" type="button" title="${esc(t("commModmailTriageHint"))}">🛡 ${esc(t("commModmailTriage"))}</button>` : ""}
-          <button class="wd-btn wd-btn--sm" id="comm-new-dm" type="button">✉ ${esc(t("commNewMessage"))}</button>
+          ${isGlobalModerator() ? `<button class="wd-btn wd-btn--sm" id="comm-modmail-triage" type="button" title="${esc(t("commModmailTriageHint"))}">${ic("shield")}${esc(t("commModmailTriage"))}</button>` : ""}
+          <button class="wd-btn wd-btn--sm" id="comm-new-dm" type="button">${ic("mail")}${esc(t("commNewMessage"))}</button>
         </div>
         <div id="comm-dm-compose" class="wd-comm-dm-compose" hidden>
           <input id="comm-dm-to" class="wp-input" type="text" autocomplete="off"
@@ -192,6 +220,8 @@ export function hubScreen(): PanelScreen {
           // Not-connected degrades gently: myClan()/listChats() return null/[]
           // (no throw), so this renders empty states rather than an error.
           [clan, chats] = await Promise.all([myClan(), listChats()]);
+          // Fixed row order: Modmail → Global → Clan → DMs (stable within type).
+          chats = chatOrder(chats);
         } catch {
           const msg = errorState(t("commLoadErr"));
           clanBox.innerHTML = card(msg);
@@ -220,7 +250,7 @@ export function hubScreen(): PanelScreen {
         const starter = (e.target as HTMLElement).closest<HTMLElement>("[data-modmail]");
         if (starter) {
           teardownMentions();
-          openThread({ kind: "modmail" }, "🛡 " + t("commModmail"));
+          openThread({ kind: "modmail" }, t("commModmail"));
           return;
         }
         const row = (e.target as HTMLElement).closest<HTMLElement>("[data-chat]");
@@ -250,7 +280,7 @@ export function hubScreen(): PanelScreen {
             const detail = await getModmailThread(uid);
             if (!detail?.id) throw new Error("no modmail thread");
             teardownMentions();
-            openThread({ kind: "clan", chatId: detail.id }, `🛡 ${ref}`);
+            openThread({ kind: "clan", chatId: detail.id }, `${t("commModmail")} · ${ref}`);
           } catch {
             toast(t("commModmailTriage"), t("commActionFail"));
           }

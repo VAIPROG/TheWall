@@ -141,14 +141,15 @@ function renderOverview(cl: ClanDetail): string {
   // Direct clan-chat access for members. ALWAYS rendered for a member — legacy
   // clans (created before clan chats shipped) have `chatId: null`, which used
   // to silently hide the button; the click handler now re-resolves the chat id
-  // (the backend detail read get-or-creates the clan chat). The kit `chat`
-  // icon replaces the raw 💬 prefix so the glyph follows the theme.
+  // (the backend detail read get-or-creates the clan chat). The kit `clanChat`
+  // icon (chat bubble + shield clan mark) replaces the raw 💬 prefix so the
+  // glyph follows the theme AND matches the clan-chat row icon in the Hub.
   const isMember = cl.viewer?.membershipStatus === "member";
   // Compact, left-aligned primary button at the TOP of Overview. Its own flex
   // wrapper shrinks it to content width (it previously sat in the column-stretch
   // `.wd-clan-head`, which stretched its row full-width and looked oversized).
   const openChat = isMember
-    ? `<div class="wd-clan-openchat">${button(t("clanOpenChat") || "Open clan chat", { size: "sm", variant: "primary", icon: "chat", id: "clan-open-chat" })}</div>`
+    ? `<div class="wd-clan-openchat">${button(t("clanOpenChat") || "Open clan chat", { size: "sm", variant: "primary", icon: "clanChat", id: "clan-open-chat" })}</div>`
     : "";
   return `
     ${openChat}

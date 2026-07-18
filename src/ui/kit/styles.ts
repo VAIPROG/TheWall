@@ -214,23 +214,43 @@ export function kitStyles(): string {
 
 /* --- Community Hub --- */
 .wd-comm-hub { display:flex; flex-direction:column; gap:8px; }
-/* Chat rows reuse .wd-list/.wd-row; add clickability + an unread pill. */
+/* Chat rows reuse .wd-list/.wd-row; add clickability + an unread pill. The
+   leading per-type SVG (shield/globe/clanChat/user) renders muted so the
+   label keeps the visual weight. */
 .wd-comm-chat { cursor:pointer; }
 .wd-comm-chat:hover { background:var(--group); }
+.wd-comm-chat > .wd-ic { flex:none; margin:0; color:var(--sub); }
 .wd-comm-chat .wd-comm-unread {
   flex:none; font-size:9px; padding:1px 5px; color:#fff; background:var(--accent);
   border-radius:8px; min-width:14px; text-align:center;
 }
 .wd-comm-actions { display:flex; gap:6px; }
 .wd-comm-actions .wd-btn { flex:1; }
-/* Info card links. */
-.wd-comm-info { display:flex; flex-direction:column; gap:3px; }
-.wd-comm-info a { color:var(--accent); font-size:11px; text-decoration:none; }
-.wd-comm-info a:hover { text-decoration:underline; }
-/* Donate note: quieter, sits under the author link. */
-.wd-comm-info-note { color:var(--sub); font-size:10px; margin:0 0 2px; }
-/* Two Discord links side by side. */
-.wd-comm-info-discord { display:flex; gap:8px; font-size:11px; color:var(--sub); }
+/* Info card: a Win95 About box. Every link carries a small muted leading
+   icon; long labels ellipsize instead of wrapping the icon away. */
+.wd-comm-info { display:flex; flex-direction:column; gap:5px; }
+.wd-comm-info-link {
+  display:inline-flex; align-items:center; gap:5px; min-width:0;
+  color:var(--accent); font-size:11px; text-decoration:none;
+}
+.wd-comm-info-link:hover { text-decoration:underline; }
+.wd-comm-info-link .wd-ic { flex:none; margin:0; color:var(--sub); }
+.wd-comm-info-link span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Author + donate: the headline block, sunken like a group well. */
+.wd-comm-info-author {
+  padding:5px 7px; background:var(--group);
+  border:2px solid; border-color:var(--dark) var(--light) var(--light) var(--dark);
+}
+.wd-comm-info-author .wd-comm-info-link { font-weight:bold; }
+/* Donate note: the emphasised line (donations fund the projects) — an
+   accent-barred aside under the author link. */
+.wd-comm-info-note {
+  margin-top:4px; padding:2px 0 2px 6px; border-left:3px solid var(--accent);
+  color:var(--sub); font-size:10px;
+}
+/* Two Discord servers as tidy side-by-side beveled link-buttons. */
+.wd-comm-info-discord { display:flex; gap:6px; margin-top:1px; }
+.wd-comm-info-dbtn { flex:1; text-decoration:none; box-sizing:border-box; }
 
 /* ---- Thread screen (message list + composer) ---- */
 /* Flex-fill chain: .wp-content is a max-height scroll box (the resize grip
@@ -361,6 +381,12 @@ export function kitStyles(): string {
 .wd-clancard-name { font-weight:bold; font-size:12px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .wd-clancard-tag { color:var(--sub); font-weight:normal; }
 .wd-clancard-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; font-size:10px; color:var(--sub); }
-.wd-clancard-chip { white-space:nowrap; }
+.wd-clancard-chip { white-space:nowrap; display:inline-flex; align-items:center; gap:3px; }
+.wd-clancard-chip .wd-ic { flex:none; margin:0; }
+/* Online-count LED: a small themed green dot (kit --ok token). */
+.wd-clancard-dot {
+  width:7px; height:7px; border-radius:50%; background:var(--ok);
+  box-shadow:inset -1px -1px 0 rgba(0,0,0,.3); display:inline-block; flex:none;
+}
 `;
 }

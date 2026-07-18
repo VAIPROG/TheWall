@@ -301,6 +301,9 @@ export function peerOf(dmKey: string | undefined, meId: string | undefined): str
 }
 
 /** Derive a human display title from a chat summary (pure — unit-tested).
+ *  PLAIN TEXT ONLY: this string doubles as the thread's back-header title,
+ *  which panel-stack runs through esc() — markup would show as raw text. The
+ *  per-type glyph is an SVG on the Hub ROW (hub.ts), never part of the title.
  *  - clan  → topic || "Clan chat"
  *  - dm    → the peer handle. `dmKey` is an opaque, canonically-ordered pair of
  *            user ids (not usernames), so it can't yield a friendly name here;
@@ -315,12 +318,26 @@ export function chatTitle(c: ChatSummary): string {
     case "dm":
       return c.topic?.trim() || "Direct message";
     case "modmail":
-      return "🛡 " + (t("commModmail") || "Modmail");
+      return t("commModmail") || "Modmail";
     case "global":
-      return c.topic?.trim() || "🌐 " + (t("commGlobalChat") || "Global");
+      return c.topic?.trim() || t("commGlobalChat") || "Global";
     default:
       return c.topic?.trim() || "Chat";
   }
+}
+
+/** Fixed Hub ordering rank per chat type: Modmail → Global → Clan → DMs. */
+const CHAT_TYPE_RANK: Record<ChatKind, number> = { modmail: 0, global: 1, clan: 2, dm: 3 };
+
+/** Order chats for the Hub list by TYPE priority (modmail → global → clan →
+ *  dm), keeping the backend's last-message-desc order WITHIN each type —
+ *  Array.prototype.sort is stable, so a rank-only comparator preserves the
+ *  incoming relative order. Unknown types sink to the bottom. Pure
+ *  (unit-tested); returns a new array. */
+export function chatOrder(list: ChatSummary[]): ChatSummary[] {
+  return [...list].sort(
+    (a, b) => (CHAT_TYPE_RANK[a.type] ?? 9) - (CHAT_TYPE_RANK[b.type] ?? 9),
+  );
 }
 
 /** Compact change-fingerprint of a rendered message list (pure — unit-tested).

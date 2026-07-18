@@ -7,6 +7,7 @@
  * via the `data-clan` root attribute; this module is presentation only.
  */
 import { esc } from "../../helpers";
+import { ic } from "../../icons";
 import { badge } from "../kit/primitives";
 import { t } from "../../i18n";
 import { clanAvatarUrl, clanBannerUrl } from "./api";
@@ -24,10 +25,15 @@ export function clanCard(cl: ClanSummary, opts: ClanCardOpts): string {
   const members = cl.stats?.memberCount ?? cl.memberCount ?? 0;
   const templates = cl.stats?.templateCount ?? 0;
   const online = cl.stats?.onlineCount;
+  // Stat chips carry crisp Win95 SVG glyphs (person / stacked pages) instead
+  // of emoji; the online count keeps a small LED-green dot (themed via --ok).
+  // ic() markup is trusted; the counts + titles are esc()'d.
   const chips =
-    `<span class="wd-clancard-chip">👥 ${esc(String(members))}</span>` +
-    `<span class="wd-clancard-chip">📄 ${esc(String(templates))}</span>` +
-    (online != null ? `<span class="wd-clancard-chip">🟢 ${esc(String(online))}</span>` : "");
+    `<span class="wd-clancard-chip" title="${esc(t("clanMembers") || "Members")}">${ic("user", 11)} ${esc(String(members))}</span>` +
+    `<span class="wd-clancard-chip" title="${esc(t("clanTemplates") || "Templates")}">${ic("template", 11)} ${esc(String(templates))}</span>` +
+    (online != null
+      ? `<span class="wd-clancard-chip" title="${esc(t("online") || "online")}"><span class="wd-clancard-dot"></span> ${esc(String(online))}</span>`
+      : "");
   return `
     <div class="wd-clancard${compact ? " wd-clancard--compact" : ""}" data-clan="${esc(cl.id)}">
       <div class="wd-clancard-banner" style="background-image:url('${esc(clanBannerUrl(cl.id))}')"></div>

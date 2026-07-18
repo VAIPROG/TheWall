@@ -9,6 +9,7 @@
 import assert from "node:assert";
 import {
   chatEndpoints,
+  chatOrder,
   chatTitle,
   peerOf,
   chronological,
@@ -75,10 +76,14 @@ assert.strictEqual(chatTitle(summary({ type: "clan" })), "Clan chat");
 assert.strictEqual(chatTitle(summary({ type: "dm", topic: "alice" })), "alice");
 assert.strictEqual(chatTitle(summary({ type: "dm", dmKey: "id1:id2" })), "Direct message");
 
-// modmail / global — now localised (t()) with a leading marker glyph, so match
-// on the substring rather than the exact string.
+// modmail / global — localised (t()), PLAIN TEXT (panel-stack esc()s titles;
+// the type glyph is an SVG on the Hub row, never in the title), so match on
+// the substring rather than the exact string.
 assert.ok(chatTitle(summary({ type: "modmail" })).includes("Modmail"));
 assert.ok(chatTitle(summary({ type: "global" })).includes("Global"));
+// No leftover emoji markers in the titles (they'd esc() into the back header).
+assert.ok(!/[🛡🌐]/u.test(chatTitle(summary({ type: "modmail" }))));
+assert.ok(!/[🛡🌐]/u.test(chatTitle(summary({ type: "global" }))));
 
 // ── chatEndpoints: global (distinct from modmail; list/send take the `global`
 // selector, but read is Uuid-only on the backend so it must be undefined —
@@ -143,10 +148,39 @@ assert.ok(chatTitle(summary({ type: "global" })).includes("Global"));
   assert.strictEqual(peerOf(undefined, me), null);
 }
 
-// ── chatTitle for global + modmail (localised, with a marker glyph) ──────────
+// ── chatTitle for global + modmail (localised, plain text) ───────────────────
 {
   assert.ok(chatTitle({ id: "x", type: "global" } as any).includes("Global"));
   assert.ok(chatTitle({ id: "x", type: "modmail" } as any).includes("Modmail"));
+}
+
+// ── chatOrder: fixed Hub row order — Modmail → Global → Clan → DMs ───────────
+{
+  const s = (id: string, type: ChatSummary["type"]) => summary({ id, type });
+  // Backend order is last-message-desc across ALL types; chatOrder groups by
+  // type priority while KEEPING that relative order within each type.
+  const input = [
+    s("d1", "dm"),
+    s("c1", "clan"),
+    s("g1", "global"),
+    s("d2", "dm"),
+    s("m1", "modmail"),
+    s("c2", "clan"),
+  ];
+  const before = input.map((x) => x.id);
+  assert.deepStrictEqual(
+    chatOrder(input).map((x) => x.id),
+    ["m1", "g1", "c1", "c2", "d1", "d2"],
+    "modmail → global → clan → dm; stable within a type",
+  );
+  assert.deepStrictEqual(input.map((x) => x.id), before, "input array not mutated");
+  // Degenerate inputs.
+  assert.deepStrictEqual(chatOrder([]), []);
+  assert.deepStrictEqual(
+    chatOrder([s("a", "dm"), s("b", "dm")]).map((x) => x.id),
+    ["a", "b"],
+    "single-type list keeps incoming order",
+  );
 }
 
 // ── clan media URLs: callable + string in bare Bun (no active client → "") ────
