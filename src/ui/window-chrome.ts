@@ -12,8 +12,6 @@ import { loadNotifications, loadChatList } from "../mail";
 import {
   loadTemplates,
   loadPublicTemplates,
-  loadRoster,
-  loadClanChat,
   syncProfile,
   refreshNotifications,
 } from "../data";
@@ -42,10 +40,6 @@ export function wireWindowChrome(win: HTMLElement): void {
       if ((tab as HTMLElement).dataset.p === "tp") {
         loadTemplates().catch(() => {});
         loadPublicTemplates().catch(() => {});
-      }
-      if ((tab as HTMLElement).dataset.p === "cl") {
-        loadRoster().catch(() => {});
-        loadClanChat().catch(() => {});
       }
       if ((tab as HTMLElement).dataset.p === "ad") {
         loadAdminUsers().catch(() => {});

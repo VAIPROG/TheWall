@@ -1,5 +1,4 @@
 export { wireAdmin } from "./admin";
-export { wireChats } from "./chats";
 export { wireOverlay, applyScalePct } from "./overlay-tab";
 export { wireProfile } from "./profile-tab";
 export { wireSettings } from "./settings-tab";
@@ -16,7 +15,6 @@ import { wireOverlay } from "./overlay-tab";
 import { wireTemplates } from "./templates/shell";
 import { wireCommunity } from "./community/shell";
 import { wireProfile } from "./profile-tab";
-import { wireChats } from "./chats";
 import { wireSettings } from "./settings-tab";
 import { wireAdmin } from "./admin";
 import { wireMailUI } from "../mail";
@@ -66,7 +64,6 @@ export function wireExtensionUI(win: HTMLElement): void {
 
   // mail tab
   wireMailUI();
-  wireChats(win);
 
   // settings tab
   wireSettings(win);

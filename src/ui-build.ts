@@ -9,15 +9,13 @@ import { injectIconFilter } from "./ui/kit/icons";
 import { renderOverlay, updateLockBtn } from "./overlay";
 import { initGuide } from "./guide";
 import { wireUI } from "./ui-wire";
-import { syncProfile, loadGuilds, refreshNotifications } from "./data";
+import { syncProfile, refreshNotifications } from "./data";
 import { buildOverlayPane } from "./ui/overlay-tab";
 import { buildTemplatesPane } from "./ui/templates/shell";
 import { buildCommunityPane } from "./ui/community/shell";
 import { buildMailPane } from "./ui/build-mail";
-import { buildSocialPane } from "./ui/build-social";
 import { buildProfilePane } from "./ui/profile-tab";
 import { buildAchievementsPane } from "./ui/achievements-tab";
-import { buildClanPane } from "./ui/chats";
 import { buildSettingsPane } from "./ui/settings-tab";
 import { buildAdminPane } from "./ui/admin";
 
@@ -41,10 +39,8 @@ export function buildUI(): void {
               <div class="wp-tab" data-p="tp">${ic("disk")}${t("tabTpl")}</div>
               <div class="wp-tab" data-p="co">${ic("chat")}${t("tabCommunity")}</div>
               <div class="wp-tab" data-p="ma">${ic("bell")}Mail</div>
-              <div class="wp-tab" data-p="so">${ic("globe")}${t("tabSocial")}</div>
               <div class="wp-tab" data-p="pr">${ic("user")}${t("tabProfile")}</div>
               <div class="wp-tab" data-p="ah">${ic("star")}${t("achTabTitle")}</div>
-              <div class="wp-tab" data-p="cl">${ic("shield")}${t("tabClan")}</div>
               <div class="wp-tab" data-p="se">${ic("gear")}${t("tabSettings")}</div>
               <div class="wp-tab" data-p="ad" id="tab-admin" style="display:none">${ic("shield")}Admin</div>
           </div>
@@ -57,14 +53,10 @@ export function buildUI(): void {
               ${buildCommunityPane()}
               <!-- MAIL -->
               ${buildMailPane()}
-              <!-- SOCIAL -->
-              ${buildSocialPane()}
               <!-- PROFILE -->
               ${buildProfilePane()}
               <!-- ACHIEVEMENTS -->
               ${buildAchievementsPane()}
-              <!-- CLAN -->
-              ${buildClanPane()}
               <!-- SETTINGS -->
               ${buildSettingsPane()}
               <!-- ADMIN (hidden unless role=admin/owner) -->
@@ -95,7 +87,6 @@ export function buildUI(): void {
   watchSiteTheme();
   wireUI(win);
   syncProfile();
-  loadGuilds();
   refreshNotifications();
   renderOverlay();
   updateLockBtn();
