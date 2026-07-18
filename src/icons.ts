@@ -47,6 +47,8 @@ const FILE_ICONS: Record<string, string> = {
   scan: '<circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="11" y="11" width="5" height="2.4" transform="rotate(45 11 11)"/>',
   check: '<path d="M2 8l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.4"/>',
   grid: '<rect x="1" y="1" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1"/><path d="M6 1v14M11 1v14M1 6h14M1 11h14" stroke="currentColor" stroke-width="1"/>',
+  // Stacked pages — templates count (clan card stat chip).
+  template: '<rect x="4" y="1" width="10" height="11"/><rect x="2" y="4" width="10" height="11" fill="#fff" stroke="currentColor" stroke-width="1.6"/><rect x="4.5" y="7" width="5" height="1.4"/><rect x="4.5" y="10" width="5" height="1.4"/>',
 };
 
 /** Navigation — globe, pin, cursors, send arrows. */
@@ -61,6 +63,12 @@ const NAVIGATION_ICONS: Record<string, string> = {
 /** Communication & alerts — chat, bell, shield, gear. */
 const COMMUNICATION_ICONS: Record<string, string> = {
   chat: '<rect x="1" y="2" width="14" height="9"/><rect x="3" y="4" width="10" height="1.6" fill="#fff"/><rect x="3" y="7" width="7" height="1.6" fill="#fff"/><path d="M4 11l0 3 3-3z"/>',
+  // Clan chat: the chat bubble fused with a shield emblem (clan mark) knocked
+  // out in white — reads as "the clan's chat" wherever a clan chat row/button
+  // appears (Community Hub list, clan page "Open clan chat").
+  clanChat: '<rect x="1" y="2" width="14" height="9"/><path d="M4 11l0 3 3-3z"/><path d="M8 3.2l3.2 1.1v2.4c0 2.1-1.7 3.1-3.2 3.6-1.5-.5-3.2-1.5-3.2-3.6V4.3z" fill="#fff"/>',
+  // Envelope — DMs / "New message" compose.
+  mail: '<rect x="1" y="3" width="14" height="10"/><path d="M2 4l6 5 6-5" fill="none" stroke="#fff" stroke-width="1.5"/>',
   bell: '<path d="M8 1a4 4 0 0 1 4 4v4l2 2H2l2-2V5a4 4 0 0 1 4-4z"/><rect x="6.5" y="13" width="3" height="2" rx="1"/>',
   shield: '<path d="M8 1l6 2v5c0 4-3 6-6 7-3-1-6-3-6-7V3z"/><path d="M5 8l2 2 4-4" fill="none" stroke="#fff" stroke-width="1.6"/>',
   gear: '<path d="M8 1l1 2 2-1 1 2 2 1-1 2 1 2-2 1-1 2-2-1-1 2-1-2-2 1-1-2-2-1 1-2-1-2 2-1 1-2 2 1z"/><circle cx="8" cy="8" r="2.6" fill="#fff"/>',
