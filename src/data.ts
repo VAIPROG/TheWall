@@ -518,8 +518,9 @@ export async function resetAvatar(): Promise<void> {
   const client = getActiveClient();
   if (!client?.on) { await errorDlg("Connect to VAI-PROG backend first"); return; }
   try {
-    // DELETE /me/avatar — fallback to PUT with empty if no DELETE route
-    await client.delete("/me/avatar");
+    // V3 DELETE /api/v3/users/me/avatar. (The old `client.delete("/me/avatar")`
+    // resolved against the V3 base → /api/v3/me/avatar, an unregistered path.)
+    await api(client).users.deleteAvatar();
     toast(t("customAvatar"), "reset to Discord avatar");
     syncProfile();
   } catch (e: any) {

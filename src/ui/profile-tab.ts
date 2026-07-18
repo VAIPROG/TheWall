@@ -6,24 +6,24 @@ import { confirmDlg, errorDlg } from "../dialog";
 import { log } from "../log";
 import { cfg } from "../config";
 import { getActiveClient, api, getMe } from "../backend/index";
-
-// Profile edit + pin management still use the V2 root surface (rich profile
-// shape). TODO(phase3): move to /api/v3/users/me + /api/v3/templates.
-function ptReq<T = any>(method: string, path: string, body?: unknown): Promise<T> {
-  const client = getActiveClient();
-  if (!client) return Promise.reject(new Error("backend offline"));
-  return client.req<T>({ method, path, body, root: true });
-}
-function ptRoot(): string {
-  return getActiveClient()?.rootUrl ?? "";
-}
 import { markAllRead, syncProfile, resetAvatar } from "../data";
-import { importShare } from "../share";
 import { openCursorShop } from "../open-cursor-shop";
 import { segmented } from "./kit/primitives";
 import { buildMailContent } from "./build-mail";
-import { loadNotifications, loadChatList } from "../mail";
+import { loadNotifications } from "../mail";
 import { buildAchievementsContent, loadAchievementList } from "./achievements-tab";
+// V3 template surface: pinned list/unpin via the facade, previews via the
+// session-authenticated V3 preview URL, click-through into the Templates
+// super-tab detail screen (V3 summaries carry no legacy `share` payload).
+import { previewUrl } from "./templates/api";
+import { openDetail } from "./templates/shell";
+import {
+  type SocialLink,
+  guessIcon,
+  normaliseUrl,
+  isUrlValid,
+  pinCaption,
+} from "./profile-model";
 import {
   updatePaintCurrent,
   updateProfilePaintLine,
@@ -54,7 +54,6 @@ export function wireProfile(_win: HTMLElement): void {
       );
       if (seg === "mail") {
         loadNotifications();
-        loadChatList();
       } else if (seg === "ach") {
         loadAchievementList().catch(() => {});
       }
@@ -62,39 +61,7 @@ export function wireProfile(_win: HTMLElement): void {
   });
 
   // ----------- Profile: bio + social links (inline-editable cards) -----------
-
-  type SocialLink = { label: string; url: string };
-
-  function guessIcon(url: string): string {
-    const u = url.toLowerCase();
-    if (u.includes("twitter.com") || u.includes("x.com")) return "🐦";
-    if (u.includes("github.com")) return "🐙";
-    if (u.includes("discord.")) return "💬";
-    if (u.includes("twitch.tv")) return "🎮";
-    if (u.includes("youtube.com") || u.includes("youtu.be")) return "▶️";
-    if (u.includes("t.me") || u.includes("telegram.")) return "✈️";
-    if (u.includes("instagram.")) return "📷";
-    if (u.includes("mailto:") || u.startsWith("mail")) return "✉️";
-    return "🔗";
-  }
-
-  function normaliseUrl(raw: string): string {
-    const v = raw.trim();
-    if (!v) return v;
-    if (/^[a-z]+:/i.test(v)) return v;
-    if (v.includes("@") && !v.includes("/")) return "mailto:" + v;
-    return "https://" + v;
-  }
-
-  function isUrlValid(raw: string): boolean {
-    if (!raw) return false;
-    try {
-      new URL(normaliseUrl(raw));
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  // Pure helpers (guessIcon/normaliseUrl/isUrlValid) live in profile-model.ts.
 
   function getLinks(): SocialLink[] {
     return ((window as any).__wallSocialLinks || []) as SocialLink[];
@@ -329,53 +296,92 @@ export function wireProfile(_win: HTMLElement): void {
   $("btn-profile-save")?.addEventListener("click", async () => {
     const bio = ($("profile-bio") as HTMLTextAreaElement)?.value || "";
     const social_links = (window as any).__wallSocialLinks || [];
+    const client = getActiveClient();
+    if (!client?.on) {
+      await errorDlg("Connect to VAI-PROG backend first (Settings)");
+      return;
+    }
     try {
-      await ptReq("PUT", "/v2/me/profile", { bio, social_links });
+      // Bio lives on the V3 user surface (PATCH /api/v3/users/me). Freeform
+      // social links have NO V3 write yet (V3 socials = verified provider
+      // links), so they still ride the V2 profile endpoint via the legacy
+      // facade — see legacy.updateProfileV2 for the gap note.
+      await api(client).users.updateMe({ bio });
+      await api(client).legacy.updateProfileV2({ social_links });
       toast("Profile", "saved");
       syncProfile();
     } catch (e: any) {
       await errorDlg("Save failed: " + errMsg(e));
     }
   });
-  // Hook up initial values whenever profile syncs
+
+  // ----------- Pinned templates (V3: GET /templates/pinned) ------------------
+  // Click → open in the Templates super-tab detail screen; Shift-click →
+  // unpin (V3 DELETE /templates/{id}/pin). The old V2 flow imported the
+  // legacy `share` payload directly, which V3 summaries no longer carry.
+  async function loadPinnedTemplates(): Promise<void> {
+    const pinBox = $("profile-pinned");
+    const client = getActiveClient();
+    if (!pinBox || !client?.on) return;
+    try {
+      const page = await api(client).templates.listPinned();
+      const pins = page?.items || [];
+      if (!pins.length) {
+        pinBox.innerHTML = `<div style="color:var(--sub);padding:6px">No pinned templates yet — pin from Templates tab.</div>`;
+        return;
+      }
+      pinBox.innerHTML = pins
+        .map(
+          (tp) =>
+            `<div style="text-align:center"><img src="${previewUrl(tp.id, 64)}" style="width:48px;height:48px;border:1px solid #888;cursor:pointer;image-rendering:pixelated" data-open-tpl="${esc(tp.id)}" title="${esc(tp.name || "")} — click to open, Shift-click to unpin" onerror="this.style.opacity=0.3"><br><span class="sub" style="font-size:10px">${esc(pinCaption(tp.name))}</span></div>`,
+        )
+        .join("");
+      pinBox.querySelectorAll<HTMLElement>("[data-open-tpl]").forEach((b) => {
+        b.addEventListener("click", (ev) => {
+          const id = b.dataset.openTpl || "";
+          if (!id) return;
+          if ((ev as MouseEvent).shiftKey) {
+            confirmDlg("Unpin this template?", "Confirm").then((ok) => {
+              if (ok)
+                api(client)
+                  .templates.unpin(id)
+                  .then(() => loadPinnedTemplates())
+                  .catch(() => {});
+            });
+          } else {
+            // Flip to the Templates super-tab and drill into the detail
+            // screen (it owns load/apply — V3 pins carry no share payload).
+            document.querySelector<HTMLElement>('.wp-tab[data-p="tp"]')?.click();
+            openDetail(id);
+          }
+        });
+      });
+    } catch (e: any) {
+      pinBox.innerHTML = `<div style="color:#b33;padding:6px">pins error: ${esc(errMsg(e))}</div>`;
+    }
+  }
+
+  // Hook up initial values whenever profile syncs. The event detail is the
+  // legacy V2 `/v2/auth/me` payload (still the only carrier of freeform
+  // social_links); bio is re-fetched from the V3 self profile so the field
+  // reflects the modern surface, with the V2 value as an instant pre-fill.
   document.addEventListener("wd:profile-loaded", (e: any) => {
     const p = e.detail || {};
     const bioEl = $("profile-bio") as HTMLTextAreaElement | null;
     if (bioEl && document.activeElement !== bioEl) bioEl.value = p.bio || "";
+    const client = getActiveClient();
+    if (client?.on) {
+      api(client)
+        .users.me()
+        .then((me) => {
+          const el = $("profile-bio") as HTMLTextAreaElement | null;
+          if (el && document.activeElement !== el) el.value = me?.bio || "";
+        })
+        .catch(() => {});
+    }
     (window as any).__wallSocialLinks = p.social_links || [];
     refreshSocial((window as any).__wallSocialLinks);
-    // Render pinned templates
-    const pinBox = $("profile-pinned");
-    if (pinBox) {
-      const pins = p.pinned_templates || [];
-      if (!pins.length) {
-        pinBox.innerHTML = `<div style="color:var(--sub);padding:6px">No pinned templates yet — pin from Templates tab.</div>`;
-      } else {
-        pinBox.innerHTML = pins
-          .map(
-            (tp: any) =>
-              `<div style="text-align:center"><img src="${ptRoot()}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" style="width:48px;height:48px;border:1px solid #888;cursor:pointer;image-rendering:pixelated" data-load-tpl="${(tp.share || "").replace(/"/g, "&quot;")}" data-unpin="${tp.id}" title="${(tp.name || "").replace(/[<>"]/g, "")}"><br><span class="sub" style="font-size:10px">${(tp.name || "").slice(0, 12)}</span></div>`,
-          )
-          .join("");
-        pinBox.querySelectorAll("[data-load-tpl]").forEach((b) => {
-          b.addEventListener("click", (ev) => {
-            if ((ev as MouseEvent).shiftKey) {
-              const id = (b as HTMLElement).dataset.unpin;
-              if (id) {
-                confirmDlg("Unpin this template?", "Confirm").then((ok) => {
-                  if (ok)
-                    ptReq("DELETE", `/v2/templates/${id}/pin`)
-                      .then(() => syncProfile())
-                      .catch(() => {});
-                });
-              }
-            } else {
-              importShare((b as HTMLElement).dataset.loadTpl || "");
-            }
-          });
-        });
-      }
-    }
+    loadPinnedTemplates().catch(() => {});
   });
 
   // Avatar

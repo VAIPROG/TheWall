@@ -112,6 +112,17 @@ export function buildLegacyApi(client: BackendClient) {
           (pass ? `?pass=${encodeURIComponent(pass)}` : ""),
       ),
 
+    // V2 rich-profile write — still the ONLY way to save freeform social
+    // links (label/url pairs; users.social_links JSON column). V3 has no
+    // equivalent write: PATCH /api/v3/users/me covers bio/displayName/username
+    // only, and V3 "socials" are verified provider links (discord/telegram/
+    // github + provider_uid) — a different concept. TODO(v3): retire once
+    // UserUpdate grows a socialLinks field.
+    updateProfileV2: (body: {
+      bio?: string;
+      social_links?: Array<{ label: string; url: string }>;
+    }) => client.putRoot("/v2/me/profile", body),
+
     pinTemplateV2: (id: string, slot?: number) =>
       client.postRoot(`/v2/templates/${encodeURIComponent(id)}/pin`, { slot }),
 
