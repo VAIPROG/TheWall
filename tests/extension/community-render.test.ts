@@ -84,6 +84,17 @@ function msg(over: Partial<Message> = {}): Message {
   assert.ok(!html.includes('data-action="delete"'), "no delete on deleted");
 }
 
+// --- react: any non-deleted message offers an "add reaction" action ---
+{
+  const html = renderMessage(msg({ authorId: "u2" }), { meId: "u1" });
+  assert.ok(html.includes('data-action="react"'), "non-deleted message has react action");
+  // Deleted messages never offer react.
+  assert.ok(
+    !renderMessage(msg({ isDeleted: true })).includes('data-action="react"'),
+    "deleted message has no react action",
+  );
+}
+
 // --- own message: edit + delete present ---
 {
   const html = renderMessage(msg({ authorId: "u1" }), { meId: "u1" });

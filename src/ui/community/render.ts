@@ -65,6 +65,7 @@ function actionBtn(mid: string, action: string, label: string): string {
 /** Labels the thread passes in (defaults are English so render.ts is testable
  *  standalone). */
 export interface ActionLabels {
+  react?: string;
   edit?: string;
   delete?: string;
   report?: string;
@@ -74,6 +75,7 @@ export interface ActionLabels {
 }
 
 const DEFAULT_LABELS: Required<ActionLabels> = {
+  react: "React",
   edit: "Edit",
   delete: "Delete",
   report: "Report",
@@ -123,6 +125,9 @@ export function renderMessage(m: Message, ctx: RenderCtx = {}, labels: ActionLab
   // canModerate) and pin.
   const acts: string[] = [];
   if (!m.isDeleted) {
+    // "React" is available to anyone who can post (open the emoji picker to add
+    // a NEW reaction) — kept leftmost so it reads as the primary affordance.
+    acts.push(actionBtn(m.id, "react", L.react));
     if (isMine) {
       acts.push(actionBtn(m.id, "edit", L.edit));
       acts.push(actionBtn(m.id, "delete", L.delete));

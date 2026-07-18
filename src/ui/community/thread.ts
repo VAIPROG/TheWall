@@ -70,6 +70,7 @@ function stopPoll(): void {
 /** i18n labels handed to the pure renderer (keeps render.ts dict-free). */
 function actionLabels() {
   return {
+    react: t("commReact"),
     edit: t("commMsgEdit"),
     delete: t("commMsgDelete"),
     report: t("commMsgReport"),
@@ -321,7 +322,22 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
         if (!m) return;
         const cid = cidFor(ref, m);
 
-        if (action === "edit") {
+        if (action === "react") {
+          // Open the shared emoji picker anchored to the clicked button; its
+          // onPick delivers the chosen shortcode (composer insertion is
+          // bypassed). PUT the reaction (on=true), then reload to show the chip.
+          // ta is a harmless placeholder target — onPick short-circuits insert.
+          if (ta) {
+            actBtn.setAttribute("data-wd-emoji-anchor", "1");
+            void openEmojiPicker(ta, actBtn, {
+              onPick: (emoji) => {
+                void react(cidFor(ref, m), m.id, emoji, true)
+                  .then(() => load())
+                  .catch(() => toast(t("commThread"), t("commActionFail")));
+              },
+            });
+          }
+        } else if (action === "edit") {
           startInlineEdit(m, cid);
         } else if (action === "delete") {
           void (async () => {
