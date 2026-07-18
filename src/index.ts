@@ -17,10 +17,8 @@ import {
   startNotifPolling,
   startAnnouncementPolling,
   loadAnnouncements,
-  loadClanChat,
   loadTemplates,
   loadPublicTemplates,
-  loadRoster,
 } from "./data";
 import { errorDlg, confirmDlg, promptDlg, infoDlg } from "./dialog";
 import { initEmotes } from "./emoji";
@@ -190,10 +188,8 @@ import { t, pluralize } from "./i18n";
       // Refresh UI state
       syncProfile();
       loadAnnouncements();
-      loadClanChat();
       loadTemplates();
       loadPublicTemplates();
-      loadRoster();
       loadNotifications();
       loadChatList();
       refreshNotifications();
