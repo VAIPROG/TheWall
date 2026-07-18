@@ -47,7 +47,7 @@ import {
   type Page,
 } from "./api";
 import { clanCard } from "./card";
-import { resetToHub } from "./shell";
+import { resetToHub, openThread } from "./shell";
 
 // ---------------------------------------------------------------------------
 // Module state (like detail.ts keeps the fetched entity in scope). Reset each
@@ -128,10 +128,18 @@ function renderOverview(cl: ClanDetail): string {
     ? `<div class="wd-clan-desc">${esc(cl.description)}</div>`
     : "";
   const media = cl.viewer?.canManageSettings ? renderMedia() : "";
+  // Direct clan-chat access, restored for members. Only shown when the clan
+  // actually has a chat (chatId present) and the viewer is a member — the
+  // backend still enforces access. Click → openThread({ kind:"clan", ... }).
+  const isMember = cl.viewer?.membershipStatus === "member";
+  const openChat = isMember && cl.chatId
+    ? `<div class="wd-clan-more">${button("💬 " + (t("clanOpenChat") || "Open clan chat"), { size: "sm", id: "clan-open-chat" })}</div>`
+    : "";
   return `
     <div class="wd-clan-head">
       ${via ? `<div class="wd-tpl-pills">${via}</div>` : ""}
       ${desc}
+      ${openChat}
     </div>
     ${group(t("clanInfo") || "Info", `<div class="wd-kvgrid">${info}</div>`)}
     ${media}`;
@@ -392,6 +400,13 @@ export function clanScreen(id: string): PanelScreen {
               $(`comm-clan-sub-${s}`)?.classList.toggle("is-on", s === seg),
             );
           });
+        });
+
+        // Open clan chat: drill into the thread screen for this clan's chat.
+        // Only rendered when chatId + membership are present (see renderOverview),
+        // so a plain null-safe wire is enough; re-attached on every load().
+        $("clan-open-chat")?.addEventListener("click", () => {
+          if (clan?.chatId) openThread({ kind: "clan", chatId: clan.chatId }, `${clan.name} chat`);
         });
 
         // Media (admin-only): file inputs upload the clan avatar / banner;
