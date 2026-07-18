@@ -57,6 +57,12 @@ export function wireWindowChrome(win: HTMLElement): void {
         refreshNotifications().catch(() => {});
         document.dispatchEvent(new CustomEvent("wd:tab-open-pr"));
       }
+      if ((tab as HTMLElement).dataset.p === "se") {
+        // Settings listens for this to re-derive the connection card and
+        // linked-accounts rows from live client state (see settings-tab.ts /
+        // links-wire.ts) — the pane markup is otherwise a boot-time paint.
+        document.dispatchEvent(new CustomEvent("wd:tab-open-se"));
+      }
     }),
   );
 

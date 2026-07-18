@@ -313,11 +313,14 @@ export async function backendConnect(): Promise<void> {
   saveCfg();
   const client = getActiveClient();
   if (!client) return;
-  if (cfg.backendToken) {
-    cfg.backendToken = "";
-    cfg.refreshToken = "";
+  // Connected ⇄ disconnected toggle. The CLIENT token is the truth (the
+  // multi-backend store); cfg.backendToken is just a legacy mirror kept in
+  // sync by multi.ts. Clearing via setToken("") drives the mirror + the
+  // wd:backend-state event so every status surface repaints.
+  if (client.token) {
+    client.setToken("", "");
+    client.setMe(undefined);
     setMe(undefined);
-    saveCfg();
     const btn = $("btn-backend-connect");
     if (btn) btn.textContent = t("connect");
     toast(t("backend"), t("disconnect"));

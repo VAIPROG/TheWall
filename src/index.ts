@@ -173,15 +173,17 @@ import { t, pluralize } from "./i18n";
     if (!client) return;
     const a = api(client);
     try {
-      // Try to use existing token; if it fails (401), re-login.
-      if (cfg.backendToken) {
+      // Try to use existing token; if it fails (401), re-login. The client
+      // token (multi-backend store) is the truth — cfg.backendToken is only
+      // a legacy mirror synced by multi.ts.
+      if (client.token) {
         try {
           const me = await a.auth.me();
           setMe(me);
           log("AUTO_AUTH", "OK", "session restored");
         } catch {
           log("AUTO_AUTH", "WARN", "stored token rejected, re-logging in");
-          cfg.backendToken = "";
+          client.setToken("", "");
           await a.auth.loginWithSiteToken("filianislost", siteToken() || "");
           setMe(await a.auth.me());
         }
