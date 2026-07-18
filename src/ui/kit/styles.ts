@@ -285,13 +285,15 @@ export function kitStyles(): string {
 .wd-comm-edit-ta { width:100%; }
 .wd-comm-edit-actions { display:flex; gap:6px; margin-top:4px; }
 /* Composer: textarea + emoji + send. */
-.wd-comm-composer { display:flex; align-items:flex-end; gap:6px; flex:none; }
-.wd-comm-input { flex:1; resize:vertical; min-height:34px; }
-/* Emoji + Send keep their intrinsic size; the textarea absorbs all resize, so
-   the buttons never squish/distort on a narrow window. The mention-suggest is
-   reparented to <body> on mount — position:absolute keeps it out of the flex
-   row before/if it isn't, so it never consumes a flex slot. */
-.wd-comm-composer > .wp-emoji-btn, .wd-comm-composer > #comm-send { flex:none; }
+.wd-comm-composer { display:flex; align-items:flex-end; gap:6px; flex:none; flex-wrap:nowrap; }
+.wd-comm-input { flex:1 1 auto; min-width:0; resize:vertical; min-height:34px; }
+/* Emoji + Send keep their intrinsic size and sit at the SAME baseline as the
+   input's bottom edge. The shared .wp-emoji-btn sets align-self:flex-start
+   globally (it would float the emoji button to the TOP, out of line with Send)
+   — override it to flex-end here. min-width:0 on the textarea lets it shrink
+   so the buttons never squish/wrap/distort as the window resizes. */
+.wd-comm-composer > .wp-emoji-btn,
+.wd-comm-composer > #comm-send { flex:none; align-self:flex-end; }
 .wd-comm-composer > #comm-mention-suggest { position:absolute; }
 /* Hub: chats header + "New message" inline compose. */
 .wd-comm-chats-head { display:flex; align-items:center; gap:6px; }
@@ -305,6 +307,7 @@ export function kitStyles(): string {
 }
 
 /* ---- Clan management drill-in (reuses .wd-tpl-detail / .wd-kv* / .wd-list) ---- */
+.wd-clan-openchat { display:flex; margin-bottom:8px; }
 .wd-clan-head { display:flex; flex-direction:column; gap:4px; }
 .wd-clan-via { font-size:10px; color:var(--sub); align-self:center; }
 .wd-clan-desc { font-size:11px; color:var(--sub); word-break:break-word; }

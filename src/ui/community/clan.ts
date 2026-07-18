@@ -144,14 +144,17 @@ function renderOverview(cl: ClanDetail): string {
   // (the backend detail read get-or-creates the clan chat). The kit `chat`
   // icon replaces the raw 💬 prefix so the glyph follows the theme.
   const isMember = cl.viewer?.membershipStatus === "member";
+  // Compact, left-aligned primary button at the TOP of Overview. Its own flex
+  // wrapper shrinks it to content width (it previously sat in the column-stretch
+  // `.wd-clan-head`, which stretched its row full-width and looked oversized).
   const openChat = isMember
-    ? `<div class="wd-clan-more">${button(t("clanOpenChat") || "Open clan chat", { size: "sm", variant: "primary", icon: "chat", id: "clan-open-chat" })}</div>`
+    ? `<div class="wd-clan-openchat">${button(t("clanOpenChat") || "Open clan chat", { size: "sm", variant: "primary", icon: "chat", id: "clan-open-chat" })}</div>`
     : "";
   return `
+    ${openChat}
     <div class="wd-clan-head">
       ${via ? `<div class="wd-tpl-pills">${via}</div>` : ""}
       ${desc}
-      ${openChat}
     </div>
     ${group(t("clanInfo") || "Info", `<div class="wd-kvgrid">${info}</div>`)}
     ${media}`;

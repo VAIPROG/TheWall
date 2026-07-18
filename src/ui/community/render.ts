@@ -42,13 +42,22 @@ export function fmtTime(iso: string): string {
   }
 }
 
-/** One reaction chip. Emoji is escaped for display but URL-encoded in the
- *  data attribute so the click handler can round-trip it cleanly. */
-function reactionChip(mid: string, emoji: string, count: number, on: boolean): string {
+/** One reaction chip. The emoji is URL-encoded in the `data-react` attribute so
+ *  the click handler round-trips the exact reaction key. For DISPLAY it runs
+ *  through `emotes()` (identity by default) so a 7TV `:shortcode:` reaction
+ *  renders as its `<img class="wd-emote">` instead of raw `:shortcode:` text;
+ *  a plain unicode emoji is left untouched. `esc` first keeps it XSS-safe. */
+function reactionChip(
+  mid: string,
+  emoji: string,
+  count: number,
+  on: boolean,
+  emotes: (html: string) => string,
+): string {
   return (
     `<button type="button" class="wd-comm-react${on ? " is-on" : ""}"` +
     ` data-react="${encodeURIComponent(emoji)}" data-mid="${esc(mid)}">` +
-    `${esc(emoji)} <span class="wd-comm-react-n">${esc(String(count))}</span></button>`
+    `${emotes(esc(emoji))} <span class="wd-comm-react-n">${esc(String(count))}</span></button>`
   );
 }
 
@@ -115,7 +124,7 @@ export function renderMessage(m: Message, ctx: RenderCtx = {}, labels: ActionLab
   const reactions =
     !m.isDeleted && m.reactions.length
       ? `<div class="wd-comm-reacts">${m.reactions
-          .map((r) => reactionChip(m.id, r.emoji, r.count, r.reactedByMe))
+          .map((r) => reactionChip(m.id, r.emoji, r.count, r.reactedByMe, emotes))
           .join("")}</div>`
       : "";
 
