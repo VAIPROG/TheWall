@@ -9,7 +9,8 @@ import { reloadEmotes } from "../emoji";
 import { confirmDlg, errorDlg, infoDlg, promptDlg } from "../dialog";
 import { toast, applyToastPlacement } from "../notify";
 import { WallEvents } from "../events";
-import { getActiveClient, api, getMe } from "../backend/index";
+import { getActiveClient, api, getMe, setMe, getLastOkAt, resolveConnState } from "../backend/index";
+import { startSiteChatEmotes, stopSiteChatEmotes } from "../site-chat-emotes";
 import { manualCheck, skipVersion, cmpVersion } from "../update-check";
 import { VERSION } from "../constants";
 import { playPaintRefillSound } from "../paint-sound";
@@ -193,21 +194,48 @@ export function wireSettings(_win: HTMLElement): void {
       await errorDlg("Reload failed: " + errMsg(e));
     }
   });
+  // Inject 7TV rendering into the SITE chat (filianislost's own chat UI).
+  // Toggling applies live: start attaches the observers, stop detaches them
+  // (already-replaced messages keep their emotes until the chat re-renders).
+  $("cfg-inject-site-emotes")?.addEventListener("change", (e: Event) => {
+    cfg.injectSiteEmotes = (e.target as HTMLInputElement).checked;
+    saveCfg();
+    if (cfg.injectSiteEmotes) startSiteChatEmotes();
+    else stopSiteChatEmotes();
+  });
   renderEmoteChannels();
 
-  // Connection / account card
+  // Connection / account card — status derives from the CLIENT (token truth
+  // lives in the multi-backend store), never from cfg.backendToken, which is
+  // only a legacy mirror and used to go stale, painting "not connected" over
+  // perfectly healthy sessions. resolveConnState() is the pure, tested core.
   const updateConnCard = () => {
-    const connected = !!cfg.backendToken;
+    const client = getActiveClient();
+    const me = getMe() as any;
+    const st = resolveConnState({
+      enabled: !!client?.enabled,
+      hasUrl: !!client?.url,
+      hasToken: !!client?.token,
+      username: me?.username || client?.me?.username,
+      lastOkAt: getLastOkAt() || undefined,
+    });
+    const connected = st.connected;
     const on = $("se-conn-on");
     const off = $("se-conn-off");
     if (on) on.style.display = connected ? "" : "none";
     if (off) off.style.display = connected ? "none" : "";
     const card = $("se-conn-card");
     if (card) card.style.borderLeftColor = connected ? "var(--ok)" : "var(--warn)";
+    // The connect/disconnect button under Connectivity mirrors the same state.
+    const connBtn = $("btn-backend-connect");
+    if (connBtn) connBtn.textContent = connected ? t("disconnect") : t("connect");
+    // Titlebar: never show "offline" while the backend session is healthy.
+    // syncProfile() overwrites this with the site username once it loads.
+    const wp = $("wp-status");
+    if (wp && connected && wp.textContent === t("offline")) wp.textContent = st.who;
     if (!connected) return;
-    const me = getMe() as any;
     const nameEl = $("se-conn-name");
-    if (nameEl) nameEl.textContent = me?.username || "connected";
+    if (nameEl) nameEl.textContent = st.who;
     const role = String(me?.globalRole || me?.global_role || me?.role || "").toLowerCase();
     const roleEl = $("se-conn-role");
     if (roleEl) {
@@ -215,21 +243,37 @@ export function wireSettings(_win: HTMLElement): void {
       roleEl.textContent = role;
       roleEl.style.display = show ? "" : "none";
     }
-    const st = $("se-conn-status");
-    if (st) st.textContent = "● connected · " + cfg.backendUrl.replace(/^https?:\/\//, "");
+    const stEl = $("se-conn-status");
+    if (stEl) {
+      const host = (client?.url || cfg.backendUrl).replace(/^https?:\/\//, "").replace(/\/api(\/v\d+)?$/, "");
+      stEl.textContent = "● connected · " + host;
+    }
     const av = $("se-conn-avatar") as HTMLImageElement | null;
     if (av && me?.id) {
       av.style.visibility = "";
-      av.src = `${getActiveClient()?.rootUrl ?? ""}/avatar?userId=${encodeURIComponent(String(me.id))}`;
+      av.src = `${client?.rootUrl ?? ""}/avatar?userId=${encodeURIComponent(String(me.id))}`;
     }
   };
   const connectThenSync = async () => {
     await backendConnect();
-    setTimeout(updateConnCard, 500);
+    updateConnCard();
   };
   $("se-conn-btn")?.addEventListener("click", connectThenSync);
   $("se-conn-disc")?.addEventListener("click", connectThenSync);
   document.addEventListener("wd:profile-loaded", updateConnCard);
+  // Reactive: token set/cleared, refresh, identity load — all repaint here
+  // (multi.ts dispatches on every client/global-me state change).
+  document.addEventListener("wd:backend-state", updateConnCard);
+  // Settings tab opened: repaint immediately, then run a lightweight liveness
+  // probe — a successful /auth/session both refreshes the identity and proves
+  // the token still works (getMe → setMe → wd:backend-state → repaint).
+  document.addEventListener("wd:tab-open-se", () => {
+    updateConnCard();
+    const client = getActiveClient();
+    if (client?.on && !getMe()) {
+      api(client).auth.me().then((u) => setMe(u)).catch(() => {});
+    }
+  });
   updateConnCard();
 
   // Backend URL + connect
@@ -237,10 +281,7 @@ export function wireSettings(_win: HTMLElement): void {
     cfg.backendUrl = (e.target as HTMLInputElement).value.trim();
     saveCfg();
   });
-  $("btn-backend-connect")!.addEventListener("click", async () => {
-    await backendConnect();
-    setTimeout(updateConnCard, 500);
-  });
+  $("btn-backend-connect")!.addEventListener("click", connectThenSync);
 
   // Toggles
   $("cfg-intercept")!.addEventListener("change", (e: Event) => {
@@ -402,7 +443,7 @@ export function buildSettingsPane(): string {
                           <button class="wd-btn wd-btn--primary wd-btn--full" id="se-conn-btn">${ic("plug")}${t("connect")}</button>
                       </div>
                   </div>
-                  <div class="wp-section-hdr">${ic("user", 10)} Display</div>
+                  <div class="wp-section-hdr">${ic("moon", 10)} Appearance</div>
                   <div class="wp-group"><div class="wp-legend">${ic("moon")}${t("theme")}</div>
                       <select id="cfg-theme" class="wp-input" style="font:11px sans-serif">
                           <option value="auto" ${cfg.theme === "auto" ? "selected" : ""}>${t("themeAuto")}</option>
@@ -414,6 +455,20 @@ export function buildSettingsPane(): string {
                       <label class="wp-check"><input type="checkbox" id="cfg-cozy" ${cfg.cozy ? "checked" : ""}> ${t("cozy")}</label>
                       <label class="wp-check"><input type="checkbox" id="cfg-pixel-icons" ${cfg.pixelIcons ? "checked" : ""}> ${t("pixelIcons")}</label>
                   </div>
+                  <div class="wp-group"><div class="wp-legend">${t("lang")}</div>
+                      <select id="lang-select" class="wp-input" style="font:11px sans-serif">
+                          <option value="en" ${localStorage.getItem("wall_overlay_lang") !== "ru" ? "selected" : ""}>English</option>
+                          <option value="ru" ${localStorage.getItem("wall_overlay_lang") === "ru" ? "selected" : ""}>Русский</option>
+                      </select>
+                      <label class="wp-check"><input type="checkbox" id="cfg-remote-i18n" ${cfg.remoteI18n ? "checked" : ""}> remote translations (backend)</label>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("cursor")}${t("cursors")}</div>
+                      <select id="cfg-cursors" class="wp-input" style="font:11px sans-serif">
+                          <option value="off" ${cfg.cursorMode === "off" ? "selected" : ""}>${t("cursorsOff")}</option>
+                          <option value="clan" ${cfg.cursorMode === "clan" ? "selected" : ""}>${t("cursorsClan")}</option>
+                      </select>
+                  </div>
+                  <div class="wp-section-hdr">${ic("bell", 10)} Notifications</div>
                   <div class="wp-group"><div class="wp-legend">${ic("bell")}${t("notifToasts")}</div>
                       <div style="display:flex;gap:10px;align-items:flex-start">
                           <div>
@@ -438,53 +493,6 @@ export function buildSettingsPane(): string {
                           </div>
                       </div>
                   </div>
-                  <div class="wp-group"><div class="wp-legend">${t("lang")}</div>
-                      <select id="lang-select" class="wp-input" style="font:11px sans-serif">
-                          <option value="en" ${localStorage.getItem("wall_overlay_lang") !== "ru" ? "selected" : ""}>English</option>
-                          <option value="ru" ${localStorage.getItem("wall_overlay_lang") === "ru" ? "selected" : ""}>Русский</option>
-                      </select>
-                      <label class="wp-check"><input type="checkbox" id="cfg-remote-i18n" ${cfg.remoteI18n ? "checked" : ""}> remote translations (backend)</label>
-                  </div>
-                  <div class="wp-group"><div class="wp-legend">${ic("cursor")}${t("cursors")}</div>
-                      <select id="cfg-cursors" class="wp-input" style="font:11px sans-serif">
-                          <option value="off" ${cfg.cursorMode === "off" ? "selected" : ""}>${t("cursorsOff")}</option>
-                          <option value="clan" ${cfg.cursorMode === "clan" ? "selected" : ""}>${t("cursorsClan")}</option>
-                      </select>
-                  </div>
-                  <div class="wp-section-hdr">${ic("plug", 10)} Connectivity</div>
-                  <div class="wp-group"><div class="wp-legend">${t("backend")}</div>
-                      <input type="text" id="cfg-backend-url" name="cfg_backend_url" autocomplete="off" class="wp-input" placeholder="https://the-wall.vai-rice.space/api" value="${esc(cfg.backendUrl)}">
-                      <button class="wp-btn" id="btn-backend-connect">${cfg.backendToken ? t("disconnect") : t("connect")}</button>
-                  </div>
-                  <div class="wp-group"><div class="wp-legend">${ic("globe")}${t("linksLegend")}</div>
-                      <div id="links-rows" style="font-size:11px"><div style="color:var(--sub)">${t("syncing")}</div></div>
-                      <div class="wp-links-actions">
-                          <button class="wp-btn" id="btn-links-manage" title="${esc(t("linksManageTip"))}">${t("linksManage")}</button>
-                          <button class="wp-btn" id="btn-links-refresh" title="${esc(t("linksRefreshTip"))}">↻ ${t("linksRefresh")}</button>
-                      </div>
-                      <label class="wp-check" style="margin-top:6px"><input type="checkbox" id="cfg-paint-reminder-remote" ${cfg.paintReminderRemote ? "checked" : ""}> ${t("paintReminderRemote")}</label>
-                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("linksHint")}</div>
-                  </div>
-                  <div class="wp-group"><div class="wp-legend">${t("advanced")}</div>
-                      <label class="wp-check"><input type="checkbox" id="cfg-intercept" ${cfg.interceptEvents ? "checked" : ""}> intercept site events (chat/paint)</label>
-                      <label class="wp-check"><input type="checkbox" id="cfg-wstap" ${cfg.wsTap ? "checked" : ""}> mirror WebSocket (read-only stats)</label>
-                      <div style="margin-top:6px">cursor selector<input type="text" id="cfg-cursor-sel" name="cfg_cursor_sel" autocomplete="off" class="wp-input" value="${esc(cfg.cursorSelector)}"></div>
-                      <div class="wp-note" style="color:var(--sub)">${t("advancedNote")}</div>
-                  </div>
-                  <div class="wp-section-hdr">${ic("emote", 10)} Tools</div>
-                  <div class="wp-group"><div class="wp-legend">${ic("emote")}7TV Emote Channels</div>
-                      <div class="wp-note" style="color:var(--sub);margin-bottom:4px">Global + filian are always loaded. Add streamer channels by their Twitch user ID.</div>
-                      <div id="cfg-emote-channels" class="wp-channels-list" style="min-height:24px;margin-bottom:4px"></div>
-                      <div class="wp-channel-add">
-                          <input type="text" id="cfg-emote-name" name="cfg_emote_name" autocomplete="off" class="wp-input" placeholder="display name (e.g. xqc)" style="flex:1">
-                          <input type="text" id="cfg-emote-tid" name="cfg_emote_tid" autocomplete="off" class="wp-input" placeholder="Twitch user ID (numeric)" style="flex:1.2">
-                          <button class="wp-btn primary" id="btn-emote-add" style="flex:none;width:auto;padding:3px 10px;margin:0;white-space:nowrap">${ic("plus")}Add</button>
-                      </div>
-                      <div class="wp-note" style="color:var(--sub);margin-top:6px;line-height:1.45">
-                          Find a Twitch user ID at <a href="https://www.streamweasels.com/tools/convert-twitch-username-to-user-id/" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all">streamweasels.com</a>.
-                      </div>
-                      <button class="wp-btn" id="btn-emote-reload" style="margin-top:4px;width:100%">↻ Reload emotes</button>
-                  </div>
                   <div class="wp-group"><div class="wp-legend">${ic("bolt")}${t("paintGroup")}</div>
                       <label class="wp-check"><input type="checkbox" id="cfg-notify-paint" ${cfg.notifyOnPaintRefill ? "checked" : ""}> ${t("paintNotifRefill")}</label>
                       <div class="wp-note" style="color:var(--sub);font-size:10px">${t("paintNotifRefillNote")}</div>
@@ -506,16 +514,55 @@ export function buildSettingsPane(): string {
                       </div>
                       <div class="wp-note" style="color:var(--sub);font-size:10px">${t("sellAllNote")}</div>
                   </div>
-                  <div class="wp-section-hdr">${ic("bell", 10)} System</div>
+                  <div class="wp-section-hdr">${ic("plug", 10)} Connectivity &amp; account</div>
+                  <div class="wp-group"><div class="wp-legend">${t("backend")}</div>
+                      <input type="text" id="cfg-backend-url" name="cfg_backend_url" autocomplete="off" class="wp-input" placeholder="https://the-wall.vai-rice.space/api" value="${esc(cfg.backendUrl)}">
+                      <button class="wp-btn" id="btn-backend-connect">${cfg.backendToken ? t("disconnect") : t("connect")}</button>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("globe")}${t("linksLegend")}</div>
+                      <div id="links-rows" style="font-size:11px"><div style="color:var(--sub)">${t("syncing")}</div></div>
+                      <div class="wp-links-actions">
+                          <button class="wp-btn" id="btn-links-manage" title="${esc(t("linksManageTip"))}">${t("linksManage")}</button>
+                          <button class="wp-btn" id="btn-links-refresh" title="${esc(t("linksRefreshTip"))}">↻ ${t("linksRefresh")}</button>
+                      </div>
+                      <label class="wp-check" style="margin-top:6px"><input type="checkbox" id="cfg-paint-reminder-remote" ${cfg.paintReminderRemote ? "checked" : ""}> ${t("paintReminderRemote")}</label>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px;margin-top:4px">${t("linksHint")}</div>
+                  </div>
+                  <div class="wp-group"><div class="wp-legend">${ic("trash")}Account</div>
+                      <button class="wp-btn" id="btn-delete-account" style="color:#c33">${ic("trash")}Delete my account</button>
+                      <div class="wp-note">Permanently removes your profile, avatars, messages and templates.</div>
+                  </div>
+                  <div class="wp-section-hdr">${ic("emote", 10)} Chat &amp; emotes</div>
+                  <div class="wp-group"><div class="wp-legend">${ic("emote")}7TV Emote Channels</div>
+                      <div class="wp-note" style="color:var(--sub);margin-bottom:4px">Global + filian are always loaded. Add streamer channels by their Twitch user ID.</div>
+                      <div id="cfg-emote-channels" class="wp-channels-list" style="min-height:24px;margin-bottom:4px"></div>
+                      <div class="wp-channel-add">
+                          <input type="text" id="cfg-emote-name" name="cfg_emote_name" autocomplete="off" class="wp-input" placeholder="display name (e.g. xqc)" style="flex:1">
+                          <input type="text" id="cfg-emote-tid" name="cfg_emote_tid" autocomplete="off" class="wp-input" placeholder="Twitch user ID (numeric)" style="flex:1.2">
+                          <button class="wp-btn primary" id="btn-emote-add" style="flex:none;width:auto;padding:3px 10px;margin:0;white-space:nowrap">${ic("plus")}Add</button>
+                      </div>
+                      <div class="wp-note" style="color:var(--sub);margin-top:6px;line-height:1.45">
+                          Find a Twitch user ID at <a href="https://www.streamweasels.com/tools/convert-twitch-username-to-user-id/" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all">streamweasels.com</a>.
+                      </div>
+                      <button class="wp-btn" id="btn-emote-reload" style="margin-top:4px;width:100%">↻ Reload emotes</button>
+                      <label class="wp-check" style="margin-top:6px"><input type="checkbox" id="cfg-inject-site-emotes" ${cfg.injectSiteEmotes ? "checked" : ""}> render 7TV emotes in the site chat</label>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px">Replaces :emote: codes in filianislost's own chat (global + clan) and adds the emote picker button.</div>
+                  </div>
+                  <div class="wp-section-hdr">${ic("gear", 10)} Advanced</div>
+                  <div class="wp-group"><div class="wp-legend">${t("advanced")}</div>
+                      <label class="wp-check"><input type="checkbox" id="cfg-intercept" ${cfg.interceptEvents ? "checked" : ""}> intercept site events (chat/paint)</label>
+                      <label class="wp-check"><input type="checkbox" id="cfg-wstap" ${cfg.wsTap ? "checked" : ""}> mirror WebSocket (read-only stats)</label>
+                      <label class="wp-check"><input type="checkbox" id="cfg-charity-no-identity" ${cfg.charityNoIdentity ? "checked" : ""}> Charity export: omit identity tag</label>
+                      <div class="wp-note" style="color:var(--sub);font-size:10px">When on, exported Charity templates drop the (TheWallDev: ID…) marker from the name.</div>
+                      <div style="margin-top:6px">cursor selector<input type="text" id="cfg-cursor-sel" name="cfg_cursor_sel" autocomplete="off" class="wp-input" value="${esc(cfg.cursorSelector)}"></div>
+                      <div class="wp-note" style="color:var(--sub)">${t("advancedNote")}</div>
+                  </div>
+                  <div class="wp-section-hdr">${ic("dl", 10)} System</div>
                   <div class="wp-group"><div class="wp-legend">${ic("dl")}Updates &amp; meta</div>
                       <div id="update-status" style="font-size:11px;color:var(--sub);margin-bottom:4px">current: v${VERSION}</div>
                       <div id="server-meta" style="font-size:10px;color:var(--sub);line-height:1.4;border:1px inset var(--shadow);padding:4px;background:var(--field);color:var(--fieldtext);white-space:pre-wrap">backend meta: (not loaded)</div>
                       <button class="wp-btn" id="btn-check-update">${ic("dl")}Check for update</button>
                       <button class="wp-btn" id="btn-load-meta">refresh backend meta</button>
-                  </div>
-                  <div class="wp-group"><div class="wp-legend">${ic("trash")}Account</div>
-                      <button class="wp-btn" id="btn-delete-account" style="color:#c33">${ic("trash")}Delete my account</button>
-                      <div class="wp-note">Permanently removes your profile, avatars, messages and templates.</div>
                   </div>
                   <div class="wp-group"><div class="wp-legend">about</div>
                       <div style="font-size:10px;line-height:1.5">The Wall Dev v${VERSION}<br>by VAI_PROG · vai on wall<br>contact: <a href="mailto:vadim+the_wall@vai-rice.space" style="color:var(--link)">vadim+the_wall@vai-rice.space</a></div>
