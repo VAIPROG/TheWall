@@ -38,6 +38,12 @@ import {
   deleteClanAvatar,
   uploadClanBanner,
   deleteClanBanner,
+  isGlobalModerator,
+  isGlobalAdmin,
+  takedownBody,
+  takedownClan,
+  unlockClan,
+  TAKEDOWN_FIELDS,
   type ClanDetail,
   type ClanMember,
   type ClanInvite,
@@ -128,12 +134,14 @@ function renderOverview(cl: ClanDetail): string {
     ? `<div class="wd-clan-desc">${esc(cl.description)}</div>`
     : "";
   const media = cl.viewer?.canManageSettings ? renderMedia() : "";
-  // Direct clan-chat access, restored for members. Only shown when the clan
-  // actually has a chat (chatId present) and the viewer is a member — the
-  // backend still enforces access. Click → openThread({ kind:"clan", ... }).
+  // Direct clan-chat access for members. ALWAYS rendered for a member — legacy
+  // clans (created before clan chats shipped) have `chatId: null`, which used
+  // to silently hide the button; the click handler now re-resolves the chat id
+  // (the backend detail read get-or-creates the clan chat). The kit `chat`
+  // icon replaces the raw 💬 prefix so the glyph follows the theme.
   const isMember = cl.viewer?.membershipStatus === "member";
-  const openChat = isMember && cl.chatId
-    ? `<div class="wd-clan-more">${button("💬 " + (t("clanOpenChat") || "Open clan chat"), { size: "sm", id: "clan-open-chat" })}</div>`
+  const openChat = isMember
+    ? `<div class="wd-clan-more">${button(t("clanOpenChat") || "Open clan chat", { size: "sm", variant: "primary", icon: "chat", id: "clan-open-chat" })}</div>`
     : "";
   return `
     <div class="wd-clan-head">
@@ -267,17 +275,62 @@ function renderSettings(cl: ClanDetail): string {
   );
 }
 
-/** Danger zone: Leave (any member) + Disband (owner only). */
+/** Danger zone: Leave (non-owner members — the backend 409s an owner leave
+ *  with "transfer ownership first", so don't offer it) + Disband (owner). */
 function renderDanger(cl: ClanDetail): string {
   const me = getActiveClient()?.me;
   const isOwner = cl.viewer?.role === "owner" || (!!me && cl.ownerId === me.id);
-  const leave = button(t("clanLeave") || "Leave clan", { size: "sm", variant: "danger", id: "clan-leave" });
+  const leave = isOwner
+    ? ""
+    : button(t("clanLeave") || "Leave clan", { size: "sm", variant: "danger", id: "clan-leave" });
   const disband = isOwner
     ? button(t("clanDisband") || "Disband clan", { size: "sm", variant: "danger", id: "clan-disband" })
     : "";
   return group(t("clanDanger") || "Danger zone", `<div class="wd-clan-danger">${leave}${disband}</div>`, {
     danger: true,
   });
+}
+
+/** Global-moderation section (GLOBAL moderator+ only; never shown to plain
+ *  clan staff). Takedown strips (and optionally locks) presentation fields;
+ *  Unlock releases an existing lock; Disband is offered to global admins on
+ *  clans they don't own (the owner path lives in the Danger zone). Gating here
+ *  is UX-only — the backend re-checks the caller's global role on every call. */
+function renderModeration(cl: ClanDetail): string {
+  const fieldChecks = TAKEDOWN_FIELDS.map(
+    (f) =>
+      `<label class="wd-clan-chk"><input type="checkbox" class="clan-mod-field" value="${esc(f)}"><span>${esc(f)}</span></label>`,
+  ).join("");
+  const takedown = `
+    <div class="wd-clan-modfields">${fieldChecks}</div>
+    <label class="wd-clan-fld"><span>${esc(t("clanModReason") || "Reason (required)")}</span>
+      <input id="clan-mod-reason" type="text" maxlength="1000"></label>
+    <label class="wd-clan-fld"><span>${esc(t("clanModAction") || "Action")}</span>
+      <select id="clan-mod-action">
+        <option value="strip">${esc(t("clanModStrip") || "Strip only")}</option>
+        <option value="strip_and_lock" selected>${esc(t("clanModStripLock") || "Strip and lock")}</option>
+      </select></label>
+    <div class="wd-clan-more">${button(t("clanModTakedown") || "Takedown", { size: "sm", variant: "danger", id: "clan-mod-takedown" })}</div>`;
+
+  const locked = cl.moderation?.lockedFields?.length
+    ? `<div class="wd-clan-modlocked">${esc((t("clanModLocked") || "Locked fields") + ": " + cl.moderation.lockedFields.join(", "))}${
+        cl.moderation.reason ? `<div class="wd-clan-modwhy">${esc(cl.moderation.reason)}</div>` : ""
+      }</div>
+      <div class="wd-clan-more">${button(t("clanModUnlock") || "Unlock", { size: "sm", icon: "unlock", id: "clan-mod-unlock" })}</div>`
+    : "";
+
+  const me = getActiveClient()?.me;
+  const isOwner = cl.viewer?.role === "owner" || (!!me && cl.ownerId === me.id);
+  const adminDisband =
+    isGlobalAdmin() && !isOwner
+      ? `<div class="wd-clan-more">${button(t("clanModDisband") || "Disband clan (admin)", { size: "sm", variant: "danger", id: "clan-mod-disband" })}</div>`
+      : "";
+
+  return group(
+    t("clanModTitle") || "Global moderation",
+    `${locked}${takedown}${adminDisband}`,
+    { danger: true, icon: "shield" },
+  );
 }
 
 /** Rank ordering for outranks-checks (higher = more privileged). Mirrors the
@@ -298,18 +351,32 @@ function rankOf(role: ClanRole | string): number {
 /** Compose the whole screen body: the advanced clanCard header + a role-gated
  *  segmented sub-nav (Overview / Members / Requests / Settings) with one
  *  sub-section shown at a time. Mirrors the profile-tab sub-nav idiom. */
+/** All sub-section ids — single source for render() + the two nav togglers. */
+const SUBSECTIONS = ["overview", "members", "requests", "settings", "moderation"] as const;
+
+/** Toggle the segmented sub-nav + the matching section to `seg`. */
+function activateSub(seg: string): void {
+  $("comm-clan-subnav")
+    ?.querySelectorAll<HTMLElement>("[data-seg]")
+    .forEach((x) => x.classList.toggle("is-on", x.dataset.seg === seg));
+  SUBSECTIONS.forEach((s) => $(`comm-clan-sub-${s}`)?.classList.toggle("is-on", s === seg));
+}
+
 function render(cl: ClanDetail): string {
   const v = cl.viewer;
   const isMember = v?.membershipStatus === "member";
+  const globalMod = isGlobalModerator();
 
   // Sub-nav items: Overview + Members always; Requests / Settings only when the
-  // viewer is permitted (backend still enforces every mutation regardless).
+  // viewer is permitted; Moderation for GLOBAL moderators+ on any clan
+  // (backend still enforces every mutation regardless).
   const segItems: Array<{ value: string; label: string }> = [
     { value: "overview", label: t("clanTabOverview") || "Overview" },
     { value: "members", label: t("clanTabMembers") || "Members" },
   ];
   if (v?.canManageMembers) segItems.push({ value: "requests", label: t("clanTabRequests") || "Requests" });
   if (v?.canManageSettings) segItems.push({ value: "settings", label: t("clanTabSettings") || "Settings" });
+  if (globalMod) segItems.push({ value: "moderation", label: t("clanTabModeration") || "Mod" });
 
   // Requests = invites + applications (admin only). Settings = the settings form
   // (admin only). The Danger zone (Leave / Disband) lives in the always-visible
@@ -318,6 +385,7 @@ function render(cl: ClanDetail): string {
   const requests = v?.canManageMembers ? renderInvites() + renderApplications() : "";
   const settingsBody = v?.canManageSettings ? renderSettings(cl) : "";
   const danger = isMember ? renderDanger(cl) : "";
+  const moderation = globalMod ? renderModeration(cl) : "";
 
   return `
     ${clanCard(cl, { context: "manage" })}
@@ -327,6 +395,7 @@ function render(cl: ClanDetail): string {
       <div class="wd-clan-sub" id="comm-clan-sub-members">${renderRoster(cl)}</div>
       <div class="wd-clan-sub" id="comm-clan-sub-requests">${requests}</div>
       <div class="wd-clan-sub" id="comm-clan-sub-settings">${settingsBody}</div>
+      <div class="wd-clan-sub" id="comm-clan-sub-moderation">${moderation}</div>
     </div>`;
 }
 
@@ -391,22 +460,29 @@ export function clanScreen(id: string): PanelScreen {
         // sections are already rendered, so switching needs no data fetch.
         const subnav = $("comm-clan-subnav");
         subnav?.querySelectorAll<HTMLElement>("[data-seg]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const seg = btn.dataset.seg || "overview";
-            subnav
-              .querySelectorAll<HTMLElement>("[data-seg]")
-              .forEach((x) => x.classList.toggle("is-on", x === btn));
-            ["overview", "members", "requests", "settings"].forEach((s) =>
-              $(`comm-clan-sub-${s}`)?.classList.toggle("is-on", s === seg),
-            );
-          });
+          btn.addEventListener("click", () => activateSub(btn.dataset.seg || "overview"));
         });
 
         // Open clan chat: drill into the thread screen for this clan's chat.
-        // Only rendered when chatId + membership are present (see renderOverview),
-        // so a plain null-safe wire is enough; re-attached on every load().
+        // Legacy clans may still carry `chatId: null` — re-fetch the detail
+        // once (the backend detail read get-or-creates the clan chat) before
+        // giving up. Rendered for every member; backend enforces access.
         $("clan-open-chat")?.addEventListener("click", () => {
-          if (clan?.chatId) openThread({ kind: "clan", chatId: clan.chatId }, `${clan.name} chat`);
+          void (async () => {
+            if (!clan) return;
+            let chatId = clan.chatId ?? null;
+            if (!chatId) {
+              try {
+                const fresh = await getClan(id);
+                chatId = fresh?.chatId ?? null;
+                if (fresh) clan = fresh;
+              } catch {
+                /* fall through to the toast below */
+              }
+            }
+            if (chatId) openThread({ kind: "clan", chatId }, `${clan.name} chat`);
+            else toast(t("clanOpenChat") || "Open clan chat", t("commActionFail") || "Action failed.");
+          })();
         });
 
         // Media (admin-only): file inputs upload the clan avatar / banner;
@@ -482,12 +558,7 @@ export function clanScreen(id: string): PanelScreen {
             memberTotal = next.total;
             if (clan) root.innerHTML = render(clan);
             wire();
-            $("comm-clan-subnav")
-              ?.querySelectorAll<HTMLElement>("[data-seg]")
-              .forEach((x) => x.classList.toggle("is-on", x.dataset.seg === "members"));
-            ["overview", "members", "requests", "settings"].forEach((s) =>
-              $(`comm-clan-sub-${s}`)?.classList.toggle("is-on", s === "members"),
-            );
+            activateSub("members");
           } catch {
             toast(t("commClanManage") || "Clan", t("commActionFail") || "Action failed.");
           }
@@ -617,7 +688,7 @@ export function clanScreen(id: string): PanelScreen {
             toast(t("clanLeave") || "Leave clan", t("commActionFail") || "Action failed.");
           }
         });
-        $("clan-disband")?.addEventListener("click", async () => {
+        const doDisband = async (): Promise<void> => {
           const ok = await confirmDlg(
             t("clanDisbandConfirm") || "Permanently disband this clan? This cannot be undone.",
             t("clanDisband") || "Disband clan",
@@ -630,7 +701,50 @@ export function clanScreen(id: string): PanelScreen {
           } catch {
             toast(t("clanDisband") || "Disband clan", t("commActionFail") || "Action failed.");
           }
+        };
+        $("clan-disband")?.addEventListener("click", () => void doDisband());
+
+        // Global moderation (moderator+ only; buttons exist only when the
+        // section rendered). Takedown validates locally via takedownBody —
+        // mirrors the backend checks so a bad form fails with a clear message.
+        $("clan-mod-takedown")?.addEventListener("click", async () => {
+          const fields = Array.from(
+            root.querySelectorAll<HTMLInputElement>(".clan-mod-field:checked"),
+          ).map((x) => x.value);
+          const reason = ($("clan-mod-reason") as HTMLInputElement | null)?.value ?? "";
+          const action = ($("clan-mod-action") as HTMLSelectElement | null)?.value ?? "strip_and_lock";
+          const body = takedownBody(fields, action, reason);
+          if (!body) {
+            toast(t("clanModTakedown") || "Takedown", t("clanModInvalid") || "Pick at least one field and give a reason.");
+            return;
+          }
+          const ok = await confirmDlg(
+            (t("clanModTakedownConfirm") || "Strip these fields?") + `\n${body.fields.join(", ")}`,
+            t("clanModTakedown") || "Takedown",
+          );
+          if (!ok) return;
+          try {
+            await takedownClan(id, body);
+            toast(t("clanModTakedown") || "Takedown", t("clanSaveOk") || "Saved.");
+          } catch {
+            toast(t("clanModTakedown") || "Takedown", t("commActionFail") || "Action failed.");
+          }
+          await load();
         });
+        $("clan-mod-unlock")?.addEventListener("click", async () => {
+          const locked = clan?.moderation?.lockedFields ?? [];
+          if (!locked.length) return;
+          try {
+            await unlockClan(id, locked);
+            toast(t("clanModUnlock") || "Unlock", t("clanSaveOk") || "Saved.");
+          } catch {
+            toast(t("clanModUnlock") || "Unlock", t("commActionFail") || "Action failed.");
+          }
+          await load();
+        });
+        // Same endpoint as the owner Disband — the backend allows global
+        // admin+ on any clan; this button only exists for them.
+        $("clan-mod-disband")?.addEventListener("click", () => void doDisband());
       };
 
       await load();

@@ -325,6 +325,11 @@ export function kitStyles(): string {
 .wd-clan-sub.is-on { display:block; }
 #comm-clan-subnav { margin:8px 0; }
 .wd-clan-media { display:flex; flex-direction:column; gap:6px; }
+/* ---- Clan page: global-moderation section (moderator+ only) ---- */
+.wd-clan-modfields { display:flex; flex-wrap:wrap; gap:2px 10px; margin-bottom:5px; }
+.wd-clan-modfields .wd-clan-chk { margin-bottom:0; }
+.wd-clan-modlocked { font-size:11px; margin-bottom:5px; }
+.wd-clan-modwhy { font-size:10px; color:var(--sub); word-break:break-word; }
 /* ---- Community browse + create-clan chooser (reuses .wd-list/.wd-row/.wd-clan-fld) ---- */
 .wd-comm-browse { display:flex; flex-direction:column; gap:6px; }
 .wd-comm-br-bar { display:flex; align-items:center; gap:6px; }
