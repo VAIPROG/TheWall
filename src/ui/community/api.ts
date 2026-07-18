@@ -596,7 +596,7 @@ export async function myClan(): Promise<ClanSummary | null> {
   const c = authedClient();
   if (!c) return null;
   const mine = await c.get<ClanSummary[]>("/clans/mine");
-  if (!mine.length) return null;
+  if (!mine?.length) return null; // client.get can yield null on 204/empty body
   const me = c.me?.id;
   return mine.find((cl) => cl.ownerId && cl.ownerId === me) ?? mine[0];
 }
