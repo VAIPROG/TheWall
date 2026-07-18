@@ -88,10 +88,13 @@ function msg(over: Partial<Message> = {}): Message {
   assert.ok(html.includes('data-action="report"'), "other's message: report present");
 }
 
-// --- moderator sees pin on others' messages ---
+// --- moderator sees pin + delete on others' messages (backend permits mod
+// deletion in clan/global/modmail chats; DMs never set canModerate) ---
 {
   const html = renderMessage(msg({ authorId: "u2" }), { meId: "u1", canModerate: true });
   assert.ok(html.includes('data-action="pin"'), "moderator sees pin");
+  assert.ok(html.includes('data-action="delete"'), "moderator sees delete on others' messages");
+  assert.ok(!html.includes('data-action="edit"'), "moderator still cannot edit others' messages");
 }
 
 // --- reactions: chips with counts + is-on when reactedByMe ---

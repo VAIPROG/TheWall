@@ -107,7 +107,9 @@ export function renderMessage(m: Message, ctx: RenderCtx = {}, labels: ActionLab
       : "";
 
   // Actions — minimal + clearly gated. Own (non-deleted) messages: edit/delete.
-  // Others' messages: report; plus pin when the viewer can moderate.
+  // Others' messages: report; moderators additionally get delete (the backend
+  // allows mod deletion in clan/global/modmail chats — DMs never set
+  // canModerate) and pin.
   const acts: string[] = [];
   if (!m.isDeleted) {
     if (isMine) {
@@ -115,6 +117,7 @@ export function renderMessage(m: Message, ctx: RenderCtx = {}, labels: ActionLab
       acts.push(actionBtn(m.id, "delete", L.delete));
     } else {
       acts.push(actionBtn(m.id, "report", L.report));
+      if (ctx.canModerate) acts.push(actionBtn(m.id, "delete", L.delete));
     }
     if (ctx.canModerate) acts.push(actionBtn(m.id, "pin", L.pin));
   }

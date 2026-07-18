@@ -11,6 +11,7 @@ import { card, button, loading, errorState, emptyState } from "../kit/primitives
 import { $, esc } from "../../helpers";
 import { t } from "../../i18n";
 import { toast } from "../../notify";
+import { promptDlg } from "../../dialog";
 import { attachMentions } from "../../mentions";
 import { getActiveClient } from "../../backend/index";
 import {
@@ -19,6 +20,8 @@ import {
   chatTitle,
   peerOf,
   getUsername,
+  getUserId,
+  getModmailThread,
   type ChatSummary,
   type ChatRef,
   type ClanSummary,
@@ -67,6 +70,17 @@ function rowTitle(c: ChatSummary): string {
   return chatTitle(c);
 }
 
+/** Whether the signed-in user is a global moderator+ (gates the modmail triage
+ *  affordance only — the backend enforces the real permission). Field name
+ *  drifted across backend versions; mirror settings-tab's defensive read. */
+function isGlobalMod(): boolean {
+  const me = getActiveClient()?.me as
+    | { globalRole?: string; global_role?: string; role?: string }
+    | undefined;
+  const r = String(me?.globalRole || me?.global_role || me?.role || "").toLowerCase();
+  return r === "moderator" || r === "admin" || r === "owner";
+}
+
 /** My-clan card body (or an empty-state when the user has no clan). Uses the
  *  shared advanced clan card (banner + avatar + stat chips); the card's
  *  `data-clan` root carries the id for the delegated open-clan click below. */
@@ -89,7 +103,13 @@ function renderChats(): string {
       return `<div class="wd-row wd-comm-chat" data-chat="${esc(c.id)}" role="button" tabindex="0"><span class="grow wd-comm-chat-label">${esc(rowTitle(c))}</span>${unread}</div>`;
     })
     .join("");
-  return `<div class="wd-list wd-list--scroll">${rows}</div>`;
+  // A modmail row only exists once the thread has been created server-side, so
+  // without this starter a user has NO way to first contact the staff. Only
+  // shown when we actually have data (chats non-empty ⇒ connected).
+  const starter = chats.some((c) => c.type === "modmail")
+    ? ""
+    : `<div class="wd-row wd-comm-chat" data-modmail="1" role="button" tabindex="0"><span class="grow wd-comm-chat-label">🛡 ${esc(t("commModmail"))} · ${esc(t("commModmailStart"))}</span></div>`;
+  return `<div class="wd-list wd-list--scroll">${rows}${starter}</div>`;
 }
 
 /** Resolve DM peer usernames for the rendered rows and patch their labels in
@@ -137,6 +157,7 @@ export function hubScreen(): PanelScreen {
         <div id="comm-myclan">${card(loading())}</div>
         <div class="wd-comm-chats-head">
           <span class="wd-legend grow">${esc(t("commChats"))}</span>
+          ${isGlobalMod() ? `<button class="wd-btn wd-btn--sm" id="comm-modmail-triage" type="button" title="${esc(t("commModmailTriageHint"))}">🛡 ${esc(t("commModmailTriage"))}</button>` : ""}
           <button class="wd-btn wd-btn--sm" id="comm-new-dm" type="button">✉ ${esc(t("commNewMessage"))}</button>
         </div>
         <div id="comm-dm-compose" class="wd-comm-dm-compose" hidden>
@@ -185,7 +206,15 @@ export function hubScreen(): PanelScreen {
       });
 
       // Chat rows → look the summary up by data-chat id and open its Thread.
+      // The modmail starter row (no summary behind it) opens the caller's own
+      // modmail thread — the backend get-or-creates it on first fetch.
       $("comm-chats")?.addEventListener("click", (e) => {
+        const starter = (e.target as HTMLElement).closest<HTMLElement>("[data-modmail]");
+        if (starter) {
+          teardownMentions();
+          openThread({ kind: "modmail" }, "🛡 " + t("commModmail"));
+          return;
+        }
         const row = (e.target as HTMLElement).closest<HTMLElement>("[data-chat]");
         const id = row?.dataset.chat;
         if (!id) return;
@@ -193,6 +222,31 @@ export function hubScreen(): PanelScreen {
         if (!c) return;
         teardownMentions(); // leaving the Hub → drop any open compose mentions
         openThread(refOf(c), rowTitle(c));
+      });
+
+      // Modmail triage (global mods only; hidden otherwise): username → that
+      // user's modmail thread, opened BY CONCRETE CHAT ID so replies land in
+      // the user's thread (POST /chats/global/modmail would post into the
+      // moderator's own thread instead).
+      $("comm-modmail-triage")?.addEventListener("click", () => {
+        void (async () => {
+          const name = await promptDlg(t("commModmailTriagePrompt"), "", t("commModmailTriage"));
+          const ref = (name ?? "").trim().replace(/^@+/, "");
+          if (!ref) return;
+          const uid = await getUserId(ref);
+          if (!uid) {
+            toast(t("commModmailTriage"), t("commDmUnknownUser"));
+            return;
+          }
+          try {
+            const detail = await getModmailThread(uid);
+            if (!detail?.id) throw new Error("no modmail thread");
+            teardownMentions();
+            openThread({ kind: "clan", chatId: detail.id }, `🛡 ${ref}`);
+          } catch {
+            toast(t("commModmailTriage"), t("commActionFail"));
+          }
+        })();
       });
 
       // Browse / Create both land in Browse (create is reached from its chooser).
@@ -218,10 +272,22 @@ export function hubScreen(): PanelScreen {
         $("comm-dm-suggest")?.remove();
       };
 
-      const openDm = () => {
+      const openDm = async (): Promise<void> => {
         const raw = (toInput?.value ?? "").trim().replace(/^@+/, "").trim();
         if (!raw) {
           toast(t("commNewMessage"), t("commDmUnknownUser"));
+          return;
+        }
+        // Pre-validate the target so a typo fails HERE with a clear message,
+        // not later as a failed send inside an empty thread. Also catch
+        // self-DMs (the backend 400s them anyway).
+        const uid = await getUserId(raw);
+        if (!uid) {
+          toast(t("commNewMessage"), t("commDmUnknownUser"));
+          return;
+        }
+        if (uid === getActiveClient()?.me?.id) {
+          toast(t("commNewMessage"), t("commDmSelf"));
           return;
         }
         // The DM send endpoint (/dm/{userRef}) get-or-creates the thread, so a
@@ -257,11 +323,11 @@ export function hubScreen(): PanelScreen {
         toInput?.focus();
       });
 
-      $("comm-dm-go")?.addEventListener("click", openDm);
+      $("comm-dm-go")?.addEventListener("click", () => void openDm());
       toInput?.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          openDm();
+          void openDm();
         }
       });
 
