@@ -154,11 +154,30 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
       void markRead(ref);
       void load();
 
+      // --- composer ---
+      const ta = $("comm-input") as HTMLTextAreaElement | null;
+      const sendBtn = $("comm-send");
+      const emojiBtn = $("comm-emoji");
+      const suggestEl = $("comm-mention-suggest");
+
+      // Mentions autocomplete. No clan roster endpoint handy here, so fall back
+      // to the usernames visible in the thread (attachMentions does this when
+      // fetchUsers returns []). Capture the handle so we can tear it down on
+      // unmount — attachMentions reparents suggestEl to document.body and binds
+      // window resize/scroll listeners; without destroy() those leak per open.
+      const mentions = (ta && suggestEl) ? attachMentions(ta, suggestEl, async () => []) : null;
+
       // --- 5s poll while mounted (self-clears on navigate-away) ---
       const tick = async (): Promise<void> => {
         const list = document.getElementById("comm-msgs");
         if (!list) {
-          stopPoll(); // screen popped/replaced → element gone → self-clear
+          // Screen popped/replaced → element gone → self-clear. Mirror the poll
+          // teardown for the mentions handle: destroy() drops the window
+          // listeners but does NOT remove the body-reparented suggest node, so
+          // remove() it too or orphans accumulate.
+          stopPoll();
+          mentions?.destroy();
+          suggestEl?.remove();
           return;
         }
         if (inFlight) return; // single-in-flight guard
@@ -170,12 +189,6 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
         }
       };
       pollTimer = setInterval(tick, 5000);
-
-      // --- composer ---
-      const ta = $("comm-input") as HTMLTextAreaElement | null;
-      const sendBtn = $("comm-send");
-      const emojiBtn = $("comm-emoji");
-      const suggestEl = $("comm-mention-suggest");
 
       const doSend = async (): Promise<void> => {
         if (!ta) return;
@@ -209,13 +222,6 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
           openEmojiPicker(ta, emojiBtn);
         }
       });
-
-      // Mentions autocomplete. No clan roster endpoint handy here, so fall back
-      // to the usernames visible in the thread (attachMentions does this when
-      // fetchUsers returns []).
-      if (ta && suggestEl) {
-        attachMentions(ta, suggestEl, async () => []);
-      }
 
       // --- delegated message actions (fresh container each mount) ---
       $("comm-msgs")?.addEventListener("click", (e) => {
