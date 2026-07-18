@@ -50,10 +50,11 @@ export function wireExtensionUI(win: HTMLElement): void {
   // community tab
   wireCommunity(win);
 
-  // social tab
   // Wall snapshot — fetch every tile from ws.filianislost.com/tiles, stitch
   // onto a brick-background canvas, downscale to chosen quality, download PNG.
-  $("btn-snapshot")!.addEventListener("click", () => {
+  // The control now lives in the Overlay pane (its old Social home was retired);
+  // wire it null-safe so a missing button never aborts the rest of wiring.
+  $("btn-snapshot")?.addEventListener("click", () => {
     const sel = $("snapshot-quality") as HTMLSelectElement | null;
     const q = (sel?.value || "high") as "low" | "medium" | "high";
     downloadWallSnapshot(q);

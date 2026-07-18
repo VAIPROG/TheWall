@@ -498,6 +498,15 @@ export function buildOverlayPane(): string {
                   </button>
                   <button class="wp-btn active-state" id="btn-lock">${t("unlock")}</button>
                   <button class="wp-btn" id="btn-toggle">${t("visibility")}</button>
+                  <!-- Wall snapshot (relocated here after the Social tab was retired). -->
+                  <div class="wp-group"><div class="wp-legend">${ic("dl")}${t("snapshot")}</div>
+                      <select id="snapshot-quality" class="wp-input" style="font:11px sans-serif">
+                          <option value="low">Low — 1500×1050 · ~30 tiles · fastest</option>
+                          <option value="medium">Medium — 3000×2100 · ~108 tiles</option>
+                          <option value="high" selected>High — 6000×4200 · ~408 tiles · best</option>
+                      </select>
+                      <button class="wp-btn" id="btn-snapshot">${ic("dl")}${t("snapshot")}</button>
+                  </div>
               </div><!-- /ov-root -->
 
               <!-- DRILL: Animation -->
