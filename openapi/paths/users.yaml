@@ -564,6 +564,13 @@ UserAvatarByRef:
     tags: [Users]
     summary: Get a user's avatar
     operationId: getUserAvatar
+    description: |
+      **Public** — no authentication required, reachable directly by an
+      `<img>` tag. For any resolvable user this **always** returns `200`,
+      serving the first available image in a fallback chain:
+      custom upload → linked Discord avatar → generated identicon.
+
+      All user profile `avatarUrl` fields now point at this endpoint.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/UserRefPath"
@@ -571,12 +578,18 @@ UserAvatarByRef:
       "200":
         description: Avatar image.
         content:
-          image/png:
+          image/webp:
             schema:
               type: string
               format: binary
-      "404":
-        $ref: "../components/responses/common.yaml#/NotFound"
+          image/svg+xml:
+            schema:
+              type: string
+              format: binary
+          image/gif:
+            schema:
+              type: string
+              format: binary
 
 UserSocialsByRef:
   get:

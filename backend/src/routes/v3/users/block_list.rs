@@ -36,7 +36,7 @@ pub async fn get_block_list(
     let mut users = Vec::new();
     for (uid,) in rows {
         if let Some(user) = load_user(&state.pool, uid).await? {
-            let avatar_url = avatar_url_for(&state.pool, uid).await?;
+            let avatar_url = avatar_url_for(&state.config, uid);
             users.push(UserProfilePublic {
                 id: user.id,
                 username: user.username,

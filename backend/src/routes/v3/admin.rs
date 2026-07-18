@@ -1153,3 +1153,174 @@ pub async fn admin_metrics(
     );
     Ok((headers, body))
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/v3/admin/users — search / filter / paginate
+//
+// The legacy `/api/admin/users` returns every user unfiltered. This is the V3
+// replacement: free-text search over username/display_name/external_id, an
+// optional exact global-role filter, and page/limit pagination.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminUserListQuery {
+    /// Free-text match against username / display_name / external_id.
+    pub q: Option<String>,
+    /// Exact global role filter (member|moderator|admin|owner).
+    pub role: Option<String>,
+    pub page: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+pub async fn admin_list_users(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<AdminUserListQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+
+    let limit = params.limit.unwrap_or(50).clamp(1, 200);
+    let page = params.page.unwrap_or(1).max(1);
+    let offset = (page - 1) * limit;
+    // Wrap the search term in wildcards for ILIKE; empty/whitespace → no filter.
+    let q = params
+        .q
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("%{s}%"));
+    let role = params
+        .role
+        .as_deref()
+        .filter(|s| matches!(*s, "member" | "moderator" | "admin" | "owner"))
+        .map(str::to_string);
+
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM users \
+         WHERE ($1::text IS NULL OR username ILIKE $1 OR display_name ILIKE $1 OR external_id ILIKE $1) \
+           AND ($2::text IS NULL OR global_role = $2)",
+    )
+    .bind(&q)
+    .bind(&role)
+    .fetch_one(&state.pool)
+    .await
+    .or_500()?;
+
+    let users = sqlx::query_as::<_, User>(
+        r#"SELECT id, external_id, username, discord_id, discord_username, role,
+                  global_role, source, preferred_lang, bio, social_links,
+                  telemetry_opt_in, created_at, updated_at, display_name
+             FROM users
+            WHERE ($1::text IS NULL OR username ILIKE $1 OR display_name ILIKE $1 OR external_id ILIKE $1)
+              AND ($2::text IS NULL OR global_role = $2)
+            ORDER BY created_at DESC
+            LIMIT $3 OFFSET $4"#,
+    )
+    .bind(&q)
+    .bind(&role)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.pool)
+    .await
+    .or_500()?;
+
+    Ok(Json(json!({
+        "users": users,
+        "page": page,
+        "limit": limit,
+        "total": total,
+    })))
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /api/v3/admin/messages/{messageId} — force-remove any message
+//
+// Soft-delete (tombstone) so thread integrity and existing rendering hold, but
+// reachable globally by a moderator without being a member of the chat. Content
+// is blanked at the wire layer for deleted rows, same as the per-chat delete.
+// ---------------------------------------------------------------------------
+
+pub async fn admin_delete_message(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(message_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
+
+    let result =
+        sqlx::query("UPDATE messages SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2 AND deleted_at IS NULL")
+            .bind(auth.user_id)
+            .bind(message_id)
+            .execute(&state.pool)
+            .await
+            .or_500()?;
+    if result.rows_affected() == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "message not found or already deleted".to_string(),
+        ));
+    }
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_delete_message",
+        "message",
+        &message_id.to_string(),
+        json!({}),
+    )
+    .await;
+
+    Ok(Json(json!({"ok": true, "message": "message deleted"})))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v3/admin/stats — JSON dashboard summary
+//
+// Complements `/api/v3/admin/metrics` (Prometheus text) with a small,
+// human/UI-friendly JSON snapshot of platform totals.
+// ---------------------------------------------------------------------------
+
+pub async fn admin_stats(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+
+    let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+    let clans: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM clans")
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+    let templates: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM templates")
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+    let messages: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE deleted_at IS NULL")
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+    let open_reports: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM reports WHERE status IN ('open', 'reviewing')")
+            .fetch_one(&state.pool)
+            .await
+            .or_500()?;
+    let active_sessions: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE expires_at > NOW()")
+            .fetch_one(&state.pool)
+            .await
+            .or_500()?;
+
+    Ok(Json(json!({
+        "users": users,
+        "clans": clans,
+        "templates": templates,
+        "messages": messages,
+        "openReports": open_reports,
+        "activeSessions": active_sessions,
+    })))
+}

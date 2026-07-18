@@ -817,3 +817,233 @@ ClansVerifyOwnership:
             schema: { type: object, properties: { id: { type: string, format: uuid } } }
       "403": { description: Not a clan admin, or guild ownership not verified. }
       "409": { description: Clan has no Discord server to verify. }
+
+# ── Clan roster & media (avatars, banners) ──────────────────────────────────
+ClansMine:
+  get:
+    tags: [Clans]
+    summary: List the caller's clans
+    operationId: listMyClans
+    description: |
+      Returns the clans the authenticated caller is an active member of, plus
+      any clans they own. Each entry uses the same shape as `GET /clans/{clanId}`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: The caller's active and owned clans.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/clans.yaml#/Clan"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+ClanAvatar:
+  get:
+    tags: [Clans]
+    summary: Get a clan's avatar
+    operationId: getClanAvatar
+    description: |
+      **Public** — no authentication required, reachable directly by an
+      `<img>` tag. Always returns `200`, serving the custom clan avatar or a
+      generated identicon fallback.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    responses:
+      "200":
+        description: Clan avatar image.
+        content:
+          image/webp:
+            schema:
+              type: string
+              format: binary
+          image/svg+xml:
+            schema:
+              type: string
+              format: binary
+  post:
+    tags: [Clans]
+    summary: Upload or replace a clan avatar
+    operationId: uploadClanAvatar
+    description: |
+      Sets the clan's custom avatar from a base64 `data:` URL. **Clan admin only.**
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [image]
+            properties:
+              image:
+                type: string
+                description: Image as a `data:` URL (e.g. `data:image/png;base64,...`).
+                example: "data:image/png;base64,iVBORw0KGgo..."
+    responses:
+      "200":
+        description: Clan avatar updated.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok, url, size]
+              properties:
+                ok: { type: boolean, example: true }
+                url: { type: string, description: URL of the stored avatar. }
+                size: { type: integer, description: Stored image size in bytes. }
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "413":
+        $ref: "../components/responses/common.yaml#/PayloadTooLarge"
+      "415":
+        description: Unsupported or undecodable image.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/ErrorResponse"
+  delete:
+    tags: [Clans]
+    summary: Remove a clan's custom avatar
+    operationId: deleteClanAvatar
+    description: Reverts to the generated identicon fallback. **Clan admin only.**
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Clan avatar removed.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok]
+              properties:
+                ok: { type: boolean, example: true }
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+ClanBanner:
+  get:
+    tags: [Clans]
+    summary: Get a clan's banner
+    operationId: getClanBanner
+    description: |
+      **Public** — no authentication required, reachable directly by an
+      `<img>` tag. Always returns `200`, serving the custom clan banner or a
+      generated gradient fallback.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    responses:
+      "200":
+        description: Clan banner image.
+        content:
+          image/webp:
+            schema:
+              type: string
+              format: binary
+          image/svg+xml:
+            schema:
+              type: string
+              format: binary
+  post:
+    tags: [Clans]
+    summary: Upload or replace a clan banner
+    operationId: uploadClanBanner
+    description: |
+      Sets the clan's custom banner from a base64 `data:` URL. **Clan admin only.**
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [image]
+            properties:
+              image:
+                type: string
+                description: Image as a `data:` URL (e.g. `data:image/png;base64,...`).
+                example: "data:image/png;base64,iVBORw0KGgo..."
+    responses:
+      "200":
+        description: Clan banner updated.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok, url, size]
+              properties:
+                ok: { type: boolean, example: true }
+                url: { type: string, description: URL of the stored banner. }
+                size: { type: integer, description: Stored image size in bytes. }
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "413":
+        $ref: "../components/responses/common.yaml#/PayloadTooLarge"
+      "415":
+        description: Unsupported or undecodable image.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/ErrorResponse"
+  delete:
+    tags: [Clans]
+    summary: Remove a clan's custom banner
+    operationId: deleteClanBanner
+    description: Reverts to the generated gradient fallback. **Clan admin only.**
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/ClanIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Clan banner removed.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok]
+              properties:
+                ok: { type: boolean, example: true }
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"

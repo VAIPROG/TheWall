@@ -9,7 +9,9 @@ mod invites;
 mod join;
 mod lifecycle;
 mod list;
+mod media;
 mod members;
+mod mine;
 mod report;
 mod restrictions;
 mod settings;
@@ -25,7 +27,12 @@ pub use invites::{create_invite, list_invites, revoke_invite};
 pub use join::{apply_for_role, join_clan};
 pub use lifecycle::{disband_clan, leave_clan};
 pub use list::list_clans;
+pub use media::{
+    delete_clan_avatar, delete_clan_banner, get_clan_avatar, get_clan_banner, upload_clan_avatar,
+    upload_clan_banner,
+};
 pub use members::{get_member, kick_member, list_members, update_member_role};
+pub use mine::get_my_clans;
 pub use report::report_clan;
 pub use restrictions::list_clan_restrictions;
 pub use settings::{get_settings, update_settings};

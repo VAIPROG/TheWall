@@ -7,6 +7,7 @@ pub mod chat;
 pub mod clan;
 pub mod dm;
 pub mod i18n;
+pub mod identicon;
 pub mod meta;
 pub mod notifications;
 pub mod stats;

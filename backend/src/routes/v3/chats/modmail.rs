@@ -49,6 +49,18 @@ pub async fn get_modmail(
         if !role.is_moderator() {
             return Err((StatusCode::FORBIDDEN, "moderator required".to_string()));
         }
+        // Reading another user's modmail is a privileged action — record it.
+        if target != auth.user_id {
+            let _ = crate::routes::v3::utils::audit::log_action(
+                &state.pool,
+                auth.user_id,
+                "modmail_viewed",
+                "user",
+                &target.to_string(),
+                serde_json::json!({}),
+            )
+            .await;
+        }
         target
     } else {
         auth.user_id

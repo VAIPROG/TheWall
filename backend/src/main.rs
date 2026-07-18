@@ -199,6 +199,12 @@ async fn main() {
         .route("/api/me/avatar", put(routes::avatar::update_my_avatar))
         .route("/api/me/avatar", delete(routes::avatar::delete_my_avatar))
         .route("/api/avatar", get(routes::avatar::get_avatar))
+        // Advanced V3 avatar path: public (reachable by <img>), resolves ref →
+        // custom → Discord → identicon, never 404s.
+        .route(
+            "/api/v3/users/{user_ref}/avatar",
+            get(routes::avatar::get_user_avatar_v3),
+        )
         .route(
             "/api/discord/avatar",
             get(routes::avatar::get_discord_avatar),
@@ -206,6 +212,23 @@ async fn main() {
         .route(
             "/api/discord/avatar/cache",
             delete(routes::avatar::clear_discord_cache),
+        )
+        // --- clan avatar + banner: public GET serve (identicon/gradient
+        // fallback, reachable by <img>) + clan-admin upload/delete. All on the
+        // legacy router so GET is unauthenticated while POST/DELETE enforce auth
+        // via the AuthUser extractor (same pattern as /api/me/avatar). The
+        // deprecation middleware skips /api/v3, so these are unaffected. ------
+        .route(
+            "/api/v3/clans/{id}/avatar",
+            get(routes::v3::clans::get_clan_avatar)
+                .post(routes::v3::clans::upload_clan_avatar)
+                .delete(routes::v3::clans::delete_clan_avatar),
+        )
+        .route(
+            "/api/v3/clans/{id}/banner",
+            get(routes::v3::clans::get_clan_banner)
+                .post(routes::v3::clans::upload_clan_banner)
+                .delete(routes::v3::clans::delete_clan_banner),
         )
         // --- misc: leaderboard, chat relay, i18n bundles, server meta -------
         .route("/api/stats/leaderboard", get(routes::stats::leaderboard))
@@ -703,6 +726,11 @@ async fn main() {
             "/api/v3/clans/new",
             post(routes::v3::clans::create_clan),
         )
+        // Caller's own clans — resolved directly instead of scanning the list.
+        .route(
+            "/api/v3/clans/mine",
+            get(routes::v3::clans::get_my_clans),
+        )
         .route(
             "/api/v3/clans/{id}",
             get(routes::v3::clans::get_clan).patch(routes::v3::clans::update_clan),
@@ -813,6 +841,9 @@ async fn main() {
         .route("/api/v3/telemetry/health", get(routes::v3::telemetry::health_check))
         .route("/api/v3/telemetry/metrics", get(routes::v3::telemetry::get_metrics))
         // --- V3 admin: user management + audit --------------------------------
+        .route("/api/v3/admin/users", get(routes::v3::admin::admin_list_users))
+        .route("/api/v3/admin/stats", get(routes::v3::admin::admin_stats))
+        .route("/api/v3/admin/messages/{message_id}", delete(routes::v3::admin::admin_delete_message))
         .route("/api/v3/admin/users/{user_ref}", get(routes::v3::admin::admin_get_user).patch(routes::v3::admin::admin_update_user))
         .route("/api/v3/admin/users/{user_ref}/ban", post(routes::v3::admin::admin_ban_user).delete(routes::v3::admin::admin_unban_user))
         .route("/api/v3/admin/users/{user_ref}/mute", post(routes::v3::admin::admin_mute_user).delete(routes::v3::admin::admin_unmute_user))

@@ -31,7 +31,7 @@ pub async fn get_me(
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
 
-    let avatar_url = avatar_url_for(&state.pool, auth.user_id).await?;
+    let avatar_url = avatar_url_for(&state.config, auth.user_id);
 
     let site_identities: Vec<SiteIdentity> = sqlx::query_as(
         "SELECT id, account_id, source, external_id, site_username, linked_at, last_seen_at
@@ -189,7 +189,7 @@ pub async fn get_user_by_ref(
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
 
-    let avatar_url = avatar_url_for(&state.pool, target_id).await?;
+    let avatar_url = avatar_url_for(&state.config, target_id);
 
     // Primary clan: the active membership with the highest role, or None.
     let clan_id: Option<Uuid> = sqlx::query_scalar(
@@ -253,18 +253,14 @@ pub(crate) async fn load_user(
     .or_500()
 }
 
-pub(crate) async fn avatar_url_for(
-    pool: &sqlx::PgPool,
-    user_id: Uuid,
-) -> Result<Option<String>, (StatusCode, String)> {
-    let url: Option<String> = sqlx::query_scalar(
-        "SELECT image FROM avatars WHERE user_id = $1",
-    )
-    .bind(user_id)
-    .fetch_optional(pool)
-    .await
-    .or_500()?;
-    Ok(url)
+/// Every profile points at the stable avatar endpoint, which serves the
+/// custom → Discord → identicon fallback chain. It never returns `None`, so a
+/// profile always carries a working, cacheable avatar URL rather than a heavy
+/// inline data URL (or nothing at all when no custom avatar is set).
+pub(crate) fn avatar_url_for(config: &crate::config::AppConfig, user_id: Uuid) -> Option<String> {
+    Some(format!(
+        "{}/api/v3/users/{}/avatar",
+        crate::routes::v3::templates::render::public_base_url(config),
+        user_id
+    ))
 }
-
-// V3 uses a deterministic generated avatar URL when no custom avatar is set.

@@ -2,6 +2,63 @@
 # ADMINS — User Management Operations
 # ══════════════════════════════════════════════════════════════════════
 
+AdminUsers:
+  get:
+    tags: [Admins]
+    summary: List / search users
+    operationId: adminListUsers
+    description: |
+      Paginated, filterable list of all users. Global `admin` or higher.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: q
+        in: query
+        schema:
+          type: string
+        description: Free-text match against username, display name, or external id.
+      - name: role
+        in: query
+        schema:
+          type: string
+          enum: [member, moderator, admin, owner]
+        description: Filter by global role.
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Paginated user list.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [users, page, limit, total]
+              properties:
+                users:
+                  type: array
+                  items:
+                    $ref: "../components/schemas/users.yaml#/User"
+                page: { type: integer }
+                limit: { type: integer }
+                total: { type: integer }
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
 AdminUserById:
   get:
     tags: [Admins]
