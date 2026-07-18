@@ -277,5 +277,28 @@ export function kitStyles(): string {
 /* Composer: textarea + emoji + send. */
 .wd-comm-composer { display:flex; align-items:flex-end; gap:6px; flex:none; }
 .wd-comm-input { flex:1; resize:vertical; min-height:34px; }
+
+/* ---- Clan management drill-in (reuses .wd-tpl-detail / .wd-kv* / .wd-list) ---- */
+.wd-clan-head { display:flex; flex-direction:column; gap:4px; }
+.wd-clan-via { font-size:10px; color:var(--sub); align-self:center; }
+.wd-clan-desc { font-size:11px; color:var(--sub); word-break:break-word; }
+/* Roster rows: avatar + name/badge + inline role select & kick. */
+.wd-clan-member .wd-clan-av { border-radius:50%; object-fit:cover; }
+.wd-clan-mctl { display:flex; align-items:center; gap:4px; flex:none; }
+.wd-clan-role { font:10px "MS Sans Serif",sans-serif; }
+/* Invites: mono code + meta. */
+.wd-clan-code { font:11px monospace; user-select:all; }
+.wd-clan-imeta { font-size:10px; color:var(--sub); white-space:nowrap; }
+/* Applications: applicant + optional message. */
+.wd-clan-app { align-items:flex-start; }
+.wd-clan-appwho { font-weight:bold; }
+.wd-clan-appmsg { font-size:10px; color:var(--sub); white-space:pre-wrap; word-break:break-word; }
+/* Settings form fields. */
+.wd-clan-fld { display:flex; flex-direction:column; gap:2px; font-size:10px; color:var(--sub); margin-bottom:5px; }
+.wd-clan-fld > input, .wd-clan-fld > textarea, .wd-clan-fld > select { font:11px "MS Sans Serif",Tahoma,sans-serif; width:100%; box-sizing:border-box; }
+.wd-clan-chk { display:flex; align-items:center; gap:5px; font-size:11px; margin-bottom:5px; }
+/* Trailing action row (Load more / Save / Create invite). */
+.wd-clan-more { margin-top:5px; }
+.wd-clan-danger { display:flex; gap:6px; flex-wrap:wrap; }
 `;
 }

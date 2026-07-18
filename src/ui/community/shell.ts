@@ -8,6 +8,7 @@ import { PanelStack, type PanelScreen } from "../kit/panel-stack";
 import { $ } from "../../helpers";
 import { hubScreen } from "./hub";
 import { threadScreen } from "./thread";
+import { clanScreen } from "./clan";
 import type { ChatRef } from "./api";
 
 // Re-export the real ChatRef (owned by api.ts) so existing importers of the
@@ -29,11 +30,7 @@ export function makeStackScreens(): StackScreens {
   return {
     hub: hubScreen,
     thread: (ref: ChatRef, title: string) => threadScreen(ref, title),
-    clan: (_id: string) => ({
-      title: "Clan",
-      render: () => `<div id="comm-clan" class="wd-stub"></div>`,
-      onMount: () => {},
-    }),
+    clan: (id: string) => clanScreen(id),
     browse: () => ({
       title: "Browse",
       render: () => `<div id="comm-browse" class="wd-stub"></div>`,
