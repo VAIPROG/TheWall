@@ -97,6 +97,32 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
       let msgs: Message[] = [];
       let canModerate = false;
       let inFlight = false;
+      // The CONCRETE chat id (read/react/edit/pin routes are Uuid-only). Clan
+      // refs carry it; global/DM/modmail refs resolve it from the first loaded
+      // (or sent) message. Null until then — read-state simply waits.
+      let cid: string | null = ref.kind === "clan" ? ref.chatId : null;
+      // Newest message id we've already marked read — avoids re-POSTing
+      // /read on every 5s poll when nothing changed.
+      let lastReadMsgId: string | null = null;
+
+      // Global chat + own-modmail moderation is gated on the caller's GLOBAL
+      // role (clan threads derive it from the chat detail below). Field name
+      // drifted across backend versions — mirror settings-tab's defensive read.
+      const me = c?.me as { globalRole?: string; global_role?: string; role?: string } | undefined;
+      const globalRole = String(me?.globalRole || me?.global_role || me?.role || "").toLowerCase();
+      if (ref.kind === "global" || ref.kind === "modmail") {
+        canModerate = globalRole === "moderator" || globalRole === "admin" || globalRole === "owner";
+      }
+
+      /** Resolve `cid` from the loaded messages and mark the thread read once
+       *  per new newest-message. markRead is best-effort (never throws). */
+      const syncRead = (): void => {
+        if (!cid && msgs.length) cid = msgs[msgs.length - 1].chatId;
+        const newest = msgs.length ? msgs[msgs.length - 1].id : null;
+        if (!cid || !newest || newest === lastReadMsgId) return;
+        lastReadMsgId = newest;
+        void markRead(cid, newest);
+      };
 
       // --- render one batch into #comm-msgs, preserving scroll-at-bottom ---
       const paint = (list: Message[]): void => {
@@ -117,29 +143,31 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
       const load = async (): Promise<void> => {
         const box = $("comm-msgs");
         if (!box) return;
+        // Not connected → error state with an in-place retry (the user may
+        // connect from Settings and come back; never reload the whole page).
+        if (!getActiveClient()?.token) {
+          box.innerHTML = `${errorState(t("commConnectFirst"))}<div class="wd-comm-actions" style="margin-top:6px"><button class="wd-btn" id="comm-retry" type="button">${esc(t("commRetry"))}</button></div>`;
+          $("comm-retry")?.addEventListener("click", () => void load());
+          return;
+        }
         try {
           msgs = await listMessages(ref);
         } catch {
+          // A transient poll failure must not wipe a thread the user is
+          // reading — only surface the error state when nothing is on screen.
+          if (msgs.length) return;
           box.innerHTML = `${errorState(t("commLoadErr"))}<div class="wd-comm-actions" style="margin-top:6px"><button class="wd-btn" id="comm-retry" type="button">${esc(t("commRetry"))}</button></div>`;
           $("comm-retry")?.addEventListener("click", () => void load());
           return;
         }
         paint(msgs);
+        syncRead();
       };
 
-      // Not connected → error state with retry (backend calls no-op otherwise).
-      if (!c) {
-        const box = $("comm-msgs");
-        if (box) {
-          box.innerHTML = `${errorState(t("commLoadErr"))}<div class="wd-comm-actions" style="margin-top:6px"><button class="wd-btn" id="comm-retry" type="button">${esc(t("commRetry"))}</button></div>`;
-          $("comm-retry")?.addEventListener("click", () => location.reload());
-        }
-        return;
-      }
-
-      // Derive moderation ability for clan threads (cheap-ish; best-effort).
-      // DM/modmail: leave false. Backend enforces regardless — this only gates
-      // which buttons we bother to show.
+      // Derive moderation ability for by-id threads from the chat detail (clan
+      // chats → clan role; a mod-opened modmail thread → viewer.role
+      // "moderator"). DM: stays false. Backend enforces regardless — this only
+      // gates which buttons we bother to show.
       if (ref.kind === "clan") {
         void getChat(ref.chatId)
           .then((detail) => {
@@ -150,8 +178,7 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
           .catch(() => {});
       }
 
-      // Initial: mark read + first load.
-      void markRead(ref);
+      // Initial load (marks read once messages + the concrete id are known).
       void load();
 
       // --- composer ---
@@ -195,10 +222,16 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
         const text = ta.value.trim();
         if (!text) return; // guard empty / whitespace-only
         try {
-          await sendMessage(ref, text);
+          const sent = await sendMessage(ref, text);
+          // First message in a fresh global/DM/modmail thread: the response
+          // carries the concrete chat id the ref lacks.
+          if (!cid && sent?.chatId) cid = sent.chatId;
           ta.value = ""; // clear only on success
-          await load();
-          void markRead(ref);
+          await load(); // paints + syncRead()s
+          // The sender always wants to see their message land — jump to the
+          // bottom even if they had scrolled up.
+          const box = $("comm-msgs");
+          if (box) box.scrollTop = box.scrollHeight;
         } catch {
           // Keep the textarea text so the user doesn't lose their message.
           toast(t("commSend"), t("commSendFail"));
@@ -235,7 +268,9 @@ export function threadScreen(ref: ChatRef, title: string): PanelScreen {
           const isOn = reactBtn.classList.contains("is-on");
           const m = msgs.find((x) => x.id === mid);
           if (!m) return;
-          void react(cidFor(ref, m), mid, emoji, !isOn).then(() => load());
+          void react(cidFor(ref, m), mid, emoji, !isOn)
+            .then(() => load())
+            .catch(() => toast(t("commThread"), t("commActionFail")));
           return;
         }
 

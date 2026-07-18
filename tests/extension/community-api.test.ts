@@ -7,7 +7,14 @@
  * Run: bun tests/extension/community-api.test.ts
  */
 import assert from "node:assert";
-import { chatEndpoints, chatTitle, peerOf, type ChatSummary } from "../../src/ui/community/api";
+import {
+  chatEndpoints,
+  chatTitle,
+  peerOf,
+  chronological,
+  type ChatSummary,
+  type Message,
+} from "../../src/ui/community/api";
 import { clanAvatarUrl, clanBannerUrl } from "../../src/ui/community/api";
 
 // ── chatEndpoints: clan ──────────────────────────────────────────────────────
@@ -69,12 +76,57 @@ assert.strictEqual(chatTitle(summary({ type: "dm", dmKey: "id1:id2" })), "Direct
 assert.ok(chatTitle(summary({ type: "modmail" })).includes("Modmail"));
 assert.ok(chatTitle(summary({ type: "global" })).includes("Global"));
 
-// ── chatEndpoints: global (distinct from modmail) ────────────────────────────
+// ── chatEndpoints: global (distinct from modmail; list/send take the `global`
+// selector, but read is Uuid-only on the backend so it must be undefined —
+// markRead uses the concrete chat id resolved from a loaded message) ─────────
 {
   const g = chatEndpoints({ kind: "global" });
   assert.strictEqual(g.list, "/chats/global/messages");
   assert.strictEqual(g.send, "/chats/global/messages");
-  assert.strictEqual(g.read, "/chats/global/read");
+  assert.strictEqual(g.read, undefined);
+}
+
+// ── chronological: normalises newest-first API pages to oldest→newest ────────
+{
+  const m = (id: string, createdAt: string): Message =>
+    ({
+      id,
+      chatId: "c1",
+      content: id,
+      editCount: 0,
+      isSystem: false,
+      isDeleted: false,
+      version: 1,
+      createdAt,
+      reactions: [],
+    }) as Message;
+  // Newest-first input (what GET /chats/{id|global}/messages returns).
+  const desc = [
+    m("m3", "2026-07-18T12:02:00Z"),
+    m("m2", "2026-07-18T12:01:00Z"),
+    m("m1", "2026-07-18T12:00:00Z"),
+  ];
+  assert.deepStrictEqual(
+    chronological(desc).map((x) => x.id),
+    ["m1", "m2", "m3"],
+    "DESC page → chronological",
+  );
+  // Already-chronological input (ChatDetail.recentMessages) is a no-op.
+  const asc = [...desc].reverse();
+  assert.deepStrictEqual(
+    chronological(asc).map((x) => x.id),
+    ["m1", "m2", "m3"],
+    "ASC input unchanged",
+  );
+  // Does not mutate its input.
+  assert.strictEqual(desc[0].id, "m3", "input array not mutated");
+  // Equal timestamps → deterministic id tiebreak.
+  const tie = [m("b", "2026-07-18T12:00:00Z"), m("a", "2026-07-18T12:00:00Z")];
+  assert.deepStrictEqual(
+    chronological(tie).map((x) => x.id),
+    ["a", "b"],
+    "timestamp tie broken by id",
+  );
 }
 
 // ── peerOf: the uuid in the dm_key that isn't me ─────────────────────────────

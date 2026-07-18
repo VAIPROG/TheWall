@@ -225,6 +225,10 @@ export interface SiteSuggestion {
 // PURE core (unit-tested — no client, no DOM, no network)
 // ---------------------------------------------------------------------------
 
+/** How a thread is addressed. `clan` is really "by concrete chat id" — the
+ *  generic `/chats/{id}/...` routes work for ANY chat the caller can access,
+ *  which is also how a global moderator opens (and replies into) another
+ *  user's modmail thread from the triage flow. */
 export type ChatRef =
   | { kind: "clan"; chatId: string }
   | { kind: "dm"; userRef: string }
@@ -232,8 +236,11 @@ export type ChatRef =
   | { kind: "global" };
 
 /** Resolve a ChatRef to its V3 message endpoints (pure — unit-tested).
- *  Clan and global chats have a distinct `/read` endpoint; DM/modmail read-state
- *  is handled server-side on fetch, so `read` is undefined for those. */
+ *  Only clan refs expose a `read` path: the backend read route (`read.rs`) is
+ *  `Path<Uuid>` — it does NOT accept the literal `global` selector (400), and
+ *  DM/modmail have no id on the ref at all. Read-state for every kind is
+ *  handled by {@link markRead} with the CONCRETE chat id (taken from a loaded
+ *  message / detail), which the read route accepts for any accessible chat. */
 export function chatEndpoints(ref: ChatRef): { list: string; send: string; read?: string } {
   if (ref.kind === "clan")
     return {
@@ -246,16 +253,29 @@ export function chatEndpoints(ref: ChatRef): { list: string; send: string; read?
       list: `/dm/${encodeURIComponent(ref.userRef)}`,
       send: `/dm/${encodeURIComponent(ref.userRef)}`,
     };
-  // The site-wide global chat is a first-class kind with its own /read — it is
-  // NOT modmail (conflating them opened the modmail endpoint for a global row).
+  // The site-wide global chat is a first-class kind — it is NOT modmail
+  // (conflating them opened the modmail endpoint for a global row). The list
+  // and send routes take the `global` selector; `/chats/global/read` would 400
+  // (Uuid-only route), so no `read` here — markRead uses the resolved id.
   if (ref.kind === "global")
     return {
       list: `/chats/global/messages`,
       send: `/chats/global/messages`,
-      read: `/chats/global/read`,
     };
-  // modmail (fallback): fixed path, read-state server-managed on fetch.
+  // modmail (fallback): fixed path, thread get-or-created server-side on fetch.
   return { list: `/chats/global/modmail`, send: `/chats/global/modmail` };
+}
+
+/** Sort messages oldest→newest (pure — unit-tested). The `/messages` list
+ *  endpoints return newest-first (created_at DESC) while ChatDetail
+ *  `recentMessages` is already chronological; normalising here lets the thread
+ *  render + append in one order regardless of which endpoint fed it. Ties fall
+ *  back to id so the order is deterministic. Returns a new array. */
+export function chronological(list: Message[]): Message[] {
+  return [...list].sort(
+    (a, b) =>
+      a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  );
 }
 
 /** The peer's user id in a DM `dmKey` ("uuidA:uuidB", canonical) — the one that
@@ -315,22 +335,27 @@ export async function getChat(id: string): Promise<ChatDetail | null> {
   return c.get<ChatDetail>(`/chats/${encodeURIComponent(id)}`);
 }
 
-/** List messages for a chat (reverse-chronological). For clan chats the list
- *  path takes before/after/limit cursors; DM/modmail return a ChatDetailView,
- *  from which we surface `recentMessages`. */
+/** List messages for a chat, normalised to CHRONOLOGICAL order (oldest→newest).
+ *  Clan AND global refs hit `/chats/{id|global}/messages`, which returns a
+ *  `Message[]` array (newest-first) and takes before/after/limit cursors.
+ *  DM/modmail return a ChatDetailView OBJECT, from which we surface
+ *  `recentMessages`. (Global previously fell into the detail path — the array
+ *  has no `.recentMessages`, so the global chat always looked empty and a
+ *  just-sent message "vanished" on reload.) */
 export async function listMessages(ref: ChatRef, opts: ListMessagesOpts = {}): Promise<Message[]> {
   const c = authedClient();
   if (!c) return [];
   const { list } = chatEndpoints(ref);
-  if (ref.kind === "clan") {
-    return c.get<Message[]>(list, {
+  if (ref.kind === "clan" || ref.kind === "global") {
+    const page = await c.get<Message[]>(list, {
       before: opts.before,
       after: opts.after,
       limit: opts.limit,
     });
+    return chronological(page ?? []);
   }
   const detail = await c.get<ChatDetail>(list);
-  return detail?.recentMessages ?? [];
+  return chronological(detail?.recentMessages ?? []);
 }
 
 export async function sendMessage(ref: ChatRef, content: string, replyToId?: string): Promise<Message> {
@@ -339,14 +364,19 @@ export async function sendMessage(ref: ChatRef, content: string, replyToId?: str
   return c.post<Message>(chatEndpoints(ref).send, { content, replyToId });
 }
 
-/** Mark a chat read. Only clan chats expose a `/read` endpoint; DM/modmail
- *  no-op (read-state is server-managed on fetch). */
-export async function markRead(ref: ChatRef, messageId?: string): Promise<void> {
+/** Mark a chat read by its CONCRETE chat id (`POST /chats/{uuid}/read` — the
+ *  backend route is Uuid-only, so the caller must resolve the real id first;
+ *  for non-clan refs it comes off a loaded message's `chatId`). Best-effort:
+ *  read-state is never worth surfacing an error (or leaking an unhandled
+ *  rejection from a fire-and-forget call site), so failures are swallowed. */
+export async function markRead(chatId: string, messageId?: string): Promise<void> {
   const c = authedClient();
-  if (!c) return;
-  const { read } = chatEndpoints(ref);
-  if (!read) return;
-  await c.post(read, { messageId });
+  if (!c || !chatId) return;
+  try {
+    await c.post(`/chats/${encodeURIComponent(chatId)}/read`, { messageId });
+  } catch {
+    /* best-effort */
+  }
 }
 
 export async function editMessage(
@@ -613,6 +643,35 @@ export async function getUsername(ref: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Resolve a user id from a ref (username / `@name` / uuid) via
+ *  `GET /users/{ref}` (`resolve_user_ref` on the backend). Best-effort: null
+ *  when not connected, unknown user, or any error — callers use it to
+ *  pre-validate DM targets and to open modmail triage. */
+export async function getUserId(ref: string): Promise<string | null> {
+  const c = authedClient();
+  if (!c || !ref) return null;
+  try {
+    const u = await c.get<{ id?: string }>(`/users/${encodeURIComponent(ref)}`);
+    return u?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch a modmail thread detail. With no argument this is the caller's own
+ *  thread (get-or-created server-side). Global moderators may pass a target
+ *  user id to read that user's thread — the backend query param is snake_case
+ *  `user_id` (ModmailQuery has no camelCase rename; confirmed in modmail.rs).
+ *  NOTE for repliers: `POST /chats/global/modmail` always posts into the
+ *  CALLER's own thread, so a moderator must reply via the generic
+ *  `/chats/{detail.id}/messages` route instead (the thread screen does this
+ *  when opened by concrete chat id). */
+export async function getModmailThread(userId?: string): Promise<ChatDetail | null> {
+  const c = authedClient();
+  if (!c) return null;
+  return c.get<ChatDetail>("/chats/global/modmail", userId ? { user_id: userId } : undefined);
 }
 
 /** Public avatar URL for a user id/ref, served by the v6.4.0 endpoint that never
