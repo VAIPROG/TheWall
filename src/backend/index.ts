@@ -21,6 +21,8 @@ export * from "./feed";
 export * from "./telemetry";
 export * from "./moderation";
 export * from "./mailbox";
+export * from "./link-status";
+export * from "./conn-status";
 export * from "./legacy";
 export * from "./logger";
 export { getMe, setMe } from "./multi";
