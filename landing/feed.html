@@ -84,7 +84,7 @@
 
       <!-- PHASE 1 TIMELAPSE -->
       <div class="group" style="border-color:var(--accent)">
-        <div class="legend"><span>★ </span><span data-i18n="feed.phase1_title">Phase 1 — Wall Timelapse</span></div>
+        <div class="legend"><span data-icon="star"></span> <span data-i18n="feed.phase1_title">Phase 1 — Wall Timelapse</span></div>
         <p data-i18n="feed.phase1_body">The first phase of The Wall is done. Watch the whole event unfold — rebuilt from 5,492 full-resolution snapshots — as a cinematic, MS-DOS-flavoured timelapse. (The full cut lands on YouTube later.)</p>
         <p style="margin-top:8px">
           <a class="btn primary" href="/phase1-timelapse.html" style="display:inline-block">▶ <span data-i18n="feed.phase1_cta">Watch the Phase 1 Timelapse →</span></a>
@@ -130,7 +130,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({"&":"&amp;",
 function currentLang(){ return document.documentElement.lang || 'en'; }
 function fmtDate(s){ try { return new Date(s).toLocaleString(); } catch { return s; } }
 function t(k){ return (window.wd_t ? wd_t(k) : k); }
-function stateLoading(el){ el.innerHTML = '<div class="state95" style="grid-column:1/-1"><span class="hourglass">⌛</span>'+esc(t('common.loading'))+'</div>'; }
+function stateLoading(el){ el.innerHTML = '<div class="state95" style="grid-column:1/-1"><span class="hourglass">'+wd.icon('hourglass')+'</span>'+esc(t('common.loading'))+'</div>'; }
 function stateEmpty(el, key){ el.innerHTML = '<div class="state95" style="grid-column:1/-1">'+esc(t(key))+'</div>'; }
 function stateError(el){ el.innerHTML = '<div class="state95 error" style="grid-column:1/-1">'+esc(t('feed.offline'))+'</div>'; }
 
@@ -195,7 +195,7 @@ async function loadSnapshots(){
         const sz = esc(g.size);
         const parts = [];
         if (g.discord_url)  parts.push(`<a href="${esc(g.discord_url)}" target="_blank">⬇ ${sz}</a>`);
-        if (g.telegram_url) parts.push(`<a href="${esc(g.telegram_url)}" target="_blank">📡 ${sz}</a>`);
+        if (g.telegram_url) parts.push(`<a href="${esc(g.telegram_url)}" target="_blank">${wd.icon("antenna")} ${sz}</a>`);
         return parts.join(' ');
       }).join(' · ');
       return `
@@ -248,7 +248,7 @@ async function loadLeaderboard(){
     if (!r.ok) throw new Error('HTTP '+r.status);
     const list = await r.json();
     if (!Array.isArray(list) || !list.length){ stateEmpty(box, 'feed.no_leaderboard'); return; }
-    const medal = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1);
+    const medal = i => i < 3 ? `<span class="medal-${i+1}">${wd.icon('medal'+(i+1))}</span>` : (i+1);
     box.innerHTML = `
       <table class="table95">
         <thead><tr><th style="width:34px">#</th><th>${esc(t('feed.lb_user'))}</th><th style="width:120px">${esc(t('feed.lb_msgs'))}</th></tr></thead>
@@ -282,7 +282,7 @@ async function loadSignals(){
           <div class="body">
             ${s.tag ? `<div class="tag">${esc(s.tag)}</div>` : ''}
             <b>${esc(s.name || '—')}</b>
-            ${s.location ? `<div class="loc">📍 ${esc(s.location)}</div>` : ''}
+            ${s.location ? `<div class="loc">${wd.icon("pin")} ${esc(s.location)}</div>` : ''}
             <div class="when">
               ${s.submitted_at ? esc(fmtDate(s.submitted_at)) : esc(fmtDate(s.sampled_at))}
               ${s.num_id ? ` · #${s.num_id}` : ''}

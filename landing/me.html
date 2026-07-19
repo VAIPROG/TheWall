@@ -59,25 +59,25 @@
           <span data-lang="fr" data-inline>Chargement…</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
-          <button class="btn" onclick="startOauth('telegram')">🔗 Connect Telegram</button>
-          <button class="btn" onclick="startOauth('discord')">🔗 Connect Discord</button>
+          <button class="btn" onclick="startOauth('telegram')"><span data-icon="link"></span> Connect Telegram</button>
+          <button class="btn" onclick="startOauth('discord')"><span data-icon="link"></span> Connect Discord</button>
           <button class="btn" onclick="unlinkProvider('telegram')">✕ Unlink Telegram</button>
           <button class="btn" onclick="unlinkProvider('discord')">✕ Unlink Discord</button>
         </div>
         <div class="note" style="margin-top:10px;font-size:12px;line-height:1.5">
           <b>
-            <span data-lang="en" data-inline>📬 Let the bots DM you (reminders &amp; alerts)</span>
-            <span data-lang="ru" data-inline>📬 Разрешить ботам писать вам в ЛС (напоминания и алерты)</span>
-            <span data-lang="de" data-inline>📬 Bots erlauben, dir DMs zu senden</span>
-            <span data-lang="fr" data-inline>📬 Autoriser les bots à vous écrire en MP</span>
+            <span data-lang="en" data-inline><span data-icon="mailbox"></span> Let the bots DM you (reminders &amp; alerts)</span>
+            <span data-lang="ru" data-inline><span data-icon="mailbox"></span> Разрешить ботам писать вам в ЛС (напоминания и алерты)</span>
+            <span data-lang="de" data-inline><span data-icon="mailbox"></span> Bots erlauben, dir DMs zu senden</span>
+            <span data-lang="fr" data-inline><span data-icon="mailbox"></span> Autoriser les bots à vous écrire en MP</span>
           </b><br>
-          ✈️
+          <span data-icon="plane" title="Telegram"></span>
           <span data-lang="en" data-inline>Telegram — open <a class="link" href="https://t.me/theWALLdevBot" target="_blank" rel="noopener">@theWALLdevBot</a> and press <b>Start</b> once.</span>
           <span data-lang="ru" data-inline>Telegram — откройте <a class="link" href="https://t.me/theWALLdevBot" target="_blank" rel="noopener">@theWALLdevBot</a> и один раз нажмите <b>Start</b>.</span>
           <span data-lang="de" data-inline>Telegram — öffne <a class="link" href="https://t.me/theWALLdevBot" target="_blank" rel="noopener">@theWALLdevBot</a> und drücke einmal <b>Start</b>.</span>
           <span data-lang="fr" data-inline>Telegram — ouvrez <a class="link" href="https://t.me/theWALLdevBot" target="_blank" rel="noopener">@theWALLdevBot</a> et appuyez une fois sur <b>Start</b>.</span>
           <br>
-          🎮
+          <span data-icon="gamepad" title="Discord"></span>
           <span data-lang="en" data-inline>Discord — a bot can only DM people it shares a server with: <a class="link" href="https://discord.com/oauth2/authorize?client_id=1511735101250076833&scope=bot&permissions=0" target="_blank" rel="noopener">add The Wall Dev bot to any server you're in</a>.</span>
           <span data-lang="ru" data-inline>Discord — бот может писать в ЛС только участникам общего с ним сервера: <a class="link" href="https://discord.com/oauth2/authorize?client_id=1511735101250076833&scope=bot&permissions=0" target="_blank" rel="noopener">добавьте бота The Wall Dev на любой ваш сервер</a>.</span>
           <span data-lang="de" data-inline>Discord — ein Bot kann nur DMs senden, wenn ihr einen Server teilt: <a class="link" href="https://discord.com/oauth2/authorize?client_id=1511735101250076833&scope=bot&permissions=0" target="_blank" rel="noopener">füge den Bot einem deiner Server hinzu</a>.</span>
@@ -85,7 +85,7 @@
         </div>
         <div style="margin-top:12px">
           <input type="email" id="link-email" class="input" placeholder="you@example.com">
-          <button class="btn full" onclick="requestEmailLink()">📧 Request email link by support</button>
+          <button class="btn full" onclick="requestEmailLink()"><span data-icon="mail"></span> Request email link by support</button>
           <div id="email-instruction" style="font-size:12px;color:var(--sub);margin-top:6px"></div>
         </div>
         <div id="links-status" class="note" style="margin-top:8px;display:none"></div>
@@ -105,7 +105,7 @@
           <span data-lang="fr" data-inline>Cela supprime définitivement profil, avatars, messages et modèles.</span>
         </p>
         <button class="btn" id="btn-delete-me" style="color:#c33">
-          🗑
+          <span data-icon="trash"></span>
           <span data-lang="en" data-inline>Delete my account</span>
           <span data-lang="ru" data-inline>Удалить мой аккаунт</span>
           <span data-lang="de" data-inline>Mein Konto löschen</span>
@@ -143,8 +143,8 @@ async function loadProfile() {
   if (!jwt()) {
     box.innerHTML = `<p style="color:#c33">Not signed in.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0">
-        <button class="btn" onclick="oauthSignIn('telegram')">✈️ Sign in with Telegram</button>
-        <button class="btn" onclick="oauthSignIn('discord')">🎮 Sign in with Discord</button>
+        <button class="btn" onclick="oauthSignIn('telegram')"><span data-icon="plane"></span> Sign in with Telegram</button>
+        <button class="btn" onclick="oauthSignIn('discord')"><span data-icon="gamepad"></span> Sign in with Discord</button>
       </div>
       <p style="font-size:12px;color:var(--sub)">OAuth sign-in works once the provider is linked to your Wall account. First time here? <a href="/login.html" class="link">Sign in with a site token →</a></p>`;
     return;

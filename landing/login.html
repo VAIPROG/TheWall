@@ -121,8 +121,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const grid = document.createElement("div");
   grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0";
   grid.innerHTML =
-    '<button class="btn" id="btn-oauth-tg">✈️ Sign in with Telegram</button>' +
-    '<button class="btn" id="btn-oauth-dc">🎮 Sign in with Discord</button>';
+    '<button class="btn" id="btn-oauth-tg">'+wd.icon("plane")+' Sign in with Telegram</button>' +
+    '<button class="btn" id="btn-oauth-dc">'+wd.icon("gamepad")+' Sign in with Discord</button>';
   const loginBtn = document.getElementById("btn-login");
   loginBtn.parentElement.insertBefore(grid, loginBtn);
   document.getElementById("btn-oauth-tg").addEventListener("click", () => oauthSignIn("telegram"));

@@ -114,7 +114,7 @@
     <div class="score-row">
       <button data-fn="startScore">▶ Start score</button>
       <button data-fn="stopScore">■ Stop score</button>
-      <button id="mute-toggle">🔈 Mute: off</button>
+      <button id="mute-toggle"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" style="vertical-align:-2px"><path d="M2 6h3l4-4v12l-4-4H2z"/><path d="M11 5.2a4 4 0 0 1 0 5.6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg> Mute: off</button>
     </div>
 
     <p class="hint">
@@ -163,7 +163,7 @@
         WallSFX.init();
         muted = !muted;
         WallSFX.setMuted(muted);
-        muteBtn.textContent = `${muted ? "🔇" : "🔈"} Mute: ${muted ? "on" : "off"}`;
+        muteBtn.innerHTML = `${muted ? '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" style="vertical-align:-2px"><path d="M2 6h3l4-4v12l-4-4H2z"/><path d="M10.5 6l4 4M14.5 6l-4 4" stroke="currentColor" stroke-width="1.6"/></svg>' : '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" style="vertical-align:-2px"><path d="M2 6h3l4-4v12l-4-4H2z"/><path d="M11 5.2a4 4 0 0 1 0 5.6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>'} Mute: ${muted ? "on" : "off"}`;
       });
     </script>
   </body>

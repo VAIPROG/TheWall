@@ -934,3 +934,32 @@ body.dark .state95.error {
         opacity: 0;
     }
 }
+
+/* Win95 SVG icons (wd.icon / [data-icon]) — replace OS emoji glyphs */
+.wd-svg {
+    width: 1em;
+    height: 1em;
+    display: inline-block;
+    vertical-align: -0.125em;
+    fill: currentColor;
+}
+[data-icon] {
+    display: inline-block;
+    line-height: 0;
+}
+.feat-card .ic .wd-svg {
+    width: 15px;
+    height: 15px;
+    vertical-align: -2px;
+}
+.shortcut .sc-ic .wd-svg {
+    width: 22px;
+    height: 22px;
+    color: var(--accent);
+}
+.medal-1 { color: #c49b1a; }
+.medal-2 { color: #8d9499; }
+.medal-3 { color: #a86636; }
+body.dark .medal-1 { color: #e2b93b; }
+body.dark .medal-2 { color: #b8bfc4; }
+body.dark .medal-3 { color: #c98a55; }

@@ -31,7 +31,7 @@
         <div class="legend"><span data-i18n="achievements.title">Achievements</span></div>
         <p data-i18n="achievements.intro"></p>
         <div id="ach-grid" class="ach-grid">
-          <div class="state95" style="grid-column:1/-1"><span class="hourglass">⌛</span><span data-i18n="achievements.loading">Loading…</span></div>
+          <div class="state95" style="grid-column:1/-1"><span class="hourglass" data-icon="hourglass"></span><span data-i18n="achievements.loading">Loading…</span></div>
         </div>
       </div>
     </div>
@@ -62,7 +62,7 @@ async function loadAchievements() {
     box.innerHTML = items.map(a => `
       <div class="ach-card ${a.unlocked_at ? '' : 'locked'}" title="${esc(a.description)}">
         <div class="ach-pts">+${a.points}</div>
-        <div class="ach-ic">${a.icon ? a.icon.slice(0,2).toUpperCase() : '★'}</div>
+        <div class="ach-ic">${a.icon ? esc(a.icon.slice(0,2).toUpperCase()) : wd.icon('star')}</div>
         <div class="ach-cat">${esc(a.category)}</div>
         <div class="ach-name">${esc(a.name)}</div>
         <div class="ach-desc">${esc(a.description)}</div>
