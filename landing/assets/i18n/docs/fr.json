@@ -1,9 +1,11 @@
 {
   "title": "Documentation",
-  "intro": "Guides pas-à-pas : installation, configuration, Deep Integration, anti-grief et API.",
+  "intro": "Guides pas-à-pas : installation, hub Community, modèles et partage, anti-grief et API.",
   "sections": {
     "getting_started": "Démarrage",
-    "anti_grief": "Anti-grief",
+    "community": "Communauté et clans",
+    "templates": "Modèles et partage",
+    "anti_grief": "Surveillance anti-grief",
     "linked_accounts": "Comptes liés",
     "api": "Référence API",
     "troubleshooting": "Dépannage",
@@ -11,56 +13,77 @@
   },
   "getting_started": {
     "heading": "1. Démarrage",
-    "body": "Choisissez un format : userscript Tampermonkey, Chrome MV3 (décompressé), ou Firefox (module temporaire).",
+    "body": "Choisissez une variante : userscript Tampermonkey, Chrome MV3 (décompressé), extension temporaire Firefox ou wrap Safari (macOS + Xcode).",
     "steps": [
-      "Ouvrez <a href=\"/\" class=\"link\">la page d'accueil</a> et téléchargez la version pour votre navigateur.",
-      "Installez selon les instructions.",
+      "Ouvrez <a href=\"/\" class=\"link\">la page d'accueil</a> et récupérez le lien de téléchargement pour votre navigateur.",
+      "Installez selon les instructions de la carte.",
       "Visitez <a href=\"https://filianislost.com\" class=\"link\">filianislost.com</a> — le panneau Win95 apparaît en haut à droite.",
-      "À la première visite, l'extension se connecte automatiquement à notre backend (pas de connexion manuelle nécessaire)."
+      "À la première visite, l'extension se connecte automatiquement à notre backend (aucune connexion manuelle nécessaire)."
     ],
-    "tip": "Mise à jour auto via <code>/dist/signature.json</code> toutes les 30 minutes. Tampermonkey peut aussi mettre à jour les userscripts nativement."
+    "tip": "La mise à jour automatique interroge <code>/dist/signature.json</code> toutes les 30 minutes. Tampermonkey peut aussi mettre à jour les userscripts nativement."
+  },
+  "community": {
+    "heading": "2. Communauté et clans",
+    "body": "Depuis la v6, tout le social vit dans un seul super-onglet Community (il remplace les anciens onglets séparés Social et Clan) :",
+    "items": [
+      "<b>Mon clan</b> — effectif avec rôles (owner / admin / mod / member), invitations, candidatures, réglages, avatar + bannière de clan.",
+      "<b>Chats</b> — chat global, chat de clan, messages privés et modmail ; avec réactions, messages épinglés et statut de lecture.",
+      "<b>Annuaire</b> — l'annuaire public des clans : rejoignez les clans ouverts, candidatez, acceptez des invitations ou créez le vôtre. La création de clan est vérifiée côté propriétaire — via votre serveur Discord, votre profil sur le site ou une revue manuelle.",
+      "<b>Infos</b> — liens auteur & don, SnackersWiki et les deux serveurs Discord dans une seule carte."
+    ],
+    "tip": "Le courrier et les succès ont déménagé dans l'onglet Profil lors de la même mise à jour."
+  },
+  "templates": {
+    "heading": "3. Modèles et partage",
+    "body": "Les modèles sont l'unité de contenu centrale de l'API V3 : une position (x/y), une échelle de 5 % à 1000 %, un document multi-calques et une animation sprite-sheet optionnelle.",
+    "items": [
+      "<b>Visibilité</b> : <code>private</code> (vous seul), <code>clan</code> (vos camarades de clan), <code>public</code> (tout le monde — passe par la file de modération avant d'apparaître dans la galerie).",
+      "<b>Partage</b> : chaque modèle a un lien ; un mot de passe d'accès optionnel permet aux personnes hors liste blanche de l'ouvrir.",
+      "<b>Aperçus</b> : le serveur rend les miniatures (<code>GET /api/v3/templates/{id}/preview?size=64|128|256</code>), les PNG complets et les exports GIF animés — aucun rendu côté client.",
+      "<b>Gestion depuis le site</b> : le <a href=\"/dashboard.html\" class=\"link\">Dashboard</a> liste vos modèles et permet de renommer, déplacer, redimensionner, changer la visibilité, définir/retirer le mot de passe ou supprimer — sans ouvrir l'extension."
+    ]
   },
   "anti_grief": {
-    "heading": "2. Anti-grief",
-    "body": "Épinglez un modèle — le backend téléchargera la fenêtre de tuiles correspondante toutes les <code>check_interval</code> secondes (min 60, défaut 600), comparera avec le modèle et émettra un événement <code>clan_alert</code> quand les dégâts dépassent <code>alert_threshold</code> (défaut 25 pixels).",
-    "example": "POST /api/v2/templates/{id}/protect\n{\n  \"clan_id\": \"uuid-du-clan\",\n  \"alert_threshold\": 25,\n  \"check_interval\": 600\n}",
-    "disable": "Désactiver : <code>DELETE /api/v2/templates/{id}/protect</code>. Le propriétaire du modèle, un mod/admin de clan ou un admin global peut basculer."
+    "heading": "4. Surveillance anti-grief",
+    "body": "Protégez une zone terminée : le backend recharge la fenêtre correspondante de tuiles du mur toutes les <code>check_interval</code> secondes (60 s…24 h, 120 par défaut), la compare à l'instantané de référence et alerte votre clan (courrier + Discord/Telegram) quand les dégâts dépassent <code>tolerance_pct</code>.",
+    "example": "POST /api/v2/regions\n{\n  \"name\": \"our-logo\",\n  \"clan_id\": \"uuid-of-clan\",\n  \"x\": 120, \"y\": 48, \"w\": 64, \"h\": 64,\n  \"tolerance_pct\": 5,\n  \"check_interval\": 120\n}",
+    "disable": "Les régions se gèrent via <code>GET/PUT/DELETE /api/v2/regions/{id}</code> (ce gardien vit encore sur la surface V2). Le propriétaire de la région, les modérateurs/admins du clan et le staff global peuvent modifier ou supprimer une région."
   },
   "linked_accounts": {
-    "heading": "3. Comptes liés",
+    "heading": "5. Comptes liés",
     "body": "Depuis <a href=\"/me.html\" class=\"link\">/me</a> :",
     "methods": [
-      "<b>Telegram</b> via OIDC (<code>oauth.telegram.org</code>) avec PKCE + scope <code>telegram:bot_access</code>. Le bot peut vous envoyer des DMs ensuite.",
-      "<b>Discord</b> via OAuth2 standard avec scope <code>identify</code>. Le bot peut envoyer des DMs si vous partagez un serveur.",
-      "<b>Email</b> via support : demandez un code à 6 caractères, envoyez un email à l'adresse support avec sujet <code>LINK-MAIL</code>, un admin confirme."
+      "<b>Telegram</b> via OIDC (<code>oauth.telegram.org</code>) avec PKCE + scope <code>telegram:bot_access</code>. Le bot peut ensuite vous écrire en MP.",
+      "<b>Discord</b> via OAuth2 standard avec le scope <code>identify</code>. Le bot peut vous écrire en MP si vous partagez un serveur avec lui ou si vous lui écrivez d'abord.",
+      "<b>E-mail</b> via le support : demandez un code à 6 caractères, envoyez un e-mail à l'adresse du support avec l'objet <code>LINK-MAIL</code> depuis votre adresse, un admin approuve."
     ],
-    "tip": "Le compte VAI est une identité séparée sur <a href=\"/vai-auth.html\" class=\"link\">/vai-auth</a> — conçu pour tous les services VAI-PROG. Liaison avec votre utilisateur Wall dans les paramètres de l'extension."
+    "tip": "VAI Account est une identité séparée sur <a href=\"/vai-auth.html\" class=\"link\">/vai-auth</a> — conçue pour couvrir tous les services VAI-PROG. Vous pouvez la lier à votre utilisateur Wall depuis les réglages de l'extension."
   },
   "api": {
-    "heading": "4. API",
-    "body": "Deux surfaces côte à côte sous <code>/api/</code> :",
+    "heading": "6. API",
+    "body": "Deux surfaces coexistent sous <code>/api/</code> :",
     "surfaces": [
-      "<code>/api/v3/*</code> — l’API actuelle : JSON camelCase, pagination par curseur, catalogue public de modèles, avatars avec repli identicon. Les nouveautés arrivent ici.",
-      "<code>/api/v2/*</code> — déprécié, conservé pour les anciens clients jusqu’au retrait.",
-      "<code>/api/v1/*</code> équivalents et endpoints partagés sous <code>/api/*</code> — gelés, clients legacy."
+      "<code>/api/v3/*</code> — l'API actuelle : JSON camelCase, pagination par curseur, parcours public des modèles, avatars avec repli identicon, clans, chats, succès et le fil. Les nouveautés arrivent ici.",
+      "<code>/api/v2/*</code> — dépréciée, conservée pour les anciens clients jusqu'à l'extinction (le gardien de régions vit encore ici).",
+      "Les équivalents <code>/api/v1/*</code> et les endpoints partagés sous <code>/api/*</code> — gelés, clients hérités."
     ],
-    "browse": "Interactif : <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Spec : <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
+    "browse": "Parcourir interactivement : <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Spécification brute : <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
   },
   "troubleshooting": {
-    "heading": "5. Dépannage",
+    "heading": "7. Dépannage",
     "items": [
-      "<b>Panneau absent</b> : vérifiez que vous êtes sur <code>https://filianislost.com</code> (pas <code>www.</code>) ; rechargez après installation.",
-      "<b>Precise Place grisé</b> : Deep Integration est désactivée — activez dans Paramètres et rechargez.",
-      "<b>Deep Integration « WARN: missing probes »</b> : le bundle du site a changé de forme — attendez la mise à jour de l'extension ou signalez sur <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
-      "<b>Flash noir sur l'onglet Clan</b> : corrigé en v3.0.x — mettez à jour.",
-      "<b>Erreurs CORS</b> : effacez les Service Workers en cache et rechargez.",
-      "<b>Toast « out of paint »</b> : c'est le cooldown du site — attendez le remplissage."
+      "<b>Le panneau n'apparaît pas</b> : vérifiez que vous êtes sur <code>https://filianislost.com</code> (pas <code>www.</code>) ; rechargez après l'installation.",
+      "<b>Precise Place grisé</b> : Deep Integration est désactivée — activez-la dans les réglages et rechargez.",
+      "<b>Deep Integration « WARN: missing probes »</b> : le bundle du site a changé — attendez la prochaine mise à jour de l'extension ou signalez-le sur <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
+      "<b>Vous voyez encore des onglets Social / Clan séparés</b> : mettez à jour vers v6+ — ils ont fusionné dans le super-onglet Community.",
+      "<b>Erreurs CORS</b> : videz les service workers en cache et rechargez. Le nginx de production définit désormais les en-têtes explicitement.",
+      "<b>Toast « out of paint »</b> : c'est le cooldown du site — attendez le rechargement ou soumettez les pixels en attente."
     ]
   },
   "self_host": {
-    "heading": "6. Auto-hébergement",
-    "body": "Backend = un binaire Rust + Postgres + nginx + Let's Encrypt. Voir <code>backend/Dockerfile</code> et <code>backend/example.env</code>.",
+    "heading": "8. Auto-hébergement du backend",
+    "body": "Le backend est un binaire Rust unique adossé à Postgres + nginx + Let's Encrypt. Voir <code>backend/Dockerfile</code> et <code>backend/example.env</code> pour les pièces mobiles.",
     "example": "cp backend/example.env backend/.env\ndocker compose -f backend/docker-compose.yml up -d   # Postgres\ncargo run --release                                  # backend",
-    "env_note": "Ou pointez <code>THE_WALL_DEV_ENV_FILE</code> vers un fichier de secrets externe (remplace les env vars existantes)."
+    "env_note": "Ou pointez <code>THE_WALL_DEV_ENV_FILE</code> vers un fichier de secrets externe (écrase les variables d'environnement existantes)."
   }
 }

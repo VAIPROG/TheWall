@@ -32,6 +32,8 @@
         <p data-i18n="docs.intro"></p>
         <div class="toc">
           <a href="#getting-started"   data-i18n="docs.sections.getting_started">Getting started</a>
+          <a href="#community"         data-i18n="docs.sections.community">Community &amp; clans</a>
+          <a href="#templates"         data-i18n="docs.sections.templates">Templates &amp; sharing</a>
           <a href="#anti-grief"        data-i18n="docs.sections.anti_grief">Anti-grief</a>
           <a href="#linked-accounts"   data-i18n="docs.sections.linked_accounts">Linked accounts</a>
           <a href="#api"               data-i18n="docs.sections.api">API</a>
@@ -66,6 +68,18 @@
     h += "<p>" + s("getting_started.body") + "</p><ol>";
     arr("getting_started.steps").forEach(function(x) { h += "<li>" + x + "</li>"; });
     h += '</ol><div class="tip">' + s("getting_started.tip") + "</div></div>";
+
+    h += '<div class="doc-section" id="community">';
+    h += "<h2>" + s("community.heading") + "</h2>";
+    h += "<p>" + s("community.body") + "</p><ul class=\"bullets\">";
+    arr("community.items").forEach(function(x) { h += "<li>" + x + "</li>"; });
+    h += '</ul><div class="tip">' + s("community.tip") + "</div></div>";
+
+    h += '<div class="doc-section" id="templates">';
+    h += "<h2>" + s("templates.heading") + "</h2>";
+    h += "<p>" + s("templates.body") + "</p><ul class=\"bullets\">";
+    arr("templates.items").forEach(function(x) { h += "<li>" + x + "</li>"; });
+    h += "</ul></div>";
 
     h += '<div class="doc-section" id="anti-grief">';
     h += "<h2>" + s("anti_grief.heading") + "</h2>";

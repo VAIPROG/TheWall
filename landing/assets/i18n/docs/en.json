@@ -1,8 +1,10 @@
 {
   "title": "Documentation",
-  "intro": "Step-by-step guides covering installation, configuration, Deep Integration, anti-grief and the API.",
+  "intro": "Step-by-step guides covering installation, the Community hub, templates & sharing, anti-grief and the API.",
   "sections": {
     "getting_started": "Getting started",
+    "community": "Community & clans",
+    "templates": "Templates & sharing",
     "anti_grief": "Anti-grief monitoring",
     "linked_accounts": "Linked accounts",
     "api": "API reference",
@@ -11,7 +13,7 @@
   },
   "getting_started": {
     "heading": "1. Getting started",
-    "body": "Pick a flavour: Tampermonkey userscript, Chrome MV3 unpacked, or Firefox temporary add-on.",
+    "body": "Pick a flavour: Tampermonkey userscript, Chrome MV3 unpacked, Firefox temporary add-on, or a Safari wrap (macOS + Xcode).",
     "steps": [
       "Open <a href=\"/\" class=\"link\">the homepage</a> and grab the download link for your browser.",
       "Install per the instructions on the card.",
@@ -20,14 +22,35 @@
     ],
     "tip": "Auto-update polls <code>/dist/signature.json</code> every 30 minutes. Tampermonkey can also auto-update userscripts natively."
   },
+  "community": {
+    "heading": "2. Community & clans",
+    "body": "Since v6 everything social lives in one Community super-tab (it replaced the old separate Social and Clan tabs):",
+    "items": [
+      "<b>My clan</b> — roster with roles (owner / admin / mod / member), invites, applications, settings, clan avatar + banner.",
+      "<b>Chats</b> — global chat, clan chat, direct messages and modmail, with reactions, pinned messages and read-state.",
+      "<b>Browse</b> — the public clan directory: join open clans, apply, accept invites, or create your own. Clan creation is owner-verified — via a Discord guild you own, your site profile, or manual review.",
+      "<b>Info</b> — author & donate links, SnackersWiki and both Discord servers in one card."
+    ],
+    "tip": "Mail and Achievements moved into the Profile tab in the same update."
+  },
+  "templates": {
+    "heading": "3. Templates & sharing",
+    "body": "Templates are the core content unit of the V3 API: a position (x/y), scale 5%–1000%, a multi-layer document and optional sprite-sheet animation.",
+    "items": [
+      "<b>Scopes</b>: <code>private</code> (only you), <code>clan</code> (your clan-mates), <code>public</code> (everyone — goes through the moderation queue before appearing in the gallery).",
+      "<b>Sharing</b>: every template is linkable; an optional access password lets people outside the whitelist open it.",
+      "<b>Previews</b>: the server renders thumbnails (<code>GET /api/v3/templates/{id}/preview?size=64|128|256</code>), full PNGs and animated GIF exports — no client rendering needed.",
+      "<b>Manage from the site</b>: the <a href=\"/dashboard.html\" class=\"link\">Dashboard</a> lists your templates and lets you rename, move, re-scale, change scope, set/remove the access password or delete them — without opening the extension."
+    ]
+  },
   "anti_grief": {
-    "heading": "2. Anti-grief monitoring",
-    "body": "Pin a template and the backend will fetch the matching window of wall tiles every <code>check_interval</code> seconds (min 60, default 600), diff against the template, and emit a <code>clan_alert</code> mailbox event when damage crosses <code>alert_threshold</code> (default 25 pixels).",
-    "example": "POST /api/v2/templates/{id}/protect\n{\n  \"clan_id\": \"uuid-of-clan\",\n  \"alert_threshold\": 25,\n  \"check_interval\": 600\n}",
-    "disable": "Disable with <code>DELETE /api/v2/templates/{id}/protect</code>. Anyone who owns the template, any clan moderator/admin, or a global admin can flip it."
+    "heading": "4. Anti-grief monitoring",
+    "body": "Protect a finished area: the backend re-fetches the matching window of wall tiles every <code>check_interval</code> seconds (60s…24h, default 120), diffs it against the reference snapshot, and alerts your clan (mailbox + Discord/Telegram) when damage crosses <code>tolerance_pct</code>.",
+    "example": "POST /api/v2/regions\n{\n  \"name\": \"our-logo\",\n  \"clan_id\": \"uuid-of-clan\",\n  \"x\": 120, \"y\": 48, \"w\": 64, \"h\": 64,\n  \"tolerance_pct\": 5,\n  \"check_interval\": 120\n}",
+    "disable": "Manage regions with <code>GET/PUT/DELETE /api/v2/regions/{id}</code> (this guard still lives on the V2 surface). The region owner, clan moderators/admins and global staff can edit or remove a region."
   },
   "linked_accounts": {
-    "heading": "3. Linked accounts",
+    "heading": "5. Linked accounts",
     "body": "From <a href=\"/me.html\" class=\"link\">/me</a>:",
     "methods": [
       "<b>Telegram</b> via OIDC (<code>oauth.telegram.org</code>) with PKCE + <code>telegram:bot_access</code> scope. Bot can DM you afterwards.",
@@ -37,28 +60,28 @@
     "tip": "VAI Account is a separate identity at <a href=\"/vai-auth.html\" class=\"link\">/vai-auth</a> — designed to span all VAI-PROG services. You can bind it to your Wall user from the extension's Settings."
   },
   "api": {
-    "heading": "4. API",
+    "heading": "6. API",
     "body": "Two surfaces live side by side under <code>/api/</code>:",
     "surfaces": [
-      "<code>/api/v3/*</code> — the current API: camelCase JSON, cursor pagination, public template browse, avatars with identicon fallback. New features land here.",
-      "<code>/api/v2/*</code> — deprecated, kept for older clients until sunset.",
+      "<code>/api/v3/*</code> — the current API: camelCase JSON, cursor pagination, public template browse, avatars with identicon fallback, clans, chats, achievements and the feed. New features land here.",
+      "<code>/api/v2/*</code> — deprecated, kept for older clients until sunset (the protected-region guard still lives here).",
       "<code>/api/v1/*</code> equivalents and shared endpoints under <code>/api/*</code> — frozen, legacy clients."
     ],
     "browse": "Browse interactively: <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Raw spec: <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
   },
   "troubleshooting": {
-    "heading": "5. Troubleshooting",
+    "heading": "7. Troubleshooting",
     "items": [
       "<b>Panel doesn't appear</b>: ensure you're on <code>https://filianislost.com</code> (not <code>www.</code>); reload after install.",
       "<b>Precise Place greyed out</b>: Deep Integration is off, enable it in Settings and reload.",
       "<b>Deep Integration \"WARN: missing probes\"</b>: site bundle changed shape — wait for the next extension update or report at <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
-      "<b>Black flash on Clan tab</b>: known fixed in v3.0.x — update.",
+      "<b>Still seeing separate Social / Clan tabs</b>: update to v6+ — they merged into the Community super-tab.",
       "<b>CORS errors</b>: clear cached service workers and reload. Production nginx now sets the headers explicitly.",
       "<b>\"out of paint\" toast</b>: that's the site's cooldown — wait for refill or submit pending pixels."
     ]
   },
   "self_host": {
-    "heading": "6. Self-hosting the backend",
+    "heading": "8. Self-hosting the backend",
     "body": "Backend is a single Rust binary backed by Postgres + nginx + Let's Encrypt. See <code>backend/Dockerfile</code> and <code>backend/example.env</code> for the moving parts.",
     "example": "cp backend/example.env backend/.env\ndocker compose -f backend/docker-compose.yml up -d   # Postgres\ncargo run --release                                  # backend",
     "env_note": "Or point <code>THE_WALL_DEV_ENV_FILE</code> at an external secrets file (overrides existing env vars)."
