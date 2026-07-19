@@ -26,6 +26,7 @@
 import { getActiveClient, getMe, api } from "../backend/index";
 import type {
   AdminUserRow,
+  AdminUserClan,
   AdminSession,
   AdminNoteWire,
   ServerConfigWire,
@@ -331,6 +332,22 @@ function renderUserPanel(
     : emptyState("no mod notes");
   const btn = (act: string, label: string, cls = "") =>
     `<button class="wd-btn wd-btn--sm${cls ? ` ${cls}` : ""}" data-act="${act}">${esc(label)}</button>`;
+  // Clan memberships (from admin_get_user → load_user_clans). Each row shows the
+  // clan + the user's role and a copyable UUID; "use ▸" fills the clan-governance
+  // UUID field (and copies it), so the admin no longer hunts for the id.
+  const clans: AdminUserClan[] = u.clans ?? [];
+  const clanRow = (c: AdminUserClan) => {
+    const tag = c.tag ? ` <span class="sub">[${esc(c.tag)}]</span>` : "";
+    return `<div class="wd-row" style="align-items:center;gap:6px;margin-bottom:3px">
+      <div class="grow"><b>${esc(c.name)}</b>${tag} · ${badge(esc(c.role), roleBadgeKind(c.role))}
+        <br><code style="font:10px monospace;user-select:all;color:var(--sub)">${esc(c.clanId)}</code></div>
+      <button class="wd-btn wd-btn--sm" data-act="use-clan" data-clan="${esc(c.clanId)}">use ▸</button>
+    </div>`;
+  };
+  const clansHtml = clans.length
+    ? clans.map(clanRow).join("")
+    : `<span class="sub">not in any clan</span>`;
+  const primaryClan = clans[0]?.clanId ?? "";
   return `<div class="wd-adm-phead">
       <b>${esc(u.username)}</b> ${badge(role, roleBadgeKind(role))}
       <button class="wd-btn wd-btn--sm" data-act="close" style="margin-left:auto">✕ close</button>
@@ -369,8 +386,11 @@ function renderUserPanel(
         ${btn("reset-avatar", "Reset avatar")}${btn("reset-username", "Reset username")}${btn("remove-clan", "Remove from clan")}
       </div>
     </div>
+    <div class="wd-group"><div class="wd-legend">Clan membership</div>
+      <div class="wd-adm-membership">${clansHtml}</div>
+    </div>
     <div class="wd-group"><div class="wd-legend">Clan governance</div>
-      <input id="admin-up-clan" name="admin_up_clan" autocomplete="off" type="text" class="wp-input" placeholder="clan UUID (admin_get_user carries no clan id)">
+      <input id="admin-up-clan" name="admin_up_clan" autocomplete="off" type="text" class="wp-input" value="${esc(primaryClan)}" placeholder="clan UUID — pre-filled from membership above">
       <div class="wd-adm-acts" style="margin-top:4px">
         <select id="admin-up-clan-role" class="wp-input" style="font:11px sans-serif;width:auto">
           ${["member", "moderator", "admin"]
@@ -416,6 +436,18 @@ async function onUserPanelClick(e: Event): Promise<void> {
     if (panel) {
       panel.style.display = "none";
       panel.innerHTML = "";
+    }
+    return;
+  }
+  if (act === "use-clan") {
+    const cid = el.dataset.clan || "";
+    const input = $("admin-up-clan") as HTMLInputElement | null;
+    if (input) input.value = cid;
+    try {
+      await navigator.clipboard?.writeText(cid);
+      toast("Admin", "clan UUID filled + copied");
+    } catch {
+      toast("Admin", "clan UUID filled");
     }
     return;
   }

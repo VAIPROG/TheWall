@@ -17,6 +17,17 @@ export interface AdminStatsWire {
 
 /** One row of `models::users::User`. NOTE: `external_id` serialises as the
  *  LEGACY key `wall_id` (models/users.rs:13) — not camelCase. */
+/** A user's active clan membership as surfaced by `admin_get_user`
+ *  (admin.rs `load_user_clans`). `clanId` is the UUID the clan role /
+ *  transfer-owner admin endpoints need. */
+export interface AdminUserClan {
+  clanId: string;
+  name: string;
+  tag?: string | null;
+  role: string;
+  joinedAt: string;
+}
+
 export interface AdminUserRow {
   id: string;
   wall_id: string;
@@ -32,6 +43,8 @@ export interface AdminUserRow {
   discordUsername?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Active clan memberships — present on `getUser`, absent on list rows. */
+  clans?: AdminUserClan[];
 }
 
 /** `admin_list_users` envelope (admin.rs:1228). */
