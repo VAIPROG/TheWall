@@ -68,6 +68,21 @@ User:
       description: Last update timestamp.
       example: "2025-06-20T14:22:00Z"
 
+SocialLinkEntry:
+  type: object
+  required:
+    - label
+    - url
+  properties:
+    label:
+      type: string
+      description: User-supplied display label for the link (e.g. "My Twitter").
+    url:
+      type: string
+      format: uri
+      description: |
+        Full HTTPS URL. Must use `https://` and belong to a whitelisted domain.
+
 UserSelf:
   allOf:
     - $ref: "#/User"
@@ -84,7 +99,16 @@ UserSelf:
           type: array
           items:
             $ref: "#/SocialAccount"
-          description: Linked OAuth social accounts (telegram, discord, github).
+          description: >-
+            OAuth-verified provider links (telegram, discord, github).
+            Distinct from `socialLinks`, which are free-form user-supplied URLs.
+        socialLinks:
+          type: array
+          items:
+            $ref: "#/SocialLinkEntry"
+          description: >-
+            Free-form (unverified) label/URL pairs added by the user.
+            Stored as JSON in `users.social_links`.
         apiKeyCount:
           type: integer
           description: Number of API keys the user has.
@@ -160,6 +184,15 @@ UserUpdate:
     telemetryOptIn:
       type: boolean
       description: New telemetry preference.
+    socialLinks:
+      type: array
+      items:
+        $ref: "#/SocialLinkEntry"
+      description: |
+        Free-form (unverified) label/URL pairs. When present this field
+        **replaces** the entire existing set. Each entry must have a non-empty
+        label and a valid `https://` URL on a whitelisted domain.
+        Validation errors return `400 Bad Request`.
 
 SocialAccount:
   type: object

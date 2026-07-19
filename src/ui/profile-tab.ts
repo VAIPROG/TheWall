@@ -6,20 +6,24 @@ import { confirmDlg, errorDlg } from "../dialog";
 import { log } from "../log";
 import { cfg } from "../config";
 import { getActiveClient, api, getMe } from "../backend/index";
-
-// Profile edit + pin management still use the V2 root surface (rich profile
-// shape). TODO(phase3): move to /api/v3/users/me + /api/v3/templates.
-function ptReq<T = any>(method: string, path: string, body?: unknown): Promise<T> {
-  const client = getActiveClient();
-  if (!client) return Promise.reject(new Error("backend offline"));
-  return client.req<T>({ method, path, body, root: true });
-}
-function ptRoot(): string {
-  return getActiveClient()?.rootUrl ?? "";
-}
 import { markAllRead, syncProfile, resetAvatar } from "../data";
-import { importShare } from "../share";
 import { openCursorShop } from "../open-cursor-shop";
+import { segmented } from "./kit/primitives";
+import { buildMailContent } from "./build-mail";
+import { loadNotifications } from "../mail";
+import { buildAchievementsContent, loadAchievementList } from "./achievements-tab";
+// V3 template surface: pinned list/unpin via the facade, previews via the
+// session-authenticated V3 preview URL, click-through into the Templates
+// super-tab detail screen (V3 summaries carry no legacy `share` payload).
+import { previewUrl } from "./templates/api";
+import { openDetail } from "./templates/shell";
+import {
+  type SocialLink,
+  guessIcon,
+  normaliseUrl,
+  isUrlValid,
+  pinCaption,
+} from "./profile-model";
 import {
   updatePaintCurrent,
   updateProfilePaintLine,
@@ -33,40 +37,31 @@ export function wireProfile(_win: HTMLElement): void {
   // null-safe so older builds with the button still wire up cleanly.
   $("btn-markread")?.addEventListener("click", markAllRead);
 
+  // ----------- Profile super-tab: segmented sub-nav (Profile/Mail/Ach) -------
+  // Mail + Achievements were standalone tabs; they now live as sub-sections of
+  // the Profile pane. The sub-nav toggles which `#profile-sub-*` is visible and
+  // fires the relevant load on demand (their wiring — wireMailUI / the mail
+  // poll / loadAchievementList — is reused unchanged, just re-pointed here).
+  const subnav = $("profile-subnav");
+  subnav?.querySelectorAll<HTMLElement>("[data-seg]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const seg = btn.dataset.seg || "profile";
+      subnav
+        .querySelectorAll<HTMLElement>("[data-seg]")
+        .forEach((x) => x.classList.toggle("is-on", x === btn));
+      ["profile", "mail", "ach"].forEach((s) =>
+        $(`profile-sub-${s}`)?.classList.toggle("is-on", s === seg),
+      );
+      if (seg === "mail") {
+        loadNotifications();
+      } else if (seg === "ach") {
+        loadAchievementList().catch(() => {});
+      }
+    });
+  });
+
   // ----------- Profile: bio + social links (inline-editable cards) -----------
-
-  type SocialLink = { label: string; url: string };
-
-  function guessIcon(url: string): string {
-    const u = url.toLowerCase();
-    if (u.includes("twitter.com") || u.includes("x.com")) return "🐦";
-    if (u.includes("github.com")) return "🐙";
-    if (u.includes("discord.")) return "💬";
-    if (u.includes("twitch.tv")) return "🎮";
-    if (u.includes("youtube.com") || u.includes("youtu.be")) return "▶️";
-    if (u.includes("t.me") || u.includes("telegram.")) return "✈️";
-    if (u.includes("instagram.")) return "📷";
-    if (u.includes("mailto:") || u.startsWith("mail")) return "✉️";
-    return "🔗";
-  }
-
-  function normaliseUrl(raw: string): string {
-    const v = raw.trim();
-    if (!v) return v;
-    if (/^[a-z]+:/i.test(v)) return v;
-    if (v.includes("@") && !v.includes("/")) return "mailto:" + v;
-    return "https://" + v;
-  }
-
-  function isUrlValid(raw: string): boolean {
-    if (!raw) return false;
-    try {
-      new URL(normaliseUrl(raw));
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  // Pure helpers (guessIcon/normaliseUrl/isUrlValid) live in profile-model.ts.
 
   function getLinks(): SocialLink[] {
     return ((window as any).__wallSocialLinks || []) as SocialLink[];
@@ -301,78 +296,121 @@ export function wireProfile(_win: HTMLElement): void {
   $("btn-profile-save")?.addEventListener("click", async () => {
     const bio = ($("profile-bio") as HTMLTextAreaElement)?.value || "";
     const social_links = (window as any).__wallSocialLinks || [];
+    const client = getActiveClient();
+    if (!client?.on) {
+      await errorDlg("Connect to VAI-PROG backend first (Settings)");
+      return;
+    }
     try {
-      await ptReq("PUT", "/v2/me/profile", { bio, social_links });
+      // Both bio and the freeform social links now ride the V3 user surface
+      // (PATCH /api/v3/users/me). `socialLinks` replaces the whole set and is
+      // server-validated (count/label-length/https + domain whitelist). These
+      // are distinct from the OAuth-verified provider links (links-wire.ts).
+      await api(client).users.updateMe({ bio, socialLinks: social_links });
       toast("Profile", "saved");
       syncProfile();
     } catch (e: any) {
       await errorDlg("Save failed: " + errMsg(e));
     }
   });
-  // Hook up initial values whenever profile syncs
+
+  // ----------- Pinned templates (V3: GET /templates/pinned) ------------------
+  // Click → open in the Templates super-tab detail screen; Shift-click →
+  // unpin (V3 DELETE /templates/{id}/pin). The old V2 flow imported the
+  // legacy `share` payload directly, which V3 summaries no longer carry.
+  async function loadPinnedTemplates(): Promise<void> {
+    const pinBox = $("profile-pinned");
+    const client = getActiveClient();
+    if (!pinBox || !client?.on) return;
+    try {
+      const page = await api(client).templates.listPinned();
+      const pins = page?.items || [];
+      if (!pins.length) {
+        pinBox.innerHTML = `<div style="color:var(--sub);padding:6px">No pinned templates yet — pin from Templates tab.</div>`;
+        return;
+      }
+      pinBox.innerHTML = pins
+        .map(
+          (tp) =>
+            `<div style="text-align:center"><img src="${previewUrl(tp.id, 64)}" style="width:48px;height:48px;border:1px solid #888;cursor:pointer;image-rendering:pixelated" data-open-tpl="${esc(tp.id)}" title="${esc(tp.name || "")} — click to open, Shift-click to unpin" onerror="this.style.opacity=0.3"><br><span class="sub" style="font-size:10px">${esc(pinCaption(tp.name))}</span></div>`,
+        )
+        .join("");
+      pinBox.querySelectorAll<HTMLElement>("[data-open-tpl]").forEach((b) => {
+        b.addEventListener("click", (ev) => {
+          const id = b.dataset.openTpl || "";
+          if (!id) return;
+          if ((ev as MouseEvent).shiftKey) {
+            confirmDlg("Unpin this template?", "Confirm").then((ok) => {
+              if (ok)
+                api(client)
+                  .templates.unpin(id)
+                  .then(() => loadPinnedTemplates())
+                  .catch(() => {});
+            });
+          } else {
+            // Flip to the Templates super-tab and drill into the detail
+            // screen (it owns load/apply — V3 pins carry no share payload).
+            document.querySelector<HTMLElement>('.wp-tab[data-p="tp"]')?.click();
+            openDetail(id);
+          }
+        });
+      });
+    } catch (e: any) {
+      pinBox.innerHTML = `<div style="color:#b33;padding:6px">pins error: ${esc(errMsg(e))}</div>`;
+    }
+  }
+
+  // Hook up initial values whenever profile syncs. Bio + freeform social links
+  // now both come from the V3 self profile (GET /api/v3/users/me), so the
+  // fields reflect the modern surface. The legacy V2 `/v2/auth/me` payload
+  // (event detail) is used only as an instant pre-fill before the V3 fetch
+  // resolves.
   document.addEventListener("wd:profile-loaded", (e: any) => {
     const p = e.detail || {};
     const bioEl = $("profile-bio") as HTMLTextAreaElement | null;
     if (bioEl && document.activeElement !== bioEl) bioEl.value = p.bio || "";
+    // Instant pre-fill from the V2 payload; the V3 fetch below is authoritative.
     (window as any).__wallSocialLinks = p.social_links || [];
     refreshSocial((window as any).__wallSocialLinks);
-    // Render pinned templates
-    const pinBox = $("profile-pinned");
-    if (pinBox) {
-      const pins = p.pinned_templates || [];
-      if (!pins.length) {
-        pinBox.innerHTML = `<div style="color:var(--sub);padding:6px">No pinned templates yet — pin from Templates tab.</div>`;
-      } else {
-        pinBox.innerHTML = pins
-          .map(
-            (tp: any) =>
-              `<div style="text-align:center"><img src="${ptRoot()}/v2/templates/${encodeURIComponent(tp.id)}/preview?size=64" style="width:48px;height:48px;border:1px solid #888;cursor:pointer;image-rendering:pixelated" data-load-tpl="${(tp.share || "").replace(/"/g, "&quot;")}" data-unpin="${tp.id}" title="${(tp.name || "").replace(/[<>"]/g, "")}"><br><span class="sub" style="font-size:10px">${(tp.name || "").slice(0, 12)}</span></div>`,
-          )
-          .join("");
-        pinBox.querySelectorAll("[data-load-tpl]").forEach((b) => {
-          b.addEventListener("click", (ev) => {
-            if ((ev as MouseEvent).shiftKey) {
-              const id = (b as HTMLElement).dataset.unpin;
-              if (id) {
-                confirmDlg("Unpin this template?", "Confirm").then((ok) => {
-                  if (ok)
-                    ptReq("DELETE", `/v2/templates/${id}/pin`)
-                      .then(() => syncProfile())
-                      .catch(() => {});
-                });
-              }
-            } else {
-              importShare((b as HTMLElement).dataset.loadTpl || "");
-            }
-          });
-        });
-      }
+    const client = getActiveClient();
+    if (client?.on) {
+      api(client)
+        .users.me()
+        .then((me) => {
+          const el = $("profile-bio") as HTMLTextAreaElement | null;
+          if (el && document.activeElement !== el) el.value = me?.bio || "";
+          // V3 socialLinks is the free-form label/url set (distinct from the
+          // OAuth-verified linkedAccounts); it's the source of truth now.
+          (window as any).__wallSocialLinks = me?.socialLinks || [];
+          refreshSocial((window as any).__wallSocialLinks);
+        })
+        .catch(() => {});
     }
+    loadPinnedTemplates().catch(() => {});
   });
 
-  // Avatar
-  $("avatar-upload")!.addEventListener("change", (e: Event) => {
-    const f = (e.target as HTMLInputElement).files?.[0];
+  // Avatar — V3 multipart upload (POST /api/v3/users/me/avatar, `file` field).
+  $("avatar-upload")?.addEventListener("change", async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const f = input.files?.[0];
     if (!f) return;
     const client = getActiveClient();
     if (!client?.on) {
       errorDlg("Connect to VAI-PROG backend first (Settings)");
-      (e.target as HTMLInputElement).value = "";
+      input.value = "";
       return;
     }
-    const rd = new FileReader();
-    rd.onload = async (ev) => {
-      try {
-        await api(client).users.setAvatar((ev.target as FileReader).result as string);
-        toast(t("customAvatar"), "uploaded");
-        syncProfile();
-      } catch (err: any) {
-        await errorDlg("Avatar upload failed: " + err.message);
-      }
-    };
-    rd.readAsDataURL(f);
+    try {
+      await api(client).users.uploadAvatar(f);
+      toast(t("customAvatar"), "uploaded");
+      syncProfile();
+    } catch (err: any) {
+      await errorDlg("Avatar upload failed: " + err.message);
+    } finally {
+      input.value = "";
+    }
   });
-  $("btn-avatar-reset")!.addEventListener("click", () => resetAvatar());
+  $("btn-avatar-reset")?.addEventListener("click", () => resetAvatar());
   $("btn-avatar-refresh-discord")?.addEventListener("click", async () => {
     const me = getMe();
     if (!me || !me.discord_id) {
@@ -439,6 +477,15 @@ export function wireProfile(_win: HTMLElement): void {
 
 export function buildProfilePane(): string {
   return `<div class="wp-pane" data-p="pr">
+              <div id="profile-subnav">${segmented(
+                [
+                  { value: "profile", label: t("tabProfile") },
+                  { value: "mail", label: t("tabMail") },
+                  { value: "ach", label: t("achTabTitle") },
+                ],
+                "profile",
+              )}</div>
+              <div id="profile-sub-profile" class="wd-profile-sub is-on">
                   <div class="wp-group"><div class="wp-legend">${ic("user")}${t("tabProfile")}</div>
                       <div id="profile-card"><div style="padding:6px">${t("syncing")}</div></div></div>
                   <div class="wp-group"><div class="wp-legend">${ic("bolt")}${t("profilePaintHeading")}</div>
@@ -476,5 +523,8 @@ export function buildProfilePane(): string {
                       <button class="wp-btn" id="btn-avatar-refresh-discord">${ic("discord")}Refresh Discord avatar cache</button>
                       <div class="wp-note" style="color:var(--sub)">${t("avatarNote")}</div>
                   </div>
-              </div>`;
+              </div>
+              <div id="profile-sub-mail" class="wd-profile-sub">${buildMailContent()}</div>
+              <div id="profile-sub-ach" class="wd-profile-sub">${buildAchievementsContent()}</div>
+          </div>`;
 }

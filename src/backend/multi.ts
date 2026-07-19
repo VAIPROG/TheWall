@@ -28,6 +28,9 @@ export function getMe(): BackendUser | undefined {
 
 export function setMe(u: BackendUser | undefined): void {
   globalMe = u;
+  // Identity arriving/leaving is a state change the status card cares about
+  // (e.g. session restored from a stored token without a fresh login).
+  emitBackendStateEvent();
 }
 
 function loadStoredBackends(): StoredBackend[] {
@@ -61,6 +64,45 @@ export const backends: StoredBackend[] = loadStoredBackends();
 
 export function saveBackends(): void {
   localStorage.setItem(BACKENDS_KEY, JSON.stringify(backends));
+}
+
+/**
+ * Keep the legacy single-backend `cfg` fields in sync with the ACTIVE
+ * backend. The multi-backend store is the token truth (login/refresh write
+ * here via BackendClient.setToken), but plenty of older code still reads
+ * `cfg.backendToken` — the Settings connection card, the `me.html#wd_jwt=`
+ * OAuth handoff, the connect/disconnect toggle. Without the mirror those all
+ * saw an empty token after the migration and reported "not connected" on a
+ * perfectly healthy session.
+ */
+function syncLegacyTokenMirror(): void {
+  const b = backends.find((x) => x.active) || backends[0];
+  if (!b) return;
+  const token = b.token || "";
+  const refresh = b.refreshToken || "";
+  if (cfg.backendToken !== token || cfg.refreshToken !== refresh) {
+    cfg.backendToken = token;
+    cfg.refreshToken = refresh;
+    saveCfg();
+  }
+}
+
+// Seed the mirror at boot: the stored backends may carry a token from a
+// previous session that never made it back into cfg.
+syncLegacyTokenMirror();
+
+/** Epoch ms of the last successful request on any client (liveness hint). */
+let lastOkAt = 0;
+
+export function getLastOkAt(): number {
+  return lastOkAt;
+}
+
+/** Notify UI (Settings card, titlebar, links rows) that backend state moved. */
+function emitBackendStateEvent(): void {
+  // Guard: pure/unit-test contexts have no DOM.
+  if (typeof document === "undefined") return;
+  document.dispatchEvent(new CustomEvent("wd:backend-state"));
 }
 
 export function getActiveBackend(): StoredBackend | null {
@@ -107,7 +149,17 @@ export function getClient(id?: string): BackendClient | null {
       onStateChange: (b) => {
         saveBackends();
         if (!b.enabled) setMe(undefined);
+        // Token/enabled/me changed → refresh the legacy mirror and let any
+        // status UI (Settings card, titlebar) repaint reactively.
+        syncLegacyTokenMirror();
+        emitBackendStateEvent();
       },
+    });
+    // Liveness: stamp every successful response so the status card can say
+    // "connected" from evidence, not from a flag that goes stale.
+    c.addResponseInterceptor((value) => {
+      lastOkAt = Date.now();
+      return value;
     });
     clients.set(backend.id, c);
   }

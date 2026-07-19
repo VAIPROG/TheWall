@@ -250,7 +250,8 @@ export function exportToCharityConfig(opts: {
   const { config } = encodeCharity(set, {
     faction: opts.faction,
     contact: opts.contact,
-    embedIdentity: false,
+    // Honor the Settings toggle (was hardcoded false, making the checkbox dead).
+    embedIdentity: !cfg.charityNoIdentity,
   });
 
   // Project from CharityEntry[] to legacy CharityTemplate[] shape.

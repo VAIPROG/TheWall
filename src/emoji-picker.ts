@@ -18,6 +18,11 @@ export type EmojiTarget = HTMLInputElement | HTMLTextAreaElement;
 let picker: HTMLElement | null = null;
 let currentTarget: EmojiTarget | null = null;
 let bodyEl: HTMLElement | null = null;
+// When set (via openEmojiPicker's onPick opt), a tile click delivers the chosen
+// shortcode to this callback and closes — INSTEAD of inserting into a textarea.
+// Reactions need the picked value, not composer insertion. Cleared on every
+// open so a picker reused for text insertion never leaks a prior reaction cb.
+let onPick: ((shortcode: string) => void) | null = null;
 
 function injectCss(): void {
   if (document.getElementById("wd-emoji-picker-css")) return;
@@ -317,6 +322,13 @@ function renderBody(filter = ""): void {
       img.title = isChannel ? `:${channel}:${name}:` : `:${name}:`;
       img.loading = "lazy";
       img.addEventListener("click", () => {
+        // Reaction mode: hand the bare shortcode (no trailing space) to the
+        // caller and close. Composer mode: insert with a trailing space.
+        if (onPick) {
+          onPick(isChannel ? `:${channel}:${name}:` : `:${name}:`);
+          closeEmojiPicker();
+          return;
+        }
         const ins = isChannel ? `:${channel}:${name}: ` : `:${name}: `;
         insertIntoTarget(ins);
       });
@@ -341,7 +353,15 @@ function insertIntoTarget(text: string): void {
   t.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-export interface OpenOpts { theme?: "auto" | "light" | "dark" }
+export interface OpenOpts {
+  theme?: "auto" | "light" | "dark";
+  /**
+   * When provided, a tile click delivers the chosen `:shortcode:` here and
+   * closes the picker INSTEAD of inserting into `target`. Used for message
+   * reactions, where we need the picked value rather than composer insertion.
+   */
+  onPick?: (shortcode: string) => void;
+}
 
 export async function openEmojiPicker(
   target: EmojiTarget,
@@ -350,6 +370,9 @@ export async function openEmojiPicker(
 ): Promise<void> {
   const p = ensureEmojiPicker();
   currentTarget = target;
+  // Reset per-open so a picker reused for text insertion never carries a stale
+  // reaction callback (and vice-versa).
+  onPick = opts.onPick ?? null;
 
   // Theme — apply explicit override, otherwise mirror walldev-tool.
   const dark = opts.theme === "dark" || (opts.theme !== "light" && isWalldevDark());

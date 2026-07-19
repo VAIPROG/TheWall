@@ -1,4 +1,5 @@
 import { BackendClient } from "./client";
+import type { LinkStatusWire } from "./link-status";
 import type { NotificationView } from "./notifications";
 
 export interface InboxItem extends NotificationView {}
@@ -14,17 +15,6 @@ export interface LegacyMailboxItem {
 export interface SendDmRequest {
   to: string;
   content: string;
-}
-
-export interface LinkAccount {
-  username?: string;
-  linkedAt?: string;
-}
-
-export interface LinkStatus {
-  telegram?: LinkAccount;
-  discord?: LinkAccount;
-  email?: LinkAccount;
 }
 
 export function buildMailboxApi(client: BackendClient) {
@@ -92,8 +82,8 @@ export function buildMailboxApi(client: BackendClient) {
     /** @deprecated use `api(client).mailbox.deletePaintReminder`. */
     deletePaintReminder: () => client.deleteRoot("/v2/me/paint-reminder"),
 
-    /** @deprecated use `api(client).users.links()`. */
-    links: () => client.getRoot<LinkStatus>("/v2/me/links"),
+    /** Flat snake_case wire shape — feed through `mapLinkStatus()` for UI. */
+    links: () => client.getRoot<LinkStatusWire>("/v2/me/links"),
 
     /** @deprecated use `api(client).users.unlink()`. */
     unlink: (provider: string) => client.deleteRoot(`/v2/me/links/${encodeURIComponent(provider)}`),

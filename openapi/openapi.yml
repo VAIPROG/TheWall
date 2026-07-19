@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: The Wall Dev API
-  version: "3.0.0"
+  version: "3.2.0"
   description: |
     # The Wall Dev API v3
 
@@ -210,9 +210,18 @@ paths:
   /admin/broadcast:
     $ref: "./paths/admins-system.yaml#/AdminBroadcast"
 
+  /admin/stats:
+    $ref: "./paths/admins-system.yaml#/AdminStats"
+
+  /admin/messages/{messageId}:
+    $ref: "./paths/admins-system.yaml#/AdminMessageById"
+
   # ════════════════════════════════════════════════════════════════════
   # ADMINS — User Management
   # ════════════════════════════════════════════════════════════════════
+
+  /admin/users:
+    $ref: "./paths/admins-users.yaml#/AdminUsers"
 
   /admin/users/{userRef}:
     $ref: "./paths/admins-users.yaml#/AdminUserById"
@@ -246,6 +255,12 @@ paths:
 
   /admin/users/{userRef}/notes:
     $ref: "./paths/admins-users.yaml#/AdminUserNotes"
+
+  /admin/clans/{clanId}/members/{userRef}/role:
+    $ref: "./paths/admins-users.yaml#/AdminClanMemberRole"
+
+  /admin/clans/{clanId}/transfer-owner:
+    $ref: "./paths/admins-users.yaml#/AdminClanTransferOwner"
 
   # ════════════════════════════════════════════════════════════════════
   # USERS
@@ -321,6 +336,9 @@ paths:
   /clans/new:
     $ref: "./paths/clans.yaml#/ClansNew"
 
+  /clans/mine:
+    $ref: "./paths/clans.yaml#/ClansMine"
+
   /clans/discord/owned-guilds:
     $ref: "./paths/clans.yaml#/ClansDiscordOwnedGuilds"
 
@@ -338,6 +356,12 @@ paths:
 
   /clans/{clanId}:
     $ref: "./paths/clans.yaml#/ClanById"
+
+  /clans/{clanId}/avatar:
+    $ref: "./paths/clans.yaml#/ClanAvatar"
+
+  /clans/{clanId}/banner:
+    $ref: "./paths/clans.yaml#/ClanBanner"
 
   /clans/{clanId}/members:
     $ref: "./paths/clans.yaml#/ClanMembers"

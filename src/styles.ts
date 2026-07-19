@@ -27,7 +27,10 @@ export function styleSheet(): string {
 .wp-tab .wd-ic{margin-right:3px}
 .wp-tab.active{font-weight:bold;padding-top:5px;z-index:2;position:relative}
 .wp-content{border:1px solid;border-color:var(--light) var(--shadow) var(--shadow) var(--light);margin:0 4px 4px;padding:8px;max-height:68vh;overflow:auto}
-.wp-pane{display:none}.wp-pane.active{display:block}
+.wp-pane{display:none}.wp-pane.active{display:block;animation:wp-pane-in .18s ease-out}
+.wd-profile-sub{display:none}.wd-profile-sub.is-on{display:block}
+#profile-subnav{margin-bottom:8px}
+@keyframes wp-pane-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .wp-group{border:2px groove var(--group);padding:8px;margin-bottom:9px;position:relative}
 .wp-legend{position:absolute;top:-8px;left:6px;background:var(--bg);padding:0 4px;font-weight:bold;display:flex;align-items:center}
 .wp-section-hdr{font-size:10px;font-weight:bold;color:var(--sub);text-transform:uppercase;letter-spacing:1.2px;display:flex;align-items:center;gap:4px;margin:14px 0 6px 2px;padding-bottom:4px;border-bottom:1px dashed var(--shadow);opacity:.9}

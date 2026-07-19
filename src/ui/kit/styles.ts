@@ -208,5 +208,224 @@ export function kitStyles(): string {
 .wd-notes { margin:0; padding-left:16px; font-size:11px; display:flex; flex-direction:column; gap:2px; }
 .wd-bundle { margin:0; padding-left:18px; font-size:11px; }
 .wd-tpl-id { font:10px monospace; color:var(--sub); text-align:center; margin-top:4px; word-break:break-all; user-select:all; opacity:.7; }
+
+/* --- stubs (remaining Community screens land in Tasks 4–6) --- */
+.wd-stub { padding:12px; color:var(--sub); font-size:11px; text-align:center; }
+
+/* --- Community Hub --- */
+.wd-comm-hub { display:flex; flex-direction:column; gap:8px; }
+/* Chat rows reuse .wd-list/.wd-row; add clickability + an unread pill. The
+   leading per-type SVG (shield/globe/clanChat/user) renders muted so the
+   label keeps the visual weight. */
+.wd-comm-chat { cursor:pointer; }
+.wd-comm-chat:hover { background:var(--group); }
+.wd-comm-chat > .wd-ic { flex:none; margin:0; color:var(--sub); }
+.wd-comm-chat .wd-comm-unread {
+  flex:none; font-size:9px; padding:1px 5px; color:#fff; background:var(--accent);
+  border-radius:8px; min-width:14px; text-align:center;
+}
+.wd-comm-actions { display:flex; gap:6px; }
+.wd-comm-actions .wd-btn { flex:1; }
+/* Info card: a Win95 About box. Every link carries a small muted leading
+   icon; long labels ellipsize instead of wrapping the icon away. */
+.wd-comm-info { display:flex; flex-direction:column; gap:5px; }
+.wd-comm-info-link {
+  display:inline-flex; align-items:center; gap:5px; min-width:0;
+  color:var(--accent); font-size:11px; text-decoration:none;
+}
+.wd-comm-info-link:hover { text-decoration:underline; }
+.wd-comm-info-link .wd-ic { flex:none; margin:0; color:var(--sub); }
+.wd-comm-info-link span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Author + donate: the headline block, sunken like a group well. */
+.wd-comm-info-author {
+  padding:5px 7px; background:var(--group);
+  border:2px solid; border-color:var(--dark) var(--light) var(--light) var(--dark);
+}
+.wd-comm-info-author .wd-comm-info-link { font-weight:bold; }
+/* Donate note: the emphasised line (donations fund the projects) — an
+   accent-barred aside under the author link. */
+.wd-comm-info-note {
+  margin-top:4px; padding:2px 0 2px 6px; border-left:3px solid var(--accent);
+  color:var(--sub); font-size:10px;
+}
+/* Two Discord servers as tidy side-by-side beveled link-buttons. */
+.wd-comm-info-discord { display:flex; gap:6px; margin-top:1px; }
+.wd-comm-info-dbtn { flex:1; text-decoration:none; box-sizing:border-box; }
+
+/* ---- Thread screen (message list + composer) ---- */
+/* Flex-fill chain: .wp-content is a max-height scroll box (the resize grip
+   sets its max-height inline) whose children are all auto-height, so a bare
+   height:100% on the thread never resolved — long threads pushed the
+   composer below the fold and the whole pane scrolled instead of the message
+   list. Bound the chain top-down (Chrome-only extension, so :has() is fine):
+   content → community pane → stack → screen each flex + min-height:0, and the
+   screen scrolls for non-thread screens (hub/clan/browse) since .wd-stack
+   clips overflow. */
+.wp-content:has(> .wp-pane[data-p="co"].active) { display:flex; flex-direction:column; }
+.wp-pane[data-p="co"].active { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+.wp-pane[data-p="co"].active > .wd-stack { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+#comm-stack .wd-stack-screen { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow-y:auto; }
+#comm-stack > .wd-stack-back { flex:none; } /* back header must never shrink */
+#comm-stack .wd-stack-screen > * { flex:none; }
+#comm-stack .wd-stack-screen > .wd-comm-thread { flex:1 1 auto; min-height:0; }
+.wd-comm-thread { display:flex; flex-direction:column; min-height:0; gap:6px; }
+.wd-comm-msglist {
+  /* flex-fill + min-height:0 lets the list track the resizable window while
+     the composer stays pinned below. */
+  flex:1 1 auto; min-height:0; overflow-y:auto;
+  display:flex; flex-direction:column; gap:6px; padding:2px;
+}
+/* One message row. */
+.wd-comm-msg { display:flex; flex-direction:column; gap:2px; }
+.wd-comm-msg-head { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--sub); }
+.wd-comm-msg-av { width:16px; height:16px; border-radius:50%; flex:none; object-fit:cover; }
+.wd-comm-msg-name { font-weight:bold; color:var(--text); }
+.wd-comm-msg-time { color:var(--sub); }
+.wd-comm-msg-edited { font-style:italic; }
+.wd-comm-msg-body { font-size:12px; overflow-wrap:anywhere; word-break:break-word; white-space:pre-wrap; }
+.wd-comm-msg-body.is-deleted { color:var(--sub); font-style:italic; }
+.wd-comm-msg-body code { background:var(--group); padding:0 2px; }
+/* Reaction chips. */
+.wd-comm-reacts { display:flex; flex-wrap:wrap; gap:4px; margin-top:1px; }
+.wd-comm-react {
+  font-size:10px; line-height:1; padding:2px 5px; cursor:pointer;
+  border:1px solid var(--dark); background:var(--group); color:var(--text);
+  display:inline-flex; align-items:center; gap:3px;
+}
+.wd-comm-react:hover { filter:brightness(1.08); }
+.wd-comm-react.is-on { background:var(--accent); color:#fff; border-color:var(--accent); }
+.wd-comm-react-n { font-variant-numeric:tabular-nums; }
+/* Per-message action buttons (edit/delete/report/pin). */
+.wd-comm-acts { display:flex; gap:6px; margin-top:1px; }
+.wd-comm-act {
+  font-size:9px; color:var(--sub); background:none; border:0; cursor:pointer; padding:0;
+}
+.wd-comm-act:hover { color:var(--accent); text-decoration:underline; }
+/* Inline edit. */
+.wd-comm-edit-ta { width:100%; }
+.wd-comm-edit-actions { display:flex; gap:6px; margin-top:4px; }
+/* Composer: textarea + emoji + send. */
+.wd-comm-composer { display:flex; align-items:flex-end; gap:6px; flex:none; flex-wrap:nowrap; }
+.wd-comm-input { flex:1 1 auto; min-width:0; resize:vertical; min-height:34px; }
+/* Emoji + Send keep their intrinsic size and sit at the SAME baseline as the
+   input's bottom edge. The shared .wp-emoji-btn sets align-self:flex-start
+   globally (it would float the emoji button to the TOP, out of line with Send)
+   — override it to flex-end here. min-width:0 on the textarea lets it shrink
+   so the buttons never squish/wrap/distort as the window resizes. */
+.wd-comm-composer > .wp-emoji-btn,
+.wd-comm-composer > #comm-send { flex:none; align-self:flex-end; }
+.wd-comm-composer > #comm-mention-suggest { position:absolute; }
+/* Hub: chats header + "New message" inline compose. */
+.wd-comm-chats-head { display:flex; align-items:center; gap:6px; }
+.wd-comm-dm-compose { display:flex; align-items:center; gap:6px; }
+.wd-comm-dm-compose .wp-input { flex:1; min-width:0; }
+.wd-comm-chat-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Compact (narrow window): shrink avatars + tighten message rows. */
+@media (max-width: 360px) {
+  .wd-comm-msg-av { width:14px; height:14px; }
+  .wd-comm-msg { gap:1px; }
+}
+
+/* ---- Clan management drill-in (reuses .wd-tpl-detail / .wd-kv* / .wd-list) ---- */
+.wd-clan-openchat { display:flex; margin-bottom:8px; }
+.wd-clan-head { display:flex; flex-direction:column; gap:4px; }
+.wd-clan-via { font-size:10px; color:var(--sub); align-self:center; }
+.wd-clan-desc { font-size:11px; color:var(--sub); word-break:break-word; }
+/* Roster rows: avatar + name/badge + inline role select & kick. */
+.wd-clan-member .wd-clan-av { border-radius:50%; object-fit:cover; }
+.wd-clan-mctl { display:flex; align-items:center; gap:4px; flex:none; }
+.wd-clan-role { font:10px "MS Sans Serif",sans-serif; }
+/* Invites: mono code + meta. */
+.wd-clan-code { font:11px monospace; user-select:all; }
+.wd-clan-imeta { font-size:10px; color:var(--sub); white-space:nowrap; }
+/* Applications: applicant + optional message. */
+.wd-clan-app { align-items:flex-start; }
+.wd-clan-appwho { font-weight:bold; }
+.wd-clan-appmsg { font-size:10px; color:var(--sub); white-space:pre-wrap; word-break:break-word; }
+/* Settings form fields. */
+.wd-clan-fld { display:flex; flex-direction:column; gap:2px; font-size:10px; color:var(--sub); margin-bottom:5px; }
+.wd-clan-fld > input, .wd-clan-fld > textarea, .wd-clan-fld > select { font:11px "MS Sans Serif",Tahoma,sans-serif; width:100%; box-sizing:border-box; }
+.wd-clan-chk { display:flex; align-items:center; gap:5px; font-size:11px; margin-bottom:5px; }
+/* Trailing action row (Load more / Save / Create invite). */
+.wd-clan-more { margin-top:5px; }
+.wd-clan-danger { display:flex; gap:6px; flex-wrap:wrap; }
+/* ---- Clan page: segmented sub-nav (Overview/Members/Requests/Settings) + Media ---- */
+.wd-clan-sub { display:none; }
+.wd-clan-sub.is-on { display:block; }
+#comm-clan-subnav { margin:8px 0; }
+.wd-clan-media { display:flex; flex-direction:column; gap:6px; }
+/* ---- Clan page: global-moderation section (moderator+ only) ---- */
+.wd-clan-modfields { display:flex; flex-wrap:wrap; gap:2px 10px; margin-bottom:5px; }
+.wd-clan-modfields .wd-clan-chk { margin-bottom:0; }
+.wd-clan-modlocked { font-size:11px; margin-bottom:5px; }
+.wd-clan-modwhy { font-size:10px; color:var(--sub); word-break:break-word; }
+/* ---- Community browse + create-clan chooser (reuses .wd-list/.wd-row/.wd-clan-fld) ---- */
+.wd-comm-browse { display:flex; flex-direction:column; gap:6px; }
+.wd-comm-br-bar { display:flex; align-items:center; gap:6px; }
+.wd-comm-br-search { flex:1; min-width:0; font:11px "MS Sans Serif",Tahoma,sans-serif; box-sizing:border-box; }
+.wd-comm-br-row { cursor:pointer; }
+.wd-comm-br-row:hover .wd-clancard { background:var(--group); }
+.wd-comm-br-foot { display:flex; align-items:center; gap:6px; padding:4px 0 2px; }
+.wd-comm-br-meta { font-size:10px; color:var(--sub); }
+.wd-comm-br-chooser { display:flex; flex-direction:column; gap:8px; }
+.wd-comm-br-note { font-size:11px; color:var(--text); margin-bottom:4px; }
+.wd-comm-br-muted { color:var(--sub); }
+.wd-comm-br-suggest { font-size:12px; font-weight:bold; margin-bottom:4px; }
+/* ---- Advanced clan card (banner + overlaid avatar + stat chips; Hub full / browse compact) ---- */
+.wd-clancard { position:relative; border:2px solid; border-color:var(--dark) var(--light) var(--light) var(--dark); background:var(--field); overflow:hidden; }
+.wd-clancard-banner { height:56px; background-size:cover; background-position:center; background-color:var(--group); }
+.wd-clancard--compact .wd-clancard-banner { height:34px; }
+.wd-clancard-av { position:absolute; left:8px; top:34px; border:2px solid var(--field); background:var(--group); }
+.wd-clancard--compact .wd-clancard-av { top:16px; width:32px; height:32px; }
+.wd-clancard-body { padding:8px 8px 8px 56px; }
+.wd-clancard-name { font-weight:bold; font-size:12px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.wd-clancard-tag { color:var(--sub); font-weight:normal; }
+.wd-clancard-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; font-size:10px; color:var(--sub); }
+.wd-clancard-chip { white-space:nowrap; display:inline-flex; align-items:center; gap:3px; }
+.wd-clancard-chip .wd-ic { flex:none; margin:0; }
+/* Online-count LED: a small themed green dot (kit --ok token). */
+.wd-clancard-dot {
+  width:7px; height:7px; border-radius:50%; background:var(--ok);
+  box-shadow:inset -1px -1px 0 rgba(0,0,0,.3); display:inline-block; flex:none;
+}
+
+/* ---- Admin console (sectioned V3 console — ui/admin.ts + admin-ui.ts) ---- */
+/* Sub-sections: one visible at a time, toggled by setAdminSection. */
+.wd-adm-sec { display:none; }
+.wd-adm-sec.is-on { display:flex; flex-direction:column; gap:8px; }
+#admin-subnav { margin-bottom:8px; }
+#admin-subnav .wd-seg { display:flex; flex-wrap:wrap; }
+#admin-subnav .wd-seg > button { flex:1 0 auto; }
+/* Small muted secondary text inside admin rows/panels. */
+.wd-adm-sec .sub { color:var(--sub); font-size:10px; }
+.wd-adm-mono { font:10px monospace; color:var(--sub); word-break:break-all; user-select:all; }
+/* Dashboard stat cards (3-up grid; alert = open reports). */
+.wd-adm-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; }
+.wd-adm-stat { border:1px solid var(--shadow); background:var(--group); padding:5px 3px; text-align:center; }
+.wd-adm-stat .k { font-size:9px; color:var(--sub); text-transform:uppercase; letter-spacing:.4px; }
+.wd-adm-stat .v { font:bold 15px monospace; color:var(--accent); }
+.wd-adm-stat.is-alert .v { color:var(--err); }
+.wd-adm-stat[data-goto] { cursor:pointer; }
+.wd-adm-stat[data-goto]:hover { filter:brightness(1.06); }
+.wd-adm-health { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+/* Toolbars (search bar, filter bar) + pagers + button clusters. */
+.wd-adm-bar { display:flex; gap:4px; align-items:center; }
+.wd-adm-bar .wp-input { flex:1; min-width:0; }
+.wd-adm-pager { display:flex; gap:6px; align-items:center; justify-content:flex-end; font-size:10px; color:var(--sub); margin-top:4px; }
+.wd-adm-acts { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+.wd-adm-form { display:flex; flex-direction:column; gap:4px; }
+.wd-adm-cfgrow { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; }
+/* Users: clickable result rows + the per-user action panel. */
+.wd-adm-urow { cursor:pointer; }
+.wd-adm-urow:hover { background:var(--group); }
+.wd-adm-panel { display:flex; flex-direction:column; gap:6px; }
+.wd-adm-phead { display:flex; align-items:center; gap:6px; font-size:12px; }
+.wd-adm-restr { display:flex; flex-direction:column; gap:3px; }
+/* Reports: action column + the inline resolve/dismiss form. */
+.wd-adm-rep { align-items:flex-start; }
+.wd-adm-repacts { display:flex; flex-direction:column; gap:3px; flex:none; }
+.wd-adm-inline { background:var(--group); border:1px solid var(--shadow); padding:5px; margin-top:4px; display:flex; flex-direction:column; gap:4px; }
+/* Clan takedown field checkboxes. */
+.wd-adm-tdfields { display:flex; flex-wrap:wrap; gap:2px 10px; margin-top:4px; }
 `;
 }

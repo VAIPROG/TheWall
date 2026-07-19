@@ -46,7 +46,8 @@ pub struct UpdateProfile {
     pub social_links: Option<Vec<SocialLink>>,
 }
 
-fn validate_url(url: &str) -> Result<(), String> {
+/// Shared with V3 `PATCH /users/me` — keep the whitelist in one place.
+pub(crate) fn validate_url(url: &str) -> Result<(), String> {
     let lower = url.to_ascii_lowercase();
     if !lower.starts_with("https://") {
         return Err(format!("url must be https://: {url}"));

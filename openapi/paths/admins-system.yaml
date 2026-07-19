@@ -250,3 +250,73 @@ AdminBroadcast:
         $ref: "../components/responses/common.yaml#/Unauthorized"
       "403":
         $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminStats:
+  get:
+    tags: [Admins]
+    summary: Get server-wide statistics
+    operationId: adminGetStats
+    description: |
+      Returns aggregate counters across the platform. Global `admin` or higher.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Server statistics.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - users
+                - clans
+                - templates
+                - messages
+                - openReports
+                - activeSessions
+              properties:
+                users: { type: integer }
+                clans: { type: integer }
+                templates: { type: integer }
+                messages: { type: integer }
+                openReports: { type: integer }
+                activeSessions: { type: integer }
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminMessageById:
+  delete:
+    tags: [Admins]
+    summary: Soft-delete any message
+    operationId: adminDeleteMessage
+    description: |
+      Soft-deletes any message by id, regardless of chat or author. Global
+      `moderator` or higher.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/MessageIdPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Message soft-deleted.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok, message]
+              properties:
+                ok: { type: boolean, example: true }
+                message: { type: string }
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"

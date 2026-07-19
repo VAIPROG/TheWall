@@ -1,9 +1,9 @@
 export { wireAdmin } from "./admin";
-export { wireChats } from "./chats";
 export { wireOverlay, applyScalePct } from "./overlay-tab";
 export { wireProfile } from "./profile-tab";
 export { wireSettings } from "./settings-tab";
 export { wireTemplates } from "./templates/shell";
+export { wireCommunity } from "./community/shell";
 export * from "./paint";
 export { wireWindowChrome } from "./window-chrome";
 export { loadAchievementList } from "./achievements-tab";
@@ -13,8 +13,8 @@ import { wireLinks } from "../links-wire";
 import { wireWindowChrome } from "./window-chrome";
 import { wireOverlay } from "./overlay-tab";
 import { wireTemplates } from "./templates/shell";
+import { wireCommunity } from "./community/shell";
 import { wireProfile } from "./profile-tab";
-import { wireChats } from "./chats";
 import { wireSettings } from "./settings-tab";
 import { wireAdmin } from "./admin";
 import { wireMailUI } from "../mail";
@@ -47,10 +47,14 @@ export function wireExtensionUI(win: HTMLElement): void {
   // templates tab
   wireTemplates(win);
 
-  // social tab
+  // community tab
+  wireCommunity(win);
+
   // Wall snapshot — fetch every tile from ws.filianislost.com/tiles, stitch
   // onto a brick-background canvas, downscale to chosen quality, download PNG.
-  $("btn-snapshot")!.addEventListener("click", () => {
+  // The control now lives in the Overlay pane (its old Social home was retired);
+  // wire it null-safe so a missing button never aborts the rest of wiring.
+  $("btn-snapshot")?.addEventListener("click", () => {
     const sel = $("snapshot-quality") as HTMLSelectElement | null;
     const q = (sel?.value || "high") as "low" | "medium" | "high";
     downloadWallSnapshot(q);
@@ -61,7 +65,6 @@ export function wireExtensionUI(win: HTMLElement): void {
 
   // mail tab
   wireMailUI();
-  wireChats(win);
 
   // settings tab
   wireSettings(win);

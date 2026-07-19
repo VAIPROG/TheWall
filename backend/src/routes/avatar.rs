@@ -14,6 +14,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+use crate::routes::identicon;
 use crate::{AppState, auth::AuthUser, models::AvatarRequest};
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +34,7 @@ struct ImageRow {
 }
 
 // Decode a data: URL into (mime, bytes). Falls back to image/png if no mime.
-fn decode_data_url(data_url: &str) -> Option<(String, Vec<u8>)> {
+pub(crate) fn decode_data_url(data_url: &str) -> Option<(String, Vec<u8>)> {
     let trimmed = data_url.strip_prefix("data:")?;
     let (header_part, b64_part) = trimmed.split_once(",")?;
     let mime = header_part
@@ -45,7 +46,7 @@ fn decode_data_url(data_url: &str) -> Option<(String, Vec<u8>)> {
     Some((mime, bytes))
 }
 
-fn image_response(mime: String, bytes: Vec<u8>) -> Response {
+pub(crate) fn image_response(mime: String, bytes: Vec<u8>) -> Response {
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, mime)
@@ -104,11 +105,15 @@ pub async fn update_my_avatar(
     .await;
 
     match result {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(serde_json::json!({"ok": true, "size": webp_bytes.len()})),
-        )
-            .into_response(),
+        Ok(_) => {
+            // Invalidate the cached fallback so the new upload shows immediately.
+            avatar_cache_evict(auth.user_id);
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({"ok": true, "size": webp_bytes.len()})),
+            )
+                .into_response()
+        }
         Err(e) => {
             tracing::error!("update_my_avatar db error: {e}");
             (
@@ -120,7 +125,7 @@ pub async fn update_my_avatar(
     }
 }
 
-fn encode_webp(bytes: &[u8], max_side: u32) -> Result<Vec<u8>, String> {
+pub(crate) fn encode_webp(bytes: &[u8], max_side: u32) -> Result<Vec<u8>, String> {
     let reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
         .map_err(|e| format!("guess format: {e}"))?;
@@ -143,7 +148,12 @@ pub async fn delete_my_avatar(auth: AuthUser, State(state): State<AppState>) -> 
         .execute(&state.pool)
         .await;
     match r {
-        Ok(_) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
+        Ok(_) => {
+            // Invalidate the cache so the next request falls back (Discord →
+            // identicon) immediately rather than serving the stale custom one.
+            avatar_cache_evict(auth.user_id);
+            (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response()
+        }
         Err(e) => {
             tracing::error!("delete_my_avatar db error: {e}");
             (
@@ -214,43 +224,109 @@ pub async fn get_avatar(
     fetch_avatar_cached(user_id, &state).await
 }
 
-/// Shared fetch+cache logic used by both get_avatar and get_avatar_v2.
+/// Shared avatar resolution behind every avatar read path (`/avatar`,
+/// `/api/v2/avatar/{id}`, `/api/v3/users/{ref}/avatar`). For a *known* user it
+/// never returns 404 — it walks a fallback chain and always ends with a
+/// generated identicon:
+///
+///   1. custom upload (the `avatars` table),
+///   2. the account's linked Discord avatar (if a verified discord link exists),
+///   3. a deterministic identicon derived from the user id.
+///
+/// The chosen image is cached for [`AVATAR_CACHE_TTL`] keyed by user id; avatar
+/// uploads/deletes evict the entry so changes appear immediately.
 async fn fetch_avatar_cached(user_id: Uuid, state: &AppState) -> Response {
-    // Check cache
+    // Cache hit. Post-change entries are always `Some`; a legacy `None` entry
+    // is treated as a miss so it re-resolves through the new chain.
     {
         let cache = avatar_cache().lock().unwrap();
         if let Some(entry) = cache.get(&user_id) {
             if entry.fetched_at.elapsed() < AVATAR_CACHE_TTL {
-                tracing::debug!("get_avatar: cache hit for user_id={user_id}");
-                return match &entry.data {
-                    Some((mime, bytes)) => image_response(mime.clone(), bytes.clone()),
-                    None => StatusCode::NOT_FOUND.into_response(),
-                };
+                if let Some((mime, bytes)) = &entry.data {
+                    tracing::debug!("get_avatar: cache hit for user_id={user_id}");
+                    return image_response(mime.clone(), bytes.clone());
+                }
             }
         }
     }
 
-    let row = sqlx::query_as::<_, ImageRow>("SELECT image FROM avatars WHERE user_id = $1")
+    // 1. Custom upload.
+    let custom = sqlx::query_as::<_, ImageRow>("SELECT image FROM avatars WHERE user_id = $1")
         .bind(user_id)
         .fetch_optional(&state.pool)
         .await
         .ok()
-        .flatten();
+        .flatten()
+        .and_then(|r| decode_data_url(&r.image));
+    if let Some((mime, bytes)) = custom {
+        tracing::debug!("get_avatar: custom avatar for user_id={user_id}");
+        avatar_cache_insert(user_id, Some((mime.clone(), bytes.clone())));
+        return image_response(mime, bytes);
+    }
 
-    let decoded = row.and_then(|r| decode_data_url(&r.image));
-    avatar_cache_insert(user_id, decoded.clone());
-
-    match decoded {
-        Some((mime, bytes)) => {
-            tracing::debug!(
-                "get_avatar: serving {mime} ({} bytes) for user_id={user_id}",
-                bytes.len()
-            );
-            image_response(mime, bytes)
+    // 2. Linked Discord avatar.
+    if let Some(discord_uid) = discord_uid_for(user_id, state).await {
+        if let Some((mime, bytes)) = discord_avatar_bytes(&discord_uid, state).await {
+            tracing::debug!("get_avatar: discord fallback for user_id={user_id}");
+            avatar_cache_insert(user_id, Some((mime.clone(), bytes.clone())));
+            return image_response(mime, bytes);
         }
+    }
+
+    // 3. Generated identicon — always succeeds, so this path never 404s.
+    tracing::debug!("get_avatar: identicon fallback for user_id={user_id}");
+    let bytes = identicon::identicon_svg(&user_id.to_string(), 256).into_bytes();
+    let mime = "image/svg+xml; charset=utf-8".to_string();
+    avatar_cache_insert(user_id, Some((mime.clone(), bytes.clone())));
+    image_response(mime, bytes)
+}
+
+/// Return the account's verified Discord snowflake, if it has one, so the
+/// avatar chain can fall back to the Discord CDN. Prefers the V3 `provider_links`
+/// table (backfilled from the legacy `users.discord_id`).
+async fn discord_uid_for(user_id: Uuid, state: &AppState) -> Option<String> {
+    sqlx::query_scalar::<_, String>(
+        "SELECT provider_uid FROM provider_links \
+         WHERE account_id = $1 AND provider = 'discord' AND is_verified \
+         ORDER BY linked_at LIMIT 1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await
+    .ok()
+    .flatten()
+}
+
+// GET /api/v3/users/{user_ref}/avatar — the advanced avatar path. Resolves the
+// ref (UUID or site external_id) then serves the full fallback chain. Never
+// 404s for a resolvable user; an unresolvable ref still yields a stable
+// identicon so `<img>` never breaks.
+pub async fn get_user_avatar_v3(
+    Path(user_ref): Path<String>,
+    State(state): State<AppState>,
+) -> Response {
+    let user_id_opt: Option<Uuid> = if let Ok(uuid) = Uuid::parse_str(&user_ref) {
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id = $1")
+            .bind(uuid)
+            .fetch_optional(&state.pool)
+            .await
+            .ok()
+            .flatten()
+    } else {
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE external_id = $1")
+            .bind(&user_ref)
+            .fetch_optional(&state.pool)
+            .await
+            .ok()
+            .flatten()
+    };
+
+    match user_id_opt {
+        Some(user_id) => fetch_avatar_cached(user_id, &state).await,
         None => {
-            tracing::debug!("get_avatar: no avatar row for user_id={user_id}");
-            StatusCode::NOT_FOUND.into_response()
+            // Unknown ref: keep `<img>` intact with a ref-seeded identicon.
+            tracing::debug!("get_user_avatar_v3: unresolved ref={user_ref}, serving identicon");
+            identicon::svg_response(identicon::identicon_svg(&user_ref, 256))
         }
     }
 }
@@ -293,6 +369,13 @@ fn avatar_cache_insert(user_id: Uuid, data: Option<(String, Vec<u8>)>) {
         }
     }
     cache.insert(user_id, AvatarCacheEntry { data, fetched_at: Instant::now() });
+}
+
+/// Drop a user's cached avatar so the next request re-resolves the fallback
+/// chain immediately. Called after a custom avatar is uploaded or deleted so
+/// the change is visible right away instead of waiting out the cache TTL.
+fn avatar_cache_evict(user_id: Uuid) {
+    avatar_cache().lock().unwrap().remove(&user_id);
 }
 
 // -------- Discord avatar proxy --------
@@ -435,24 +518,33 @@ pub async fn get_discord_avatar(
     State(state): State<AppState>,
     Query(params): Query<AvatarQuery>,
 ) -> Response {
-    let discord_id = params.user_id;
-    tracing::debug!("get_discord_avatar: discord_id={discord_id}");
+    tracing::debug!("get_discord_avatar: discord_id={}", params.user_id);
+    match discord_avatar_bytes(&params.user_id, &state).await {
+        Some((mime, bytes)) => image_response(mime, bytes),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
 
-    // Check cache (positive + negative)
+/// Resolve a Discord snowflake to avatar bytes (WebP, or raw GIF for animated
+/// avatars), going through the shared positive/negative cache + rate limiter.
+/// Returns `None` when the id is unknown or the CDN fetch fails. This is the
+/// reusable core behind both `GET /discord/avatar` and the user avatar chain.
+async fn discord_avatar_bytes(discord_id: &str, state: &AppState) -> Option<(String, Vec<u8>)> {
+    // Check cache (positive + negative).
     {
         let cache = discord_cache().lock().unwrap();
-        if let Some(entry) = cache.get(&discord_id) {
+        if let Some(entry) = cache.get(discord_id) {
             if entry.bytes.is_empty() {
                 if entry.cached_at.elapsed() < DISCORD_NEGATIVE_TTL {
-                    tracing::debug!("get_discord_avatar: negative cache hit for {discord_id}");
-                    return StatusCode::NOT_FOUND.into_response();
+                    tracing::debug!("discord_avatar_bytes: negative cache hit for {discord_id}");
+                    return None;
                 }
             } else if entry.cached_at.elapsed() < DISCORD_CACHE_TTL {
                 tracing::debug!(
-                    "get_discord_avatar: cache hit for {discord_id} ({} bytes)",
+                    "discord_avatar_bytes: cache hit for {discord_id} ({} bytes)",
                     entry.bytes.len()
                 );
-                return image_response(entry.mime.clone(), entry.bytes.clone());
+                return Some((entry.mime.clone(), entry.bytes.clone()));
             }
         }
     }
@@ -468,32 +560,27 @@ pub async fn get_discord_avatar(
         .or_else(|| crate::config::opt_env("DISCORD_BOT"));
     if bot_token.is_none() {
         tracing::warn!(
-            "get_discord_avatar({discord_id}): no bot token (DISCORD_BOT_TOKEN unset) — falling back to embed avatar"
+            "discord_avatar_bytes({discord_id}): no bot token (DISCORD_BOT_TOKEN unset) — falling back to embed avatar"
         );
     }
     let client = reqwest::Client::new();
 
     // 1. Get avatar hash via Discord API (rate-limited).
     let avatar_hash: Option<String> = if let Some(token) = bot_token {
-        match discord_users_get(&client, &token, &discord_id, 3).await {
+        match discord_users_get(&client, &token, discord_id, 3).await {
             Ok(r) if r.status().is_success() => {
                 let parsed: Option<DiscordUser> = r.json().await.ok();
-                let hash = parsed.and_then(|u| u.avatar);
-                tracing::debug!(
-                    "get_discord_avatar({discord_id}): Discord API ok, avatar_hash={:?}",
-                    hash
-                );
-                hash
+                parsed.and_then(|u| u.avatar)
             }
             Ok(r) => {
                 tracing::warn!(
-                    "get_discord_avatar({discord_id}): Discord API status {}",
+                    "discord_avatar_bytes({discord_id}): Discord API status {}",
                     r.status()
                 );
                 None
             }
             Err(e) => {
-                tracing::warn!("get_discord_avatar({discord_id}): Discord API err {}", e);
+                tracing::warn!("discord_avatar_bytes({discord_id}): Discord API err {}", e);
                 None
             }
         }
@@ -501,7 +588,7 @@ pub async fn get_discord_avatar(
         None
     };
 
-    // 2. Build CDN URL
+    // 2. Build CDN URL (custom hash, else the deterministic embed default).
     let cdn_url = if let Some(hash) = avatar_hash {
         let ext = if hash.starts_with("a_") { "gif" } else { "png" };
         format!(
@@ -509,7 +596,6 @@ pub async fn get_discord_avatar(
             discord_id, hash, ext
         )
     } else {
-        // Fallback to default embed avatar
         let idx = discord_id
             .parse::<u128>()
             .ok()
@@ -518,7 +604,7 @@ pub async fn get_discord_avatar(
         format!("https://cdn.discordapp.com/embed/avatars/{}.png", idx)
     };
 
-    // 3. Fetch image bytes
+    // 3. Fetch image bytes.
     match client.get(&cdn_url).send().await {
         Ok(r) if r.status().is_success() => {
             let src_mime = r
@@ -539,32 +625,34 @@ pub async fn get_discord_avatar(
                             Err(_) => (src_mime, raw),
                         }
                     };
-                    let mut cache = discord_cache().lock().unwrap();
-                    cache.insert(
-                        discord_id,
+                    discord_cache().lock().unwrap().insert(
+                        discord_id.to_string(),
                         DiscordCacheEntry {
                             bytes: final_bytes.clone(),
                             mime: final_mime.clone(),
                             cached_at: Instant::now(),
                         },
                     );
-                    image_response(final_mime, final_bytes)
+                    Some((final_mime, final_bytes))
                 }
-                Err(_) => StatusCode::BAD_GATEWAY.into_response(),
+                Err(_) => None,
             }
         }
         _ => {
-            // Negative cache so we don't hammer Discord for unknown IDs.
-            let mut cache = discord_cache().lock().unwrap();
-            cache.insert(
-                discord_id,
+            // Negative cache so we don't hammer Discord for unknown IDs. An
+            // empty `bytes` marks the miss; the read side honours it for
+            // `DISCORD_NEGATIVE_TTL`. Use `Instant::now()` directly —
+            // `Instant - Duration` can panic on underflow shortly after process
+            // start (the monotonic clock's origin may be < the subtrahend).
+            discord_cache().lock().unwrap().insert(
+                discord_id.to_string(),
                 DiscordCacheEntry {
                     bytes: Vec::new(),
                     mime: String::new(),
-                    cached_at: Instant::now() - (DISCORD_CACHE_TTL - DISCORD_NEGATIVE_TTL),
+                    cached_at: Instant::now(),
                 },
             );
-            StatusCode::NOT_FOUND.into_response()
+            None
         }
     }
 }

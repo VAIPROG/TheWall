@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: The Wall Dev API
-  version: 3.0.0
+  version: 3.2.0
   description: |
     # The Wall Dev API v3
 
@@ -780,6 +780,155 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /admin/stats:
+    get:
+      tags:
+        - Admins
+      summary: Get server-wide statistics
+      operationId: adminGetStats
+      description: |
+        Returns aggregate counters across the platform. Global `admin` or higher.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Server statistics.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - users
+                  - clans
+                  - templates
+                  - messages
+                  - openReports
+                  - activeSessions
+                properties:
+                  users:
+                    type: integer
+                  clans:
+                    type: integer
+                  templates:
+                    type: integer
+                  messages:
+                    type: integer
+                  openReports:
+                    type: integer
+                  activeSessions:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/messages/{messageId}:
+    delete:
+      tags:
+        - Admins
+      summary: Soft-delete any message
+      operationId: adminDeleteMessage
+      description: |
+        Soft-deletes any message by id, regardless of chat or author. Global
+        `moderator` or higher.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - $ref: '#/components/parameters/MessageIdPath'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Message soft-deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - message
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/users:
+    get:
+      tags:
+        - Admins
+      summary: List / search users
+      operationId: adminListUsers
+      description: |
+        Paginated, filterable list of all users. Global `admin` or higher.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Free-text match against username, display name, or external id.
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum:
+              - member
+              - moderator
+              - admin
+              - owner
+          description: Filter by global role.
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Paginated user list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - users
+                  - page
+                  - limit
+                  - total
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/users/{userRef}:
     get:
       tags:
@@ -814,8 +963,12 @@ paths:
       summary: Update user info (admin override)
       operationId: adminUpdateUser
       description: |
-        Directly modifies user fields bypassing normal validation
-        limits. Logged in audit trail.
+        Directly modifies user fields bypassing normal validation limits.
+        Logged in audit trail.
+
+        **Role elevation rule:** setting `role` to `admin` or `owner` requires
+        the caller to hold the `owner` global role. A plain `admin` caller
+        receives `403 Forbidden`. Invalid role strings return `400 Bad Request`.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
         - $ref: '#/components/parameters/UserRefPath'
@@ -1298,6 +1451,163 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /admin/clans/{clanId}/members/{userRef}/role:
+    post:
+      tags:
+        - Admins
+      summary: Override a clan member's role (admin)
+      operationId: adminSetClanMemberRole
+      description: |
+        Sets the clan role of any active clan member without the caller
+        needing to be a member of that clan. Global `admin` or higher.
+
+        **Constraints:**
+        - `role` must be `member`, `moderator`, or `admin`; `owner` is not
+          valid — use `POST /admin/clans/{clanId}/transfer-owner` instead.
+        - Returns `409 Conflict` if the target user is the clan owner.
+        - Returns `404 Not Found` if the user has no active membership in
+          the clan.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: clanId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Clan UUID.
+        - $ref: '#/components/parameters/UserRefPath'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminClanRoleRequest'
+      responses:
+        '200':
+          description: Clan role updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - clanId
+                  - userId
+                  - role
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  clanId:
+                    type: string
+                    format: uuid
+                    description: Clan UUID.
+                  userId:
+                    type: string
+                    format: uuid
+                    description: Account UUID of the member whose role was changed.
+                  role:
+                    type: string
+                    enum:
+                      - member
+                      - moderator
+                      - admin
+                    description: The newly assigned clan role.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Conflict. The target user is the clan owner — use
+            `transfer-owner` to change ownership.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/clans/{clanId}/transfer-owner:
+    post:
+      tags:
+        - Admins
+      summary: Transfer clan ownership (admin)
+      operationId: adminTransferClanOwner
+      description: |
+        Changes the owner of a clan without the caller needing to hold
+        any rank inside that clan. Global `admin` or higher.
+
+        The new owner must have an active membership (one is created
+        automatically if absent). The previous owner is stepped down
+        to `admin` inside the clan. The one-clan-per-owner invariant
+        is enforced — returns `409 Conflict` if the target already
+        owns another clan.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: clanId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Clan UUID.
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTransferOwnerRequest'
+      responses:
+        '200':
+          description: Ownership transferred.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - clanId
+                  - ownerId
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  clanId:
+                    type: string
+                    format: uuid
+                    description: Clan UUID.
+                  ownerId:
+                    type: string
+                    format: uuid
+                    description: Account UUID of the new owner.
+                  previousOwnerId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: Account UUID of the former owner (null if the clan had no owner).
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Target user already owns another clan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /users/me:
     get:
       tags:
@@ -1796,6 +2106,60 @@ paths:
                   $ref: '#/components/schemas/UserPublic'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /users/resolve:
+    post:
+      tags:
+        - Users
+      summary: Resolve user references to UUIDs
+      operationId: resolveUsers
+      description: |
+        Batch-resolve user references (UUID, `@username`, or bare username) to
+        UUIDs. Lets clients accept human-friendly usernames in template access
+        lists (whitelist / blocklist / co-editors) and convert them to the UUIDs
+        the ACL stores. Authenticated to avoid anonymous user-enumeration; capped
+        at 200 refs per request.
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refs
+              properties:
+                refs:
+                  type: array
+                  items:
+                    type: string
+                  example:
+                    - '@alice'
+                    - bob
+                    - 51d07786-6d57-4ae8-aa7e-86f27926ee3b
+      responses:
+        '200':
+          description: Resolution result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - resolved
+                  - unresolved
+                properties:
+                  resolved:
+                    type: object
+                    additionalProperties:
+                      type: string
+                      format: uuid
+                    description: input ref → resolved UUID
+                  unresolved:
+                    type: array
+                    items:
+                      type: string
+                    description: refs that matched no user
   /users/me/site-identities:
     get:
       tags:
@@ -2001,6 +2365,13 @@ paths:
         - Users
       summary: Get a user's avatar
       operationId: getUserAvatar
+      description: |
+        **Public** — no authentication required, reachable directly by an
+        `<img>` tag. For any resolvable user this **always** returns `200`,
+        serving the first available image in a fallback chain:
+        custom upload → linked Discord avatar → generated identicon.
+
+        All user profile `avatarUrl` fields now point at this endpoint.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
         - $ref: '#/components/parameters/UserRefPath'
@@ -2008,12 +2379,18 @@ paths:
         '200':
           description: Avatar image.
           content:
-            image/png:
+            image/webp:
               schema:
                 type: string
                 format: binary
-        '404':
-          $ref: '#/components/responses/NotFound'
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
   /users/{userRef}/socials:
     get:
       tags:
@@ -2193,6 +2570,188 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '409':
           $ref: '#/components/responses/Conflict'
+  /clans/mine:
+    get:
+      tags:
+        - Clans
+      summary: List the caller's clans
+      operationId: listMyClans
+      description: |
+        Returns the clans the authenticated caller is an active member of, plus
+        any clans they own. Each entry uses the same shape as `GET /clans/{clanId}`.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: The caller's active and owned clans.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Clan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /clans/discord/owned-guilds:
+    get:
+      tags:
+        - Clans
+      summary: List the caller's server-verified owned Discord guild ids
+      operationId: clansDiscordOwnedGuilds
+      description: |
+        Returns the Discord guild ids the caller was verified to own during the
+        most recent clan-guilds OAuth round-trip (empty if none/expired — the
+        client re-runs the consent via `/auth/oauth/start` with `intent=clan-guilds`).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Verified owned guild ids.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+  /clans/site-suggestion:
+    get:
+      tags:
+        - Clans
+      summary: The caller's filianislost site-clan suggestion
+      operationId: clansSiteSuggestion
+      description: The stored site-clan the caller can import via `/clans/from-site`, or 204 when none.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The suggestion.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  source:
+                    type: string
+                  externalId:
+                    type: string
+                  name:
+                    type: string
+                  displayName:
+                    type: string
+                    nullable: true
+                  discordId:
+                    type: string
+                    nullable: true
+                  icon:
+                    type: string
+                    nullable: true
+        '204':
+          description: No site clan to import.
+  /clans/from-guild:
+    post:
+      tags:
+        - Clans
+      summary: Create an owner-verified clan from an owned Discord guild
+      operationId: clansFromGuild
+      description: |
+        Creates a clan bound to a Discord guild the caller was server-verified to
+        own (the guild id must be in the caller's verified cache; single-use).
+        `ownerVerified=true`, `ownerVerifiedVia=discord`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - guildId
+              properties:
+                guildId:
+                  type: string
+                name:
+                  type: string
+                tag:
+                  type: string
+      responses:
+        '200':
+          description: Created clan id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        '403':
+          description: Guild ownership not verified (re-run the Discord consent).
+        '409':
+          description: This guild is already a clan.
+  /clans/from-site:
+    post:
+      tags:
+        - Clans
+      summary: Create an owner-unverified clan from the site suggestion
+      operationId: clansFromSite
+      description: Creates a clan from the caller's stored filianislost suggestion; `ownerVerified=false` until confirmed.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Created clan id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        '409':
+          description: No site clan to import
+          or the clan already exists.: null
+  /clans/{clanId}/verify-ownership:
+    post:
+      tags:
+        - Clans
+      summary: Verify ownership of an unverified clan via Discord
+      operationId: clansVerifyOwnership
+      description: |
+        A clan admin proves ownership of the clan's bound Discord guild (the guild
+        id must be in the caller's verified cache) → flips `ownerVerified=true`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: clanId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Clan id (now verified).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        '403':
+          description: Not a clan admin
+          or guild ownership not verified.: null
+        '409':
+          description: Clan has no Discord server to verify.
   /clans/{clanId}:
     get:
       tags:
@@ -2261,6 +2820,240 @@ paths:
           $ref: '#/components/responses/NotFound'
         '423':
           $ref: '#/components/responses/Locked'
+  /clans/{clanId}/avatar:
+    get:
+      tags:
+        - Clans
+      summary: Get a clan's avatar
+      operationId: getClanAvatar
+      description: |
+        **Public** — no authentication required, reachable directly by an
+        `<img>` tag. Always returns `200`, serving the custom clan avatar or a
+        generated identicon fallback.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - $ref: '#/components/parameters/ClanIdPath'
+      responses:
+        '200':
+          description: Clan avatar image.
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+    post:
+      tags:
+        - Clans
+      summary: Upload or replace a clan avatar
+      operationId: uploadClanAvatar
+      description: |
+        Sets the clan's custom avatar from a base64 `data:` URL. **Clan admin only.**
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - $ref: '#/components/parameters/ClanIdPath'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  description: Image as a `data:` URL (e.g. `data:image/png;base64,...`).
+                  example: data:image/png;base64,iVBORw0KGgo...
+      responses:
+        '200':
+          description: Clan avatar updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - url
+                  - size
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  url:
+                    type: string
+                    description: URL of the stored avatar.
+                  size:
+                    type: integer
+                    description: Stored image size in bytes.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          description: Unsupported or undecodable image.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Clans
+      summary: Remove a clan's custom avatar
+      operationId: deleteClanAvatar
+      description: Reverts to the generated identicon fallback. **Clan admin only.**
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - $ref: '#/components/parameters/ClanIdPath'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Clan avatar removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /clans/{clanId}/banner:
+    get:
+      tags:
+        - Clans
+      summary: Get a clan's banner
+      operationId: getClanBanner
+      description: |
+        **Public** — no authentication required, reachable directly by an
+        `<img>` tag. Always returns `200`, serving the custom clan banner or a
+        generated gradient fallback.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - $ref: '#/components/parameters/ClanIdPath'
+      responses:
+        '200':
+          description: Clan banner image.
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+    post:
+      tags:
+        - Clans
+      summary: Upload or replace a clan banner
+      operationId: uploadClanBanner
+      description: |
+        Sets the clan's custom banner from a base64 `data:` URL. **Clan admin only.**
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - $ref: '#/components/parameters/ClanIdPath'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  description: Image as a `data:` URL (e.g. `data:image/png;base64,...`).
+                  example: data:image/png;base64,iVBORw0KGgo...
+      responses:
+        '200':
+          description: Clan banner updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - url
+                  - size
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  url:
+                    type: string
+                    description: URL of the stored banner.
+                  size:
+                    type: integer
+                    description: Stored image size in bytes.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          description: Unsupported or undecodable image.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Clans
+      summary: Remove a clan's custom banner
+      operationId: deleteClanBanner
+      description: Reverts to the generated gradient fallback. **Clan admin only.**
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - $ref: '#/components/parameters/ClanIdPath'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Clan banner removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /clans/{clanId}/members:
     get:
       tags:
@@ -4266,6 +5059,14 @@ paths:
         - $ref: '#/components/parameters/UserRefPath'
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/PerPageParam'
+        - name: active
+          in: query
+          schema:
+            type: boolean
+          description: |
+            Filter by active status. `true` returns only restrictions that are
+            not yet lifted (`removedAt` is null) and not expired; `false` returns
+            only lifted or expired restrictions. Omit to return all.
       security:
         - BearerAuth: []
         - ApiKeyAuth: []
@@ -5182,6 +5983,14 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+    MessageIdPath:
+      name: messageId
+      in: path
+      required: true
+      description: Unique identifier of the message.
+      schema:
+        type: string
+        format: uuid
     UserRefPath:
       name: userRef
       in: path
@@ -5226,14 +6035,6 @@ components:
       in: path
       required: true
       description: Unique identifier of the chat.
-      schema:
-        type: string
-        format: uuid
-    MessageIdPath:
-      name: messageId
-      in: path
-      required: true
-      description: Unique identifier of the message.
       schema:
         type: string
         format: uuid
@@ -5727,7 +6528,33 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
-          description: Broadcast message content.
+          description: Broadcast message body (1–2000 characters).
+        title:
+          type: string
+          maxLength: 200
+          description: |
+            Optional notification headline. Defaults to "Broadcast" when omitted or blank.
+        kind:
+          type: string
+          description: |
+            Optional notification type. Defaults to `system_announcement` when omitted.
+
+            **Canonical V3 types:** `system_announcement`, `news_announcement`,
+            `mod_action`, `restriction_update`, `mention`.
+
+            **Legacy aliases:** `news` → `news_announcement`;
+            `announcement` | `alert` → `system_announcement`.
+
+            Any other value returns `400 Bad Request`.
+          enum:
+            - system_announcement
+            - news_announcement
+            - mod_action
+            - restriction_update
+            - mention
+            - news
+            - announcement
+            - alert
         targetRole:
           type: string
           enum:
@@ -5742,13 +6569,81 @@ components:
             type: string
             format: uuid
           description: Specific account UUIDs to target. Overrides targetRole if provided.
+    User:
+      type: object
+      required:
+        - id
+        - username
+        - displayName
+        - role
+        - lang
+        - telemetryOptIn
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique account identifier (UUID).
+          example: 550e8400-e29b-41d4-a716-446655440000
+        username:
+          type: string
+          description: Unique username.
+          example: jane_doe
+        displayName:
+          type: string
+          description: User-visible display name.
+          example: Jane Doe
+        bio:
+          type: string
+          nullable: true
+          description: User biography.
+          example: Pixel artist and game developer.
+        avatarUrl:
+          type: string
+          nullable: true
+          format: uri
+          description: URL to the user's avatar image.
+          example: https://example.com/avatars/jane.png
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - moderator
+            - member
+          description: User role in the system.
+          example: member
+        lang:
+          type: string
+          description: Preferred language code.
+          example: en
+        telemetryOptIn:
+          type: boolean
+          description: Whether the user has opted into telemetry.
+          example: true
+        clanId:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the user's primary clan, if any.
+          example: 661e8400-e29b-41d4-a716-446655440000
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp.
+          example: '2025-01-15T10:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp.
+          example: '2025-06-20T14:22:00Z'
     RestrictionSet:
       type: object
       required:
         - id
         - userId
         - scope
-        - appliedBy
         - appliedAt
         - sanctions
       properties:
@@ -5774,6 +6669,7 @@ components:
         appliedBy:
           type: string
           format: uuid
+          nullable: true
           description: Account UUID of the moderator who applied the restriction.
         appliedAt:
           type: string
@@ -5788,6 +6684,16 @@ components:
           type: string
           nullable: true
           description: Human-readable reason for the restriction.
+        removedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the restriction was lifted. Null if still active.
+        removedBy:
+          type: string
+          format: uuid
+          nullable: true
+          description: Account UUID of the moderator who lifted the restriction.
         sanctions:
           type: object
           description: Individual sanction flags — each controls a specific capability.
@@ -5983,82 +6889,16 @@ components:
             - admin
             - moderator
             - member
-          description: Updated global role.
+          description: |
+            Updated global role. Setting `admin` or `owner` requires the caller to
+            be an `owner`; a plain `admin` caller receives `403 Forbidden`.
+            Invalid role strings return `400 Bad Request`.
         lang:
           type: string
           description: Updated language preference.
         telemetryOptIn:
           type: boolean
           description: Updated telemetry opt-in preference.
-    User:
-      type: object
-      required:
-        - id
-        - username
-        - displayName
-        - role
-        - lang
-        - telemetryOptIn
-        - createdAt
-        - updatedAt
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique account identifier (UUID).
-          example: 550e8400-e29b-41d4-a716-446655440000
-        username:
-          type: string
-          description: Unique username.
-          example: jane_doe
-        displayName:
-          type: string
-          description: User-visible display name.
-          example: Jane Doe
-        bio:
-          type: string
-          nullable: true
-          description: User biography.
-          example: Pixel artist and game developer.
-        avatarUrl:
-          type: string
-          nullable: true
-          format: uri
-          description: URL to the user's avatar image.
-          example: https://example.com/avatars/jane.png
-        role:
-          type: string
-          enum:
-            - owner
-            - admin
-            - moderator
-            - member
-          description: User role in the system.
-          example: member
-        lang:
-          type: string
-          description: Preferred language code.
-          example: en
-        telemetryOptIn:
-          type: boolean
-          description: Whether the user has opted into telemetry.
-          example: true
-        clanId:
-          type: string
-          format: uuid
-          nullable: true
-          description: UUID of the user's primary clan, if any.
-          example: 661e8400-e29b-41d4-a716-446655440000
-        createdAt:
-          type: string
-          format: date-time
-          description: Account creation timestamp.
-          example: '2025-01-15T10:30:00Z'
-        updatedAt:
-          type: string
-          format: date-time
-          description: Last update timestamp.
-          example: '2025-06-20T14:22:00Z'
     BanRequest:
       type: object
       properties:
@@ -6116,6 +6956,30 @@ components:
           minLength: 1
           maxLength: 2000
           description: Note content.
+    AdminClanRoleRequest:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          enum:
+            - member
+            - moderator
+            - admin
+          description: |
+            New clan role for the target member.
+            `owner` is not valid here — use `POST /admin/clans/{clanId}/transfer-owner` instead.
+    AdminTransferOwnerRequest:
+      type: object
+      required:
+        - userRef
+      properties:
+        userRef:
+          type: string
+          description: |
+            New owner — UUID, `@username`, or bare username. Must be an existing user.
+            Returns `409 Conflict` if the target already owns another clan.
     SiteIdentity:
       type: object
       required:
@@ -6185,6 +7049,20 @@ components:
           type: string
           format: date-time
           description: When the account was linked.
+    SocialLinkEntry:
+      type: object
+      required:
+        - label
+        - url
+      properties:
+        label:
+          type: string
+          description: User-supplied display label for the link (e.g. "My Twitter").
+        url:
+          type: string
+          format: uri
+          description: |
+            Full HTTPS URL. Must use `https://` and belong to a whitelisted domain.
     UserSelf:
       allOf:
         - $ref: '#/components/schemas/User'
@@ -6199,7 +7077,12 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/SocialAccount'
-              description: Linked OAuth social accounts (telegram, discord, github).
+              description: OAuth-verified provider links (telegram, discord, github). Distinct from `socialLinks`, which are free-form user-supplied URLs.
+            socialLinks:
+              type: array
+              items:
+                $ref: '#/components/schemas/SocialLinkEntry'
+              description: Free-form (unverified) label/URL pairs added by the user. Stored as JSON in `users.social_links`.
             apiKeyCount:
               type: integer
               description: Number of API keys the user has.
@@ -6233,6 +7116,15 @@ components:
         telemetryOptIn:
           type: boolean
           description: New telemetry preference.
+        socialLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialLinkEntry'
+          description: |
+            Free-form (unverified) label/URL pairs. When present this field
+            **replaces** the entire existing set. Each entry must have a non-empty
+            label and a valid `https://` URL on a whitelisted domain.
+            Validation errors return `400 Bad Request`.
     SocialAccountLink:
       type: object
       required:
@@ -7164,6 +8056,21 @@ components:
         verified:
           type: boolean
           description: Whether the clan has been officially verified.
+        ownerVerified:
+          type: boolean
+          description: |
+            Whether the clan creator's ownership is proven. True for clans created
+            from a Discord guild the caller owns; false for site/manual clans until
+            confirmed via POST /clans/{clanId}/verify-ownership.
+        ownerVerifiedVia:
+          type: string
+          nullable: true
+          description: How ownership was verified (`discord`), or null if unverified.
+        ownerVerifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When ownership was verified, or null if unverified.
         discoverable:
           type: boolean
           description: Whether the clan appears in public search and discovery listings.
@@ -8063,6 +8970,12 @@ components:
         templateCount:
           type: integer
           description: Number of templates in the document bundle (`document.templates[]`); 1 for a single template.
+        animated:
+          type: boolean
+          description: |
+            True when any layer carries a sprite-sheet `animation` block — i.e. the
+            template renders as an animated GIF via `/animated`. False for static
+            templates and rows without a backfilled document.
     TemplateCreate:
       type: object
       description: |
@@ -8465,7 +9378,6 @@ components:
         - id
         - type
         - title
-        - body
         - isRead
         - createdAt
       properties:
@@ -8489,7 +9401,8 @@ components:
           description: Short notification headline.
         body:
           type: string
-          description: Full notification content.
+          nullable: true
+          description: Full notification content. Null when the notification has no body.
         isRead:
           type: boolean
           description: Whether the user has acknowledged this notification.
@@ -8506,9 +9419,31 @@ components:
           format: date-time
           description: Timestamp when the notification was created.
     NotificationPage:
-      allOf:
-        - $ref: '#/components/schemas/Notification'
-        - $ref: '#/components/schemas/Pagination'
+      type: object
+      required:
+        - items
+        - page
+        - perPage
+        - total
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+          description: Notifications for the current page.
+        page:
+          type: integer
+          description: Current page number (1-based).
+        perPage:
+          type: integer
+          description: Items per page.
+        total:
+          type: integer
+          description: Total number of notifications matching the filter.
+        totalPages:
+          type: integer
+          description: Total number of pages.
     AckRequest:
       type: object
       required:
@@ -8530,6 +9465,7 @@ components:
         - restrictionUpdates
         - modActions
         - systemAnnouncements
+        - newsAnnouncements
         - mentions
       properties:
         pushEnabled:
@@ -8549,7 +9485,10 @@ components:
           description: Notify on moderation actions affecting the user.
         systemAnnouncements:
           type: boolean
-          description: Notify on system-wide announcements.
+          description: Notify on system-wide (`system_announcement`) broadcasts.
+        newsAnnouncements:
+          type: boolean
+          description: Notify on news-type (`news_announcement`) broadcasts.
         mentions:
           type: boolean
           description: Notify when mentioned in chat or templates.
@@ -8573,7 +9512,10 @@ components:
           description: Notify on moderation actions affecting the user.
         systemAnnouncements:
           type: boolean
-          description: Notify on system-wide announcements.
+          description: Notify on system-wide (`system_announcement`) broadcasts.
+        newsAnnouncements:
+          type: boolean
+          description: Notify on news-type (`news_announcement`) broadcasts.
         mentions:
           type: boolean
           description: Notify when mentioned in chat or templates.

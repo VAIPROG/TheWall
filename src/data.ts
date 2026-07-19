@@ -313,11 +313,14 @@ export async function backendConnect(): Promise<void> {
   saveCfg();
   const client = getActiveClient();
   if (!client) return;
-  if (cfg.backendToken) {
-    cfg.backendToken = "";
-    cfg.refreshToken = "";
+  // Connected ⇄ disconnected toggle. The CLIENT token is the truth (the
+  // multi-backend store); cfg.backendToken is just a legacy mirror kept in
+  // sync by multi.ts. Clearing via setToken("") drives the mirror + the
+  // wd:backend-state event so every status surface repaints.
+  if (client.token) {
+    client.setToken("", "");
+    client.setMe(undefined);
     setMe(undefined);
-    saveCfg();
     const btn = $("btn-backend-connect");
     if (btn) btn.textContent = t("connect");
     toast(t("backend"), t("disconnect"));
@@ -515,8 +518,9 @@ export async function resetAvatar(): Promise<void> {
   const client = getActiveClient();
   if (!client?.on) { await errorDlg("Connect to VAI-PROG backend first"); return; }
   try {
-    // DELETE /me/avatar — fallback to PUT with empty if no DELETE route
-    await client.delete("/me/avatar");
+    // V3 DELETE /api/v3/users/me/avatar. (The old `client.delete("/me/avatar")`
+    // resolved against the V3 base → /api/v3/me/avatar, an unregistered path.)
+    await api(client).users.deleteAvatar();
     toast(t("customAvatar"), "reset to Discord avatar");
     syncProfile();
   } catch (e: any) {

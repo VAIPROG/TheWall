@@ -80,6 +80,10 @@ pub struct RestrictionView {
     pub applied_at: DateTime<Utc>,
     pub expires_at: Option<DateTime<Utc>>,
     pub reason: Option<String>,
+    /// When the restriction was lifted (NULL = never lifted).
+    pub removed_at: Option<DateTime<Utc>>,
+    /// Who lifted it.
+    pub removed_by: Option<Uuid>,
     pub sanctions: Sanctions,
 }
 
@@ -94,6 +98,8 @@ impl RestrictionView {
             applied_at: r.applied_at,
             expires_at: r.expires_at,
             reason: r.reason,
+            removed_at: r.removed_at,
+            removed_by: r.removed_by,
             sanctions: Sanctions {
                 mute: r.s_mute,
                 ban: r.s_ban,

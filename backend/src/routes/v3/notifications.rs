@@ -206,6 +206,13 @@ pub async fn update_settings(
     State(state): State<AppState>,
     Json(body): Json<NotificationSettingsUpdate>,
 ) -> Result<Json<NotificationSettings>, (StatusCode, String)> {
+    // Make sure the row exists so a PATCH before the first GET doesn't 404.
+    sqlx::query("INSERT INTO notification_settings (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING")
+        .bind(auth.user_id)
+        .execute(&state.pool)
+        .await
+        .or_500()?;
+
     let row = sqlx::query_as::<_, NotificationSettings>(
         r#"UPDATE notification_settings SET
                push_enabled = COALESCE($2, push_enabled),

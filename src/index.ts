@@ -17,17 +17,15 @@ import {
   startNotifPolling,
   startAnnouncementPolling,
   loadAnnouncements,
-  loadClanChat,
   loadTemplates,
   loadPublicTemplates,
-  loadRoster,
 } from "./data";
 import { errorDlg, confirmDlg, promptDlg, infoDlg } from "./dialog";
 import { initEmotes } from "./emoji";
 import { startSiteChatEmotes } from "./site-chat-emotes";
 import { startSiteProfileInject } from "./site-profile-inject";
 import "./profile-modal";
-import { startMailPolling, loadNotifications, loadChatList } from "./mail";
+import { startMailPolling, loadNotifications } from "./mail";
 import { startPaintWatch } from "./paint-state";
 import { PAINT_REFILL_AWAY_THRESHOLD_MS } from "./constants";
 import { playPaintRefillSound } from "./paint-sound";
@@ -64,7 +62,12 @@ import { t, pluralize } from "./i18n";
   w.__nativeConfirm = w.confirm;
   w.__nativePrompt = w.prompt;
   w.alert = (msg: any) => {
-    errorDlg(String(msg));
+    // Page code (the site's own error paths included) sometimes calls
+    // `alert(err.message)` with the message missing — native alert would show
+    // the literal "undefined", and in our Win95 Error dialog that reads as an
+    // extension bug. Map nullish/empty to a generic line instead.
+    const text = msg == null ? "" : String(msg);
+    errorDlg(text.trim() ? text : "Unknown error (no message provided — see console)");
   };
   w.confirm = (msg: any) => {
     return confirmDlg(String(msg)) as any;
@@ -170,15 +173,17 @@ import { t, pluralize } from "./i18n";
     if (!client) return;
     const a = api(client);
     try {
-      // Try to use existing token; if it fails (401), re-login.
-      if (cfg.backendToken) {
+      // Try to use existing token; if it fails (401), re-login. The client
+      // token (multi-backend store) is the truth — cfg.backendToken is only
+      // a legacy mirror synced by multi.ts.
+      if (client.token) {
         try {
           const me = await a.auth.me();
           setMe(me);
           log("AUTO_AUTH", "OK", "session restored");
         } catch {
           log("AUTO_AUTH", "WARN", "stored token rejected, re-logging in");
-          cfg.backendToken = "";
+          client.setToken("", "");
           await a.auth.loginWithSiteToken("filianislost", siteToken() || "");
           setMe(await a.auth.me());
         }
@@ -190,12 +195,9 @@ import { t, pluralize } from "./i18n";
       // Refresh UI state
       syncProfile();
       loadAnnouncements();
-      loadClanChat();
       loadTemplates();
       loadPublicTemplates();
-      loadRoster();
       loadNotifications();
-      loadChatList();
       refreshNotifications();
       startChatPolling();
       startNotifPolling();

@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     AppState,
     auth::AuthUser,
-    models::{ProviderLink, SiteIdentity, SocialAccountPublic, User, UserProfilePublic, UserSelf, UserUpdate},
+    models::{ProviderLink, SiteIdentity, SocialAccountPublic, SocialLinkEntry, User, UserProfilePublic, UserSelf, UserUpdate},
     routes::v3::utils::{audit, users::resolve_user_ref as resolve_user_ref_util},
 };
 
@@ -31,7 +31,7 @@ pub async fn get_me(
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
 
-    let avatar_url = avatar_url_for(&state.pool, auth.user_id).await?;
+    let avatar_url = avatar_url_for(&state.config, auth.user_id);
 
     let site_identities: Vec<SiteIdentity> = sqlx::query_as(
         "SELECT id, account_id, source, external_id, site_username, linked_at, last_seen_at
@@ -67,6 +67,11 @@ pub async fn get_me(
         .await
         .or_500()?;
 
+    // Free-form (unverified) links from users.social_links; tolerate any
+    // legacy shape by dropping entries that don't parse.
+    let social_links: Vec<SocialLinkEntry> =
+        serde_json::from_value(user.social_links.clone()).unwrap_or_default();
+
     Ok(Json(UserSelf {
         id: user.id,
         username: user.username,
@@ -81,6 +86,7 @@ pub async fn get_me(
         updated_at: user.updated_at,
         site_identities,
         linked_accounts,
+        social_links,
         api_key_count,
         block_list_count,
     }))
@@ -134,6 +140,34 @@ pub async fn update_me(
         }
     }
 
+    // Free-form social links: same validation as the legacy V2 endpoint
+    // (count/label limits + https + domain whitelist). These stay UNVERIFIED —
+    // OAuth provider links (/users/me/socials/*) are the verified ones.
+    let social_json: Option<serde_json::Value> = match body.social_links {
+        Some(ref links) => {
+            if links.len() > state.config.limits.social_link_count {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    format!("max {} social links", state.config.limits.social_link_count),
+                ));
+            }
+            for link in links {
+                if link.label.trim().is_empty()
+                    || link.label.chars().count() > state.config.limits.social_link_label
+                {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        format!("label must be 1-{} chars", state.config.limits.social_link_label),
+                    ));
+                }
+                crate::routes::v2::profile::validate_url(&link.url)
+                    .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+            }
+            Some(serde_json::to_value(links).or_500()?)
+        }
+        None => None,
+    };
+
     sqlx::query(
         "UPDATE users SET
             display_name = COALESCE($1, display_name),
@@ -141,14 +175,16 @@ pub async fn update_me(
             bio = COALESCE($3, bio),
             preferred_lang = COALESCE($4, preferred_lang),
             telemetry_opt_in = COALESCE($5, telemetry_opt_in),
+            social_links = COALESCE($6, social_links),
             updated_at = NOW()
-         WHERE id = $6",
+         WHERE id = $7",
     )
     .bind(body.display_name.as_deref())
     .bind(body.username.as_deref())
     .bind(body.bio.as_deref())
     .bind(body.lang.as_deref())
     .bind(body.telemetry_opt_in)
+    .bind(social_json)
     .bind(auth.user_id)
     .execute(&state.pool)
     .await
@@ -189,7 +225,7 @@ pub async fn get_user_by_ref(
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
 
-    let avatar_url = avatar_url_for(&state.pool, target_id).await?;
+    let avatar_url = avatar_url_for(&state.config, target_id);
 
     // Primary clan: the active membership with the highest role, or None.
     let clan_id: Option<Uuid> = sqlx::query_scalar(
@@ -253,18 +289,14 @@ pub(crate) async fn load_user(
     .or_500()
 }
 
-pub(crate) async fn avatar_url_for(
-    pool: &sqlx::PgPool,
-    user_id: Uuid,
-) -> Result<Option<String>, (StatusCode, String)> {
-    let url: Option<String> = sqlx::query_scalar(
-        "SELECT image FROM avatars WHERE user_id = $1",
-    )
-    .bind(user_id)
-    .fetch_optional(pool)
-    .await
-    .or_500()?;
-    Ok(url)
+/// Every profile points at the stable avatar endpoint, which serves the
+/// custom → Discord → identicon fallback chain. It never returns `None`, so a
+/// profile always carries a working, cacheable avatar URL rather than a heavy
+/// inline data URL (or nothing at all when no custom avatar is set).
+pub(crate) fn avatar_url_for(config: &crate::config::AppConfig, user_id: Uuid) -> Option<String> {
+    Some(format!(
+        "{}/api/v3/users/{}/avatar",
+        crate::routes::v3::templates::render::public_base_url(config),
+        user_id
+    ))
 }
-
-// V3 uses a deterministic generated avatar URL when no custom avatar is set.

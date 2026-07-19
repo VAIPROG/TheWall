@@ -31,7 +31,17 @@ pub async fn get_clan(
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "clan not found".to_string()))?;
 
-    let view = build_clan_view(&state.pool, Some(auth.user_id), clan).await?;
+    let mut view = build_clan_view(&state.pool, Some(auth.user_id), clan).await?;
+
+    // Legacy clans (created before clan chats shipped in create/from-guild/
+    // from-site) have no chat row, so `chatId` came back null and the client
+    // could never open the clan chat. Ensure it here — the single-clan detail
+    // read is the natural place: get-or-create is idempotent, costs nothing
+    // once the row exists, and keeps the hot list endpoints write-free.
+    if view.chat_id.is_none() {
+        view.chat_id = Some(crate::routes::v3::chats::clan_chat_id(&state.pool, id).await?);
+    }
+
     Ok(Json(view))
 }
 

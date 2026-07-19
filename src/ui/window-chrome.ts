@@ -8,22 +8,14 @@ import {
 import { $ } from "../helpers";
 import { log } from "../log";
 import { mountReopener } from "../reopen";
-import { loadNotifications, loadChatList } from "../mail";
 import {
   loadTemplates,
   loadPublicTemplates,
-  loadRoster,
-  loadClanChat,
   syncProfile,
   refreshNotifications,
 } from "../data";
-import {
-  loadAdminUsers,
-  loadModApps,
-  loadAdminTemplates,
-  loadAdminNotifs,
-} from "./admin-ui";
-import { loadAchievementList } from "./achievements-tab";
+import { refreshAdmin } from "./admin-ui";
+import { refreshCommunity } from "./community/shell";
 
 export function wireWindowChrome(win: HTMLElement): void {
   // tab switching
@@ -43,25 +35,27 @@ export function wireWindowChrome(win: HTMLElement): void {
         loadTemplates().catch(() => {});
         loadPublicTemplates().catch(() => {});
       }
-      if ((tab as HTMLElement).dataset.p === "cl") {
-        loadRoster().catch(() => {});
-        loadClanChat().catch(() => {});
+      if ((tab as HTMLElement).dataset.p === "co") {
+        // Re-fetch on focus: the Community stack mounts once at startup (often
+        // before login), so its first load can no-op without a token. Refresh
+        // now that the client is authenticated.
+        refreshCommunity();
       }
       if ((tab as HTMLElement).dataset.p === "ad") {
-        loadAdminUsers().catch(() => {});
-        loadModApps().catch(() => {});
-        loadAdminTemplates().catch(() => {});
-        loadAdminNotifs().catch(() => {});
+        // Only the visible admin sub-section re-fetches (lazy per-section
+        // loaders live in admin-ui.ts).
+        refreshAdmin();
       }
       if ((tab as HTMLElement).dataset.p === "pr") {
         syncProfile().catch(() => {});
         refreshNotifications().catch(() => {});
         document.dispatchEvent(new CustomEvent("wd:tab-open-pr"));
       }
-      if ((tab as HTMLElement).dataset.p === "ah") {
-        // Achievements now live in their own tab so the Profile pane stays
-        // focused on identity / coins / paint actions.
-        loadAchievementList().catch(() => {});
+      if ((tab as HTMLElement).dataset.p === "se") {
+        // Settings listens for this to re-derive the connection card and
+        // linked-accounts rows from live client state (see settings-tab.ts /
+        // links-wire.ts) — the pane markup is otherwise a boot-time paint.
+        document.dispatchEvent(new CustomEvent("wd:tab-open-se"));
       }
     }),
   );
@@ -165,10 +159,5 @@ export function wireWindowChrome(win: HTMLElement): void {
   $("wp-close")!.addEventListener("click", () => {
     win.style.display = "none";
     mountReopener();
-  });
-
-  // Load mail when user clicks the mail tab
-  document.querySelectorAll('.wp-tab[data-p="ma"]').forEach((b) => {
-    b.addEventListener("click", () => { loadNotifications(); loadChatList(); });
   });
 }

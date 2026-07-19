@@ -200,6 +200,21 @@ pub async fn create_invite(
         created_at: invite.7,
     };
 
+    // Best-effort: tell the invitee about a direct invite (respects the
+    // clan_invites notification opt-out).
+    if let Some(target_uid) = view.target_user_id {
+        let _ = crate::routes::v3::notifications::notify(
+            &state.pool,
+            target_uid,
+            "clan_invite",
+            "Clan invite",
+            Some(&format!("You have been invited to join \"{}\".", clan.name)),
+            None,
+            json!({ "clanId": clan_id, "inviteId": view.id, "code": view.code }),
+        )
+        .await;
+    }
+
     Ok((StatusCode::CREATED, Json(view)))
 }
 

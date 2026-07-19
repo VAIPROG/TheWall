@@ -167,6 +167,18 @@ pub struct ListRestrictionsQuery {
 pub struct UserRestrictionsQuery {
     pub page: Option<i64>,
     pub per_page: Option<i64>,
+    /// true → only active (not lifted, not expired); false → only inactive.
+    pub active: Option<bool>,
+}
+
+/// SQL fragment implementing the active/inactive filter — shared semantics
+/// with the global /restrictions list.
+fn active_clause(active: Option<bool>) -> &'static str {
+    match active {
+        Some(true) => "AND removed_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())",
+        Some(false) => "AND (removed_at IS NOT NULL OR (expires_at IS NOT NULL AND expires_at <= NOW()))",
+        None => "",
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -189,11 +201,7 @@ pub async fn list_restrictions(
     let per_page = q.per_page.unwrap_or(50).clamp(1, 100);
     let offset = (page - 1) * per_page;
 
-    let active_clause = match q.active {
-        Some(true) => "AND removed_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())",
-        Some(false) => "AND (removed_at IS NOT NULL OR (expires_at IS NOT NULL AND expires_at <= NOW()))",
-        None => "",
-    };
+    let active_clause = active_clause(q.active);
 
     let scope_filter = q.scope.as_deref();
     let user_filter = q.user_id;
@@ -507,24 +515,29 @@ pub async fn user_restrictions(
     let per_page = q.per_page.unwrap_or(50).clamp(1, 100);
     let offset = (page - 1) * per_page;
 
-    let total: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM restrictions WHERE user_id = $1",
-    )
-    .bind(target_id)
-    .fetch_one(&state.pool)
-    .await
-    .or_500()?;
+    let active_clause = active_clause(q.active);
 
-    let rows = sqlx::query_as::<_, RestrictionRow>(
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM restrictions WHERE user_id = $1 {active_clause}"
+    );
+    let total: i64 = sqlx::query_scalar(&count_sql)
+        .bind(target_id)
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+
+    let rows_sql = format!(
         r#"SELECT id, user_id, scope, clan_id, applied_by, applied_at, expires_at,
                   reason, s_mute, s_ban, s_publish_templates, s_invite_to_clan,
                   s_send_reports, s_send_modmail, removed_at, removed_by, created_at
              FROM restrictions
             WHERE user_id = $1
+            {active_clause}
             ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3"#,
-    )
-    .bind(target_id)
+            LIMIT $2 OFFSET $3"#
+    );
+    let rows = sqlx::query_as::<_, RestrictionRow>(&rows_sql)
+        .bind(target_id)
     .bind(per_page)
     .bind(offset)
     .fetch_all(&state.pool)

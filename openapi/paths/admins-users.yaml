@@ -2,6 +2,63 @@
 # ADMINS — User Management Operations
 # ══════════════════════════════════════════════════════════════════════
 
+AdminUsers:
+  get:
+    tags: [Admins]
+    summary: List / search users
+    operationId: adminListUsers
+    description: |
+      Paginated, filterable list of all users. Global `admin` or higher.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: q
+        in: query
+        schema:
+          type: string
+        description: Free-text match against username, display name, or external id.
+      - name: role
+        in: query
+        schema:
+          type: string
+          enum: [member, moderator, admin, owner]
+        description: Filter by global role.
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Paginated user list.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [users, page, limit, total]
+              properties:
+                users:
+                  type: array
+                  items:
+                    $ref: "../components/schemas/users.yaml#/User"
+                page: { type: integer }
+                limit: { type: integer }
+                total: { type: integer }
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
 AdminUserById:
   get:
     tags: [Admins]
@@ -34,8 +91,12 @@ AdminUserById:
     summary: Update user info (admin override)
     operationId: adminUpdateUser
     description: |
-      Directly modifies user fields bypassing normal validation
-      limits. Logged in audit trail.
+      Directly modifies user fields bypassing normal validation limits.
+      Logged in audit trail.
+
+      **Role elevation rule:** setting `role` to `admin` or `owner` requires
+      the caller to hold the `owner` global role. A plain `admin` caller
+      receives `403 Forbidden`. Invalid role strings return `400 Bad Request`.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/UserRefPath"
@@ -513,3 +574,150 @@ AdminUserNotes:
         $ref: "../components/responses/common.yaml#/Forbidden"
       "404":
         $ref: "../components/responses/common.yaml#/NotFound"
+
+# ══════════════════════════════════════════════════════════════════════
+# ADMINS — Clan Governance Overrides
+# ══════════════════════════════════════════════════════════════════════
+
+AdminClanMemberRole:
+  post:
+    tags: [Admins]
+    summary: Override a clan member's role (admin)
+    operationId: adminSetClanMemberRole
+    description: |
+      Sets the clan role of any active clan member without the caller
+      needing to be a member of that clan. Global `admin` or higher.
+
+      **Constraints:**
+      - `role` must be `member`, `moderator`, or `admin`; `owner` is not
+        valid — use `POST /admin/clans/{clanId}/transfer-owner` instead.
+      - Returns `409 Conflict` if the target user is the clan owner.
+      - Returns `404 Not Found` if the user has no active membership in
+        the clan.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: clanId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Clan UUID.
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/AdminClanRoleRequest"
+    responses:
+      "200":
+        description: Clan role updated.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok, clanId, userId, role]
+              properties:
+                ok: { type: boolean, example: true }
+                clanId:
+                  type: string
+                  format: uuid
+                  description: Clan UUID.
+                userId:
+                  type: string
+                  format: uuid
+                  description: Account UUID of the member whose role was changed.
+                role:
+                  type: string
+                  enum: [member, moderator, admin]
+                  description: The newly assigned clan role.
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "409":
+        description: |
+          Conflict. The target user is the clan owner — use
+          `transfer-owner` to change ownership.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/Error"
+
+AdminClanTransferOwner:
+  post:
+    tags: [Admins]
+    summary: Transfer clan ownership (admin)
+    operationId: adminTransferClanOwner
+    description: |
+      Changes the owner of a clan without the caller needing to hold
+      any rank inside that clan. Global `admin` or higher.
+
+      The new owner must have an active membership (one is created
+      automatically if absent). The previous owner is stepped down
+      to `admin` inside the clan. The one-clan-per-owner invariant
+      is enforced — returns `409 Conflict` if the target already
+      owns another clan.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: clanId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Clan UUID.
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/admins.yaml#/AdminTransferOwnerRequest"
+    responses:
+      "200":
+        description: Ownership transferred.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ok, clanId, ownerId]
+              properties:
+                ok: { type: boolean, example: true }
+                clanId:
+                  type: string
+                  format: uuid
+                  description: Clan UUID.
+                ownerId:
+                  type: string
+                  format: uuid
+                  description: Account UUID of the new owner.
+                previousOwnerId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Account UUID of the former owner (null if the clan had no owner).
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+      "409":
+        description: Target user already owns another clan.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/common.yaml#/Error"

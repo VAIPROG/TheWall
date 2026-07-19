@@ -45,6 +45,7 @@ const SVG: Record<string, string> = {
   star: `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
   award: `<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>`,
   chat: `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`,
+  clanChat: `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 5.5l3.5 1.3v2.8c0 2.7-2.1 4-3.5 4.5-1.4-.5-3.5-1.8-3.5-4.5V6.8z"/>`,
   clan: `<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>`,
   link: `<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>`,
 
@@ -72,7 +73,7 @@ const EMOJI: Record<string, string> = {
   progress: "📊", lock: "🔒", unlock: "🔓", eye: "👁", eyeOff: "🙈", trash: "🗑",
   plus: "＋", edit: "✎", check: "✓", x: "✕", chevronRight: "›", chevronLeft: "‹",
   image: "🖼", file: "📄", user: "👤", star: "★", award: "🏅", chat: "💬",
-  clan: "🚩", link: "🔗", theme: "🌙", download: "⬇", upload: "⬆", refresh: "↻",
+  clanChat: "💬", clan: "🚩", link: "🔗", theme: "🌙", download: "⬇", upload: "⬆", refresh: "↻",
   volume: "🔊", mute: "🔇", ban: "⛔", warning: "⚠", info: "ℹ", search: "🔍",
   bolt: "⚡", clock: "🕓", emote: "😀",
 };

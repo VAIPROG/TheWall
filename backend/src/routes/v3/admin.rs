@@ -101,14 +101,30 @@ pub async fn admin_update_user(
     Path(user_ref): Path<String>,
     Json(body): Json<AdminUserUpdate>,
 ) -> Result<Json<User>, (StatusCode, String)> {
-    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+    let caller_role = require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
     let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
 
-    if let Some(ref role) = body.role {
-        if !matches!(role.as_str(), "member" | "moderator" | "admin" | "owner") {
-            return Err((StatusCode::BAD_REQUEST, "invalid role".to_string()));
+    // Normalise + gate role changes like /promote: only the owner may grant
+    // admin/owner, and the stored value is always a canonical global_role.
+    let normalized_role: Option<&'static str> = match body.role.as_deref() {
+        None => None,
+        Some(role) => {
+            let new_role = match role {
+                "member" | "user" => GlobalRole::User,
+                "moderator" => GlobalRole::Moderator,
+                "admin" => GlobalRole::Admin,
+                "owner" => GlobalRole::Owner,
+                _ => return Err((StatusCode::BAD_REQUEST, "invalid role".to_string())),
+            };
+            if new_role >= GlobalRole::Admin && caller_role != GlobalRole::Owner {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    "only owner can grant admin or owner".to_string(),
+                ));
+            }
+            Some(new_role.as_str())
         }
-    }
+    };
 
     sqlx::query(
         "UPDATE users SET
@@ -124,7 +140,7 @@ pub async fn admin_update_user(
     .bind(body.username.as_deref())
     .bind(body.display_name.as_deref())
     .bind(body.bio.as_deref())
-    .bind(body.role.as_deref())
+    .bind(normalized_role)
     .bind(body.lang.as_deref())
     .bind(body.telemetry_opt_in)
     .bind(target_id)
@@ -364,7 +380,7 @@ pub async fn admin_promote_user(
     }
 
     sqlx::query("UPDATE users SET global_role = $1, updated_at = NOW() WHERE id = $2")
-        .bind(&body.role)
+        .bind(new_role.as_str())
         .bind(target_id)
         .execute(&state.pool)
         .await
@@ -892,6 +908,29 @@ pub struct BroadcastRequest {
     pub message: String,
     pub target_role: Option<String>,
     pub target_user_ids: Option<Vec<Uuid>>,
+    /// Optional notification title (defaults to "Broadcast").
+    pub title: Option<String>,
+    /// Optional notification kind (defaults to "system_announcement").
+    /// Accepts the canonical V3 notification types plus the legacy
+    /// news/announcement/alert aliases used by the old /admin/broadcast.
+    pub kind: Option<String>,
+}
+
+/// Normalise a requested broadcast kind to a canonical V3 notification type.
+/// Returns None for unknown values.
+fn normalize_broadcast_kind(kind: &str) -> Option<&'static str> {
+    match kind {
+        // canonical V3 notification types (see notifications::notify)
+        "system_announcement" => Some("system_announcement"),
+        "news_announcement" => Some("news_announcement"),
+        "mod_action" => Some("mod_action"),
+        "restriction_update" => Some("restriction_update"),
+        "mention" => Some("mention"),
+        // legacy aliases from the V1 mailbox taxonomy
+        "news" => Some("news_announcement"),
+        "announcement" | "alert" => Some("system_announcement"),
+        _ => None,
+    }
 }
 
 pub async fn admin_get_config(
@@ -1014,6 +1053,26 @@ pub async fn admin_broadcast(
         return Err((StatusCode::BAD_REQUEST, "message must be 1-2000 characters".to_string()));
     }
 
+    let title = match body.title.as_deref().map(str::trim) {
+        Some(t) if !t.is_empty() => {
+            if t.len() > 200 {
+                return Err((StatusCode::BAD_REQUEST, "title must be \u{2264}200 characters".to_string()));
+            }
+            t.to_string()
+        }
+        _ => "Broadcast".to_string(),
+    };
+
+    let kind = match body.kind.as_deref().map(str::trim) {
+        Some(k) if !k.is_empty() => normalize_broadcast_kind(k).ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "kind must be one of: system_announcement, news_announcement, mod_action, restriction_update, mention, news, announcement, alert".to_string(),
+            )
+        })?,
+        _ => "system_announcement",
+    };
+
     let target_ids: Vec<Uuid> = if let Some(ids) = body.target_user_ids {
         ids
     } else {
@@ -1038,8 +1097,8 @@ pub async fn admin_broadcast(
         if let Ok(Some(_)) = crate::routes::v3::notifications::notify(
             &state.pool,
             *user_id,
-            "system_announcement",
-            "Broadcast",
+            kind,
+            &title,
             Some(message),
             None,
             json!({"fromAdmin": auth.user_id}),
@@ -1056,7 +1115,7 @@ pub async fn admin_broadcast(
         "admin_broadcast",
         "server",
         "broadcast",
-        json!({ "message": message, "recipients": sent }),
+        json!({ "message": message, "title": title, "kind": kind, "recipients": sent }),
     )
     .await;
 
@@ -1152,4 +1211,366 @@ pub async fn admin_metrics(
         "text/plain; version=0.0.4; charset=utf-8".parse().unwrap(),
     );
     Ok((headers, body))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v3/admin/users — search / filter / paginate
+//
+// The legacy `/api/admin/users` returns every user unfiltered. This is the V3
+// replacement: free-text search over username/display_name/external_id, an
+// optional exact global-role filter, and page/limit pagination.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminUserListQuery {
+    /// Free-text match against username / display_name / external_id.
+    pub q: Option<String>,
+    /// Exact global role filter (member|moderator|admin|owner).
+    pub role: Option<String>,
+    pub page: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+pub async fn admin_list_users(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<AdminUserListQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+
+    let limit = params.limit.unwrap_or(50).clamp(1, 200);
+    let page = params.page.unwrap_or(1).max(1);
+    let offset = (page - 1) * limit;
+    // Wrap the search term in wildcards for ILIKE; empty/whitespace → no filter.
+    let q = params
+        .q
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("%{s}%"));
+    let role = params
+        .role
+        .as_deref()
+        .filter(|s| matches!(*s, "member" | "moderator" | "admin" | "owner"))
+        .map(str::to_string);
+
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM users \
+         WHERE ($1::text IS NULL OR username ILIKE $1 OR display_name ILIKE $1 OR external_id ILIKE $1) \
+           AND ($2::text IS NULL OR global_role = $2)",
+    )
+    .bind(&q)
+    .bind(&role)
+    .fetch_one(&state.pool)
+    .await
+    .or_500()?;
+
+    let users = sqlx::query_as::<_, User>(
+        r#"SELECT id, external_id, username, discord_id, discord_username, role,
+                  global_role, source, preferred_lang, bio, social_links,
+                  telemetry_opt_in, created_at, updated_at, display_name
+             FROM users
+            WHERE ($1::text IS NULL OR username ILIKE $1 OR display_name ILIKE $1 OR external_id ILIKE $1)
+              AND ($2::text IS NULL OR global_role = $2)
+            ORDER BY created_at DESC
+            LIMIT $3 OFFSET $4"#,
+    )
+    .bind(&q)
+    .bind(&role)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.pool)
+    .await
+    .or_500()?;
+
+    Ok(Json(json!({
+        "users": users,
+        "page": page,
+        "limit": limit,
+        "total": total,
+    })))
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /api/v3/admin/messages/{messageId} — force-remove any message
+//
+// Soft-delete (tombstone) so thread integrity and existing rendering hold, but
+// reachable globally by a moderator without being a member of the chat. Content
+// is blanked at the wire layer for deleted rows, same as the per-chat delete.
+// ---------------------------------------------------------------------------
+
+pub async fn admin_delete_message(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(message_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Moderator).await?;
+
+    let result =
+        sqlx::query("UPDATE messages SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2 AND deleted_at IS NULL")
+            .bind(auth.user_id)
+            .bind(message_id)
+            .execute(&state.pool)
+            .await
+            .or_500()?;
+    if result.rows_affected() == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "message not found or already deleted".to_string(),
+        ));
+    }
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_delete_message",
+        "message",
+        &message_id.to_string(),
+        json!({}),
+    )
+    .await;
+
+    Ok(Json(json!({"ok": true, "message": "message deleted"})))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v3/admin/stats — JSON dashboard summary
+//
+// Complements `/api/v3/admin/metrics` (Prometheus text) with a small,
+// human/UI-friendly JSON snapshot of platform totals.
+// ---------------------------------------------------------------------------
+
+pub async fn admin_stats(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+
+    let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+    let clans: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM clans")
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+    let templates: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM templates")
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+    let messages: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages WHERE deleted_at IS NULL")
+        .fetch_one(&state.pool)
+        .await
+        .or_500()?;
+    let open_reports: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM reports WHERE status IN ('open', 'reviewing')")
+            .fetch_one(&state.pool)
+            .await
+            .or_500()?;
+    let active_sessions: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE expires_at > NOW()")
+            .fetch_one(&state.pool)
+            .await
+            .or_500()?;
+
+    Ok(Json(json!({
+        "users": users,
+        "clans": clans,
+        "templates": templates,
+        "messages": messages,
+        "openReports": open_reports,
+        "activeSessions": active_sessions,
+    })))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v3/admin/clans/{clanId}/members/{userRef}/role
+// POST /api/v3/admin/clans/{clanId}/transfer-owner
+//
+// Global-admin overrides for clan governance: set a member's clan role or
+// transfer clan ownership without holding any rank inside the clan. Both are
+// gated to global admin+ and audited.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminClanRoleRequest {
+    /// member | moderator | admin (ownership goes through transfer-owner).
+    pub role: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminTransferOwnerRequest {
+    /// The new owner — user id, @username, or "me".
+    pub user_ref: String,
+}
+
+/// Load `(owner_id, name)` for a clan; 404 when the clan doesn't exist.
+async fn load_clan_owner(
+    pool: &sqlx::PgPool,
+    clan_id: Uuid,
+) -> Result<(Option<Uuid>, String), (StatusCode, String)> {
+    sqlx::query_as::<_, (Option<Uuid>, String)>(
+        "SELECT owner_id, name FROM clans WHERE id = $1",
+    )
+    .bind(clan_id)
+    .fetch_optional(pool)
+    .await
+    .or_500()?
+    .ok_or_else(|| (StatusCode::NOT_FOUND, "clan not found".to_string()))
+}
+
+pub async fn admin_set_clan_member_role(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path((clan_id, user_ref)): Path<(Uuid, String)>,
+    Json(body): Json<AdminClanRoleRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+    let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
+
+    if !matches!(body.role.as_str(), "member" | "moderator" | "admin") {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "role must be member, moderator, or admin (use transfer-owner for ownership)".to_string(),
+        ));
+    }
+
+    let (owner_id, _name) = load_clan_owner(&state.pool, clan_id).await?;
+    if owner_id == Some(target_id) {
+        return Err((
+            StatusCode::CONFLICT,
+            "target is the clan owner — use transfer-owner instead".to_string(),
+        ));
+    }
+
+    let result = sqlx::query(
+        "UPDATE clan_memberships SET clan_role = $1
+          WHERE clan_id = $2 AND user_id = $3 AND active = TRUE",
+    )
+    .bind(&body.role)
+    .bind(clan_id)
+    .bind(target_id)
+    .execute(&state.pool)
+    .await
+    .or_500()?;
+
+    if result.rows_affected() == 0 {
+        return Err((StatusCode::NOT_FOUND, "active clan membership not found".to_string()));
+    }
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_clan_role_set",
+        "clan",
+        &clan_id.to_string(),
+        json!({ "userId": target_id, "role": body.role }),
+    )
+    .await;
+
+    Ok(Json(json!({
+        "ok": true,
+        "clanId": clan_id,
+        "userId": target_id,
+        "role": body.role,
+    })))
+}
+
+pub async fn admin_transfer_clan_owner(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(clan_id): Path<Uuid>,
+    Json(body): Json<AdminTransferOwnerRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
+    let new_owner_id = resolve_user_ref(&state.pool, &body.user_ref, auth.user_id).await?;
+
+    let (old_owner_id, clan_name) = load_clan_owner(&state.pool, clan_id).await?;
+    if old_owner_id == Some(new_owner_id) {
+        return Err((StatusCode::BAD_REQUEST, "user already owns this clan".to_string()));
+    }
+
+    // One-clan-per-owner invariant (mirrors create_clan).
+    let owns_other: Option<bool> = sqlx::query_scalar(
+        "SELECT TRUE FROM clans WHERE owner_id = $1 AND id <> $2",
+    )
+    .bind(new_owner_id)
+    .bind(clan_id)
+    .fetch_optional(&state.pool)
+    .await
+    .or_500()?;
+    if owns_other.is_some() {
+        return Err((StatusCode::CONFLICT, "target user already owns another clan".to_string()));
+    }
+
+    let mut tx = state.pool.begin().await.or_500()?;
+
+    sqlx::query("UPDATE clans SET owner_id = $1, updated_at = NOW() WHERE id = $2")
+        .bind(new_owner_id)
+        .bind(clan_id)
+        .execute(&mut *tx)
+        .await
+        .or_500()?;
+
+    // Ensure the new owner has an active membership. Ownership itself derives
+    // from clans.owner_id; the membership row carries 'admin' like create_clan.
+    sqlx::query(
+        r#"INSERT INTO clan_memberships (id, user_id, clan_id, clan_role, active, joined_at)
+           VALUES (gen_random_uuid(), $1, $2, 'admin', TRUE, NOW())
+           ON CONFLICT (user_id, clan_id) DO UPDATE
+               SET active = TRUE, clan_role = 'admin'"#,
+    )
+    .bind(new_owner_id)
+    .bind(clan_id)
+    .execute(&mut *tx)
+    .await
+    .or_500()?;
+
+    // Previous owner steps down to clan admin (membership row kept as-is
+    // otherwise; their owner rank was derived from clans.owner_id).
+    if let Some(old_id) = old_owner_id {
+        sqlx::query(
+            "UPDATE clan_memberships SET clan_role = 'admin'
+              WHERE clan_id = $1 AND user_id = $2 AND active = TRUE",
+        )
+        .bind(clan_id)
+        .bind(old_id)
+        .execute(&mut *tx)
+        .await
+        .or_500()?;
+    }
+
+    tx.commit().await.or_500()?;
+
+    let _ = audit::log_action(
+        &state.pool,
+        auth.user_id,
+        "admin_clan_owner_transferred",
+        "clan",
+        &clan_id.to_string(),
+        json!({ "from": old_owner_id, "to": new_owner_id }),
+    )
+    .await;
+
+    // Best-effort heads-up for the new owner.
+    let _ = crate::routes::v3::notifications::notify(
+        &state.pool,
+        new_owner_id,
+        "mod_action",
+        "Clan ownership transferred",
+        Some(&format!("You are now the owner of clan \"{clan_name}\".")),
+        None,
+        json!({ "clanId": clan_id }),
+    )
+    .await;
+
+    Ok(Json(json!({
+        "ok": true,
+        "clanId": clan_id,
+        "ownerId": new_owner_id,
+        "previousOwnerId": old_owner_id,
+    })))
 }

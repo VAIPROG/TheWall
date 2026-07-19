@@ -117,6 +117,11 @@ export function initLayers(): void {
     overlayImg.draggable = false;
     overlayImg.setAttribute("draggable", "false");
     overlayImg.style.userSelect = "none";
+    // Honour the persisted opacity on a fresh mount (e.g. after a reload the img
+    // is recreated). Without this the element falls back to the CSS default
+    // (.6) and any saved `cfg.defaultOpacity` visibly "resets". Dots mode forces
+    // full opacity, mirroring the display-segment handler.
+    overlayImg.style.opacity = cfg.compactMarkers ? "1" : String(cfg.defaultOpacity);
     overlayImg.addEventListener("dragstart", (e) => e.preventDefault());
     layers.appendChild(overlayImg);
   }
@@ -757,7 +762,15 @@ export function emitOverlayChanged(): void {
  * loaded right away.
  */
 export function clearOverlay(): void {
-  setOverlayAnimation(null);
+  // Stop animation WITHOUT re-rendering: a render here would rasterise the
+  // still-present old source and, because rasteriseFrame is async (img.onload),
+  // that render would land AFTER the reset below and re-write overlayData.src
+  // (see renderOverlay → renderDiffOnly), silently un-clearing the overlay and
+  // making the debounced persist save re-store the "cleared" template.
+  setOverlayAnimation(null, false);
+  // Invalidate any render already in flight (e.g. from a move/scale a moment
+  // before Clear) so its onload drops instead of repopulating overlayData.src.
+  _renderGen++;
   overlayData = { x: 0, y: 0, w: 0, h: 0, src: "" };
   _cachedTemplateData = null;
   _cachedTemplateW = 0;

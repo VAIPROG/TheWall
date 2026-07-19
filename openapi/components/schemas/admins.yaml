@@ -188,7 +188,10 @@ AdminUserUpdate:
         - admin
         - moderator
         - member
-      description: Updated global role.
+      description: |
+        Updated global role. Setting `admin` or `owner` requires the caller to
+        be an `owner`; a plain `admin` caller receives `403 Forbidden`.
+        Invalid role strings return `400 Bad Request`.
     lang:
       type: string
       description: Updated language preference.
@@ -300,7 +303,33 @@ BroadcastRequest:
       type: string
       minLength: 1
       maxLength: 2000
-      description: Broadcast message content.
+      description: Broadcast message body (1–2000 characters).
+    title:
+      type: string
+      maxLength: 200
+      description: |
+        Optional notification headline. Defaults to "Broadcast" when omitted or blank.
+    kind:
+      type: string
+      description: |
+        Optional notification type. Defaults to `system_announcement` when omitted.
+
+        **Canonical V3 types:** `system_announcement`, `news_announcement`,
+        `mod_action`, `restriction_update`, `mention`.
+
+        **Legacy aliases:** `news` → `news_announcement`;
+        `announcement` | `alert` → `system_announcement`.
+
+        Any other value returns `400 Bad Request`.
+      enum:
+        - system_announcement
+        - news_announcement
+        - mod_action
+        - restriction_update
+        - mention
+        - news
+        - announcement
+        - alert
     targetRole:
       type: string
       enum:
@@ -315,6 +344,32 @@ BroadcastRequest:
         type: string
         format: uuid
       description: Specific account UUIDs to target. Overrides targetRole if provided.
+
+AdminClanRoleRequest:
+  type: object
+  required:
+    - role
+  properties:
+    role:
+      type: string
+      enum:
+        - member
+        - moderator
+        - admin
+      description: |
+        New clan role for the target member.
+        `owner` is not valid here — use `POST /admin/clans/{clanId}/transfer-owner` instead.
+
+AdminTransferOwnerRequest:
+  type: object
+  required:
+    - userRef
+  properties:
+    userRef:
+      type: string
+      description: |
+        New owner — UUID, `@username`, or bare username. Must be an existing user.
+        Returns `409 Conflict` if the target already owns another clan.
 
 AdminUserView:
   type: object

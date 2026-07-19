@@ -19,6 +19,38 @@ export interface TemplatePatchRequest {
   accessPassword?: string;
 }
 
+/** Light list projection returned by GET /api/v3/templates{,/pinned} —
+ *  mirrors backend `TemplateSummary` (backend/src/models/templates.rs,
+ *  camelCase serde). No legacy `share` payload: open/import goes through the
+ *  Templates super-tab detail screen instead. */
+export interface TemplateSummaryV3 {
+  id: string;
+  /** null when the creator is redacted for anonymity. */
+  userId: string | null;
+  name: string;
+  x: number;
+  y: number;
+  scale: number;
+  scope: string;
+  status: string;
+  version: number;
+  clanId?: string | null;
+  verifiedAt?: string | null;
+  createdAt: string;
+  hasDocument?: boolean;
+  templateCount?: number;
+  animated?: boolean;
+}
+
+/** Standard V3 page envelope for template lists. */
+export interface TemplatePageV3 {
+  items: TemplateSummaryV3[];
+  page: number;
+  perPage: number;
+  total: number;
+  totalPages: number;
+}
+
 export function buildTemplatesApi(client: BackendClient) {
   const path = (id: string) => `/templates/${encodeURIComponent(id)}`;
 
@@ -63,7 +95,7 @@ export function buildTemplatesApi(client: BackendClient) {
 
     unpin: (id: string) => client.delete(`${path(id)}/pin`),
 
-    listPinned: () => client.get("/templates/pinned"),
+    listPinned: () => client.get<TemplatePageV3>("/templates/pinned"),
   };
 }
 

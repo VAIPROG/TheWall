@@ -143,8 +143,13 @@ export class BackendClient {
       next = await fn(next);
     }
 
+    // A FormData body means multipart/form-data (e.g. the V3 avatar upload,
+    // POST /api/v3/users/me/avatar with a `file` field). In that case DON'T set
+    // Content-Type — the browser adds it WITH the multipart boundary — and pass
+    // the FormData through unserialized. Everything else is JSON.
+    const isForm = typeof FormData !== "undefined" && next.body instanceof FormData;
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      ...(isForm ? {} : { "Content-Type": "application/json" }),
       "X-ClientVersion-TheWallDev-API": "3",
       ...(next.headers || {}),
     };
@@ -153,7 +158,12 @@ export class BackendClient {
     }
 
     const url = (next.root ? this.rootUrl : this.url) + next.path;
-    const body = next.body !== undefined ? JSON.stringify(next.body) : undefined;
+    const body =
+      next.body === undefined
+        ? undefined
+        : isForm
+          ? (next.body as FormData)
+          : JSON.stringify(next.body);
 
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => ctrl.abort("ERR_TIMEOUT"), TIMEOUT_MS);

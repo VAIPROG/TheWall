@@ -4,7 +4,6 @@ Notification:
     - id
     - type
     - title
-    - body
     - isRead
     - createdAt
   properties:
@@ -28,7 +27,8 @@ Notification:
       description: Short notification headline.
     body:
       type: string
-      description: Full notification content.
+      nullable: true
+      description: Full notification content. Null when the notification has no body.
     isRead:
       type: boolean
       description: Whether the user has acknowledged this notification.
@@ -46,9 +46,31 @@ Notification:
       description: Timestamp when the notification was created.
 
 NotificationPage:
-  allOf:
-    - $ref: "./notifications.yaml#/Notification"
-    - $ref: "./common.yaml#/Pagination"
+  type: object
+  required:
+    - items
+    - page
+    - perPage
+    - total
+    - totalPages
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "./notifications.yaml#/Notification"
+      description: Notifications for the current page.
+    page:
+      type: integer
+      description: Current page number (1-based).
+    perPage:
+      type: integer
+      description: Items per page.
+    total:
+      type: integer
+      description: Total number of notifications matching the filter.
+    totalPages:
+      type: integer
+      description: Total number of pages.
 
 AckRequest:
   type: object
@@ -72,6 +94,7 @@ NotificationSettings:
     - restrictionUpdates
     - modActions
     - systemAnnouncements
+    - newsAnnouncements
     - mentions
   properties:
     pushEnabled:
@@ -91,7 +114,10 @@ NotificationSettings:
       description: Notify on moderation actions affecting the user.
     systemAnnouncements:
       type: boolean
-      description: Notify on system-wide announcements.
+      description: Notify on system-wide (`system_announcement`) broadcasts.
+    newsAnnouncements:
+      type: boolean
+      description: Notify on news-type (`news_announcement`) broadcasts.
     mentions:
       type: boolean
       description: Notify when mentioned in chat or templates.
@@ -116,7 +142,10 @@ NotificationSettingsUpdate:
       description: Notify on moderation actions affecting the user.
     systemAnnouncements:
       type: boolean
-      description: Notify on system-wide announcements.
+      description: Notify on system-wide (`system_announcement`) broadcasts.
+    newsAnnouncements:
+      type: boolean
+      description: Notify on news-type (`news_announcement`) broadcasts.
     mentions:
       type: boolean
       description: Notify when mentioned in chat or templates.

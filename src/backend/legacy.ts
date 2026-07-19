@@ -112,6 +112,10 @@ export function buildLegacyApi(client: BackendClient) {
           (pass ? `?pass=${encodeURIComponent(pass)}` : ""),
       ),
 
+    // NOTE: the V2 rich-profile write (`PUT /v2/me/profile`) is retired —
+    // freeform social links now ride PATCH /api/v3/users/me (`socialLinks`),
+    // see backend/users.ts ProfileUpdate + ui/profile-tab.ts.
+
     pinTemplateV2: (id: string, slot?: number) =>
       client.postRoot(`/v2/templates/${encodeURIComponent(id)}/pin`, { slot }),
 
