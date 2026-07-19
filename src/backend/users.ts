@@ -23,12 +23,19 @@ export function buildUsersApi(client: BackendClient) {
 
     updateMe: (body: ProfileUpdate) => client.patch<BackendUser>("/users/me", body),
 
-    // Avatar upload + self-delete still use the V1 root endpoints. V3's
-    // avatar upload is multipart/form-data (POST /api/v3/users/me/avatar);
-    // BackendClient only speaks JSON bodies, so switching needs a multipart
-    // wrapper first. TODO(phase3): switch setAvatar to the V3 multipart upload.
     avatar: () => client.getRoot<string>("/me/avatar"),
 
+    /** V3 avatar upload — multipart/form-data (`file` field) to
+     *  POST /api/v3/users/me/avatar. BackendClient now handles a FormData body
+     *  (skips JSON serialization + Content-Type). Backend validates format
+     *  (png/jpeg/webp/gif) + size and stores a self-contained data URI. */
+    uploadAvatar: (file: File | Blob) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return client.post<{ ok?: boolean; url?: string }>("/users/me/avatar", fd);
+    },
+
+    /** @deprecated legacy V1 base64 upload; use {@link uploadAvatar}. */
     setAvatar: (image: string) => client.putRoot("/me/avatar", { image }),
 
     /** Remove the custom avatar (falls back to Discord → identicon chain).

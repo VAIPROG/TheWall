@@ -384,27 +384,26 @@ export function wireProfile(_win: HTMLElement): void {
     loadPinnedTemplates().catch(() => {});
   });
 
-  // Avatar
-  $("avatar-upload")?.addEventListener("change", (e: Event) => {
-    const f = (e.target as HTMLInputElement).files?.[0];
+  // Avatar — V3 multipart upload (POST /api/v3/users/me/avatar, `file` field).
+  $("avatar-upload")?.addEventListener("change", async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const f = input.files?.[0];
     if (!f) return;
     const client = getActiveClient();
     if (!client?.on) {
       errorDlg("Connect to VAI-PROG backend first (Settings)");
-      (e.target as HTMLInputElement).value = "";
+      input.value = "";
       return;
     }
-    const rd = new FileReader();
-    rd.onload = async (ev) => {
-      try {
-        await api(client).users.setAvatar((ev.target as FileReader).result as string);
-        toast(t("customAvatar"), "uploaded");
-        syncProfile();
-      } catch (err: any) {
-        await errorDlg("Avatar upload failed: " + err.message);
-      }
-    };
-    rd.readAsDataURL(f);
+    try {
+      await api(client).users.uploadAvatar(f);
+      toast(t("customAvatar"), "uploaded");
+      syncProfile();
+    } catch (err: any) {
+      await errorDlg("Avatar upload failed: " + err.message);
+    } finally {
+      input.value = "";
+    }
   });
   $("btn-avatar-reset")?.addEventListener("click", () => resetAvatar());
   $("btn-avatar-refresh-discord")?.addEventListener("click", async () => {
