@@ -7,7 +7,7 @@
  *                sessions/notes/wipeout/impersonate…)
  *   Moderation — /moderation/reports review, /moderation/queue approvals,
  *                /admin/messages/{id} removal, clan takedown/unlock
- *   Broadcast  — legacy titled composer + V3 role-targeted broadcast
+ *   Broadcast  — V3 titled + kind (news/announcement/alert) role-targeted
  *   System     — /admin/config, /admin/maintenance, /admin/audit
  *   Tools      — legacy template catalog + achievements admin
  *
@@ -18,8 +18,6 @@
  *   - /admin/moderation        moderator applications review
  *   - /admin/templates         full catalog list + hard delete
  *   - /admin/notifications     sent-notification inbox view
- *   - /admin/broadcast         titled news/alert broadcast (V3 broadcast has
- *                              no title/kind — see BACKEND GAP note below)
  *   - /v2/admin/templates/backfill-previews
  *
  * The V3 shutdown/restart endpoints are deliberately NOT exposed (see
@@ -37,7 +35,6 @@ import { $, esc, errMsg } from "../helpers";
 import { log } from "../log";
 import { toast } from "../notify";
 import { confirmDlg, errorDlg, infoDlg, promptDlg } from "../dialog";
-import { isWalldevDark } from "../theme";
 import { badge, loading, emptyState, errorState } from "./kit/primitives";
 import {
   statsCards,
@@ -50,6 +47,8 @@ import {
   parseMetrics,
   fmtUptime,
   roleBadgeKind,
+  normalizeBroadcastKind,
+  restrictionState,
 } from "./admin-model";
 import { takedownBody, takedownClan, unlockClan } from "./community/api";
 
@@ -256,7 +255,7 @@ function usersPageBy(delta: number): void {
   loadAdminUsers().catch(() => {});
 }
 
-/** Human label for an active restriction row (sanction flags → words). */
+/** Human label for a restriction row (sanction flags → words). */
 function restrictionLabel(r: RestrictionViewWire): string {
   const kinds: string[] = [];
   if (r.sanctions?.ban) kinds.push("BAN");
@@ -268,6 +267,17 @@ function restrictionLabel(r: RestrictionViewWire): string {
   const kind = kinds.join("+") || "restriction";
   const until = r.expiresAt ? ` until ${fmtWhen(r.expiresAt)}` : " (permanent)";
   return `${kind}${r.reason ? ` — ${r.reason}` : ""}${until}`;
+}
+
+/** One restriction pill — active rows are painted red; lifted/expired rows are
+ *  muted + struck with the reason it's no longer in force (removedAt/expiry). */
+function restrictionPill(r: RestrictionViewWire): string {
+  const st = restrictionState(r);
+  const label = esc(restrictionLabel(r));
+  if (st.status === "active") {
+    return `<div class="wd-pill wd-pill--err">${label}</div>`;
+  }
+  return `<div class="wd-pill" style="opacity:.6;text-decoration:line-through" title="${esc(st.detail)}">${label} <span class="sub" style="text-decoration:none">(${esc(st.detail)})</span></div>`;
 }
 
 async function openUserPanel(ref: string): Promise<void> {
@@ -299,14 +309,17 @@ function renderUserPanel(
   const role = String(u.globalRole || u.role || "member").toLowerCase();
   const kv = (k: string, v: string) =>
     v ? `<div class="wd-kv"><span class="wd-kv-k">${esc(k)}</span><span class="wd-kv-v">${esc(v)}</span></div>` : "";
-  // The view has no removedAt (backend gap) — filter what we can: expired rows.
-  const now = Date.now();
-  const active = restr.filter((r) => !r.expiresAt || new Date(r.expiresAt).getTime() > now);
-  const restrHtml = active.length
-    ? active
-        .map((r) => `<div class="wd-pill wd-pill--err">${esc(restrictionLabel(r))}</div>`)
-        .join("")
-    : `<span class="sub">no active restrictions on record</span>`;
+  // Show ALL rows newest-first: active ones red, lifted/expired muted+struck
+  // (restrictionState reads removedAt/expiresAt). Active-first ordering keeps
+  // the ones that still bite at the top.
+  const ordered = [...restr].sort((a, b) => {
+    const aa = restrictionState(a).status === "active" ? 0 : 1;
+    const bb = restrictionState(b).status === "active" ? 0 : 1;
+    return aa - bb;
+  });
+  const restrHtml = ordered.length
+    ? ordered.map((r) => restrictionPill(r)).join("")
+    : `<span class="sub">no restrictions on record</span>`;
   const notesHtml = notes.length
     ? notes
         .map(
@@ -356,6 +369,19 @@ function renderUserPanel(
         ${btn("reset-avatar", "Reset avatar")}${btn("reset-username", "Reset username")}${btn("remove-clan", "Remove from clan")}
       </div>
     </div>
+    <div class="wd-group"><div class="wd-legend">Clan governance</div>
+      <input id="admin-up-clan" name="admin_up_clan" autocomplete="off" type="text" class="wp-input" placeholder="clan UUID (admin_get_user carries no clan id)">
+      <div class="wd-adm-acts" style="margin-top:4px">
+        <select id="admin-up-clan-role" class="wp-input" style="font:11px sans-serif;width:auto">
+          ${["member", "moderator", "admin"]
+            .map((r) => `<option value="${r}">${r}</option>`)
+            .join("")}
+        </select>
+        ${btn("clan-role", "Set clan role")}
+        ${btn("clan-transfer", "Transfer ownership to this user", "wd-btn--danger")}
+      </div>
+      <div class="sub">Global-admin override — set the user's role in the given clan, or transfer that clan's ownership to them (they must be a member).</div>
+    </div>
     <div class="wd-group"><div class="wd-legend">Sessions</div>
       <div class="wd-list wd-list--scroll" id="admin-up-sessions"><div class="sub" style="padding:4px 6px">not loaded</div></div>
       <div class="wd-adm-acts" style="margin-top:4px">
@@ -403,10 +429,51 @@ async function onUserPanelClick(e: Event): Promise<void> {
         const role = ($("admin-up-role") as HTMLSelectElement | null)?.value;
         if (!role) return;
         if (!(await confirmDlg(`Set global role of "${u.username}" to ${role}?`, "Promote"))) return;
-        await a.admin.promote(u.id, role);
+        try {
+          await a.admin.promote(u.id, role);
+        } catch (err: any) {
+          // Non-owner admins can't grant admin/owner — the backend 403s. Show
+          // the reason plainly rather than a generic "promote failed".
+          if (err?.status === 403) {
+            await errorDlg("Only an owner can grant the admin or owner role.");
+            return;
+          }
+          throw err;
+        }
         toast("Admin", `role → ${role}`);
         await reload();
         loadAdminUsers().catch(() => {});
+        break;
+      }
+      case "clan-role":
+      case "clan-transfer": {
+        // admin_get_user carries no clan id, so the admin supplies it here.
+        const clanId = ($("admin-up-clan") as HTMLInputElement | null)?.value.trim();
+        if (!clanId) {
+          await errorDlg("Enter the clan UUID first.");
+          return;
+        }
+        if (act === "clan-role") {
+          const cr = ($("admin-up-clan-role") as HTMLSelectElement | null)?.value as
+            | "member"
+            | "moderator"
+            | "admin"
+            | undefined;
+          if (!cr) return;
+          if (!(await confirmDlg(`Set "${u.username}" to clan role "${cr}" in ${clanId}?`, "Clan role"))) return;
+          await a.admin.setClanMemberRole(clanId, u.id, cr);
+          toast("Admin", `clan role → ${cr}`);
+        } else {
+          if (
+            !(await confirmDlg(
+              `Transfer OWNERSHIP of clan ${clanId} to "${u.username}"?\nThe current owner steps down to clan admin.`,
+              "Transfer clan ownership",
+            ))
+          )
+            return;
+          await a.admin.transferClanOwner(clanId, u.id);
+          toast("Admin", "clan ownership transferred");
+        }
         break;
       }
       case "ban":
@@ -554,6 +621,13 @@ async function onUserPanelClick(e: Event): Promise<void> {
       }
     }
   } catch (err: any) {
+    // Role/ownership grants are the ones the backend gates hardest — surface
+    // the 403 (owner-only) with a clear message; 409s carry a useful backend
+    // detail in errMsg (already included below).
+    if (err?.status === 403 && (act === "clan-transfer" || act === "clan-role")) {
+      await errorDlg("Forbidden — this action requires a global admin/owner. " + errMsg(err));
+      return;
+    }
     await errorDlg(`${act} failed: ` + errMsg(err));
   }
 }
@@ -915,10 +989,12 @@ export async function loadModApps(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Broadcast — legacy titled composer + V3 role-targeted message
+// Broadcast — V3 titled + kind + role-targeted message
 // ---------------------------------------------------------------------------
 
-/** Send the V3 role-targeted broadcast (plain message, no title/kind). */
+/** Send the V3 broadcast (title + kind + optional role targeting). The V3
+ *  endpoint now carries the title and the news/announcement/alert kind, so the
+ *  old legacy titled composer is gone — this is the single titled path. */
 async function sendV3Broadcast(): Promise<void> {
   const ta = $("admin-bc-msg") as HTMLTextAreaElement | null;
   const message = ta?.value.trim() || "";
@@ -926,128 +1002,31 @@ async function sendV3Broadcast(): Promise<void> {
     await errorDlg("Message must be 1–2000 characters.");
     return;
   }
+  const titleEl = $("admin-bc-title") as HTMLInputElement | null;
+  const title = titleEl?.value.trim() || "";
+  if (title.length > 200) {
+    await errorDlg("Title must be 200 characters or fewer.");
+    return;
+  }
+  const kind = normalizeBroadcastKind(($("admin-bc-kind") as HTMLSelectElement | null)?.value);
   const role = ($("admin-bc-role") as HTMLSelectElement | null)?.value || "all";
   const a = backendApi();
   if (!a) return;
   const who = role === "all" ? "ALL users" : `every ${role}`;
-  if (!(await confirmDlg(`Send this V3 broadcast to ${who}?`, "Broadcast"))) return;
+  if (!(await confirmDlg(`Send this "${kind}" broadcast to ${who}?`, "Broadcast"))) return;
   try {
     const r = await a.admin.broadcast({
       message,
+      title: title || undefined,
+      kind,
       targetRole: role === "all" ? undefined : role,
     });
     toast("Admin", `broadcast sent to ${r?.recipients ?? "?"} users`);
     if (ta) ta.value = "";
+    if (titleEl) titleEl.value = "";
   } catch (e: any) {
     await errorDlg("Broadcast failed: " + errMsg(e));
   }
-}
-
-/**
- * Two-field broadcast dialog (title + body) on the LEGACY /admin/broadcast —
- * kept because the V3 broadcast carries neither a title nor the news/alert
- * kind (BACKEND GAP: admin.rs BroadcastRequest hardcodes the "Broadcast"
- * title and has no kind). Built ad-hoc because the standard promptDlg only
- * collects one field. Uses the same Win95 + theme system as dialog.ts so it
- * picks up dark mode automatically.
- */
-export async function broadcastNotification(): Promise<void> {
-  injectBroadcastCss();
-  const wrap = document.createElement("div");
-  wrap.className = "wd-bc-host" + (isWalldevDark() ? " wd-dark" : "");
-  const onThemeChange = () => wrap.classList.toggle("wd-dark", isWalldevDark());
-  document.addEventListener("wd:theme-changed", onThemeChange);
-  wrap.innerHTML = `
-    <div class="wd-bc-back"></div>
-    <div class="wd-bc-dlg" role="dialog" aria-modal="true">
-      <div class="wd-bc-tb">
-        <span class="wd-bc-tb-title"><span class="wd-bc-led"></span><span>📣 Broadcast to all users</span></span>
-        <span class="wd-bc-x" role="button" title="Close">✕</span>
-      </div>
-      <div class="wd-bc-bd">
-        <div class="wd-bc-icon">📢</div>
-        <div class="wd-bc-fields">
-          <label for="wd-bc-title">
-            <span class="wd-bc-lbl">Title</span>
-            <input id="wd-bc-title" name="wd_bc_title" type="text" class="wd-bc-title" placeholder="A short, descriptive subject" maxlength="120" autocomplete="off">
-          </label>
-          <label for="wd-bc-body">
-            <span class="wd-bc-lbl">Body <span class="wd-bc-hint">(markdown supported)</span></span>
-            <textarea id="wd-bc-body" name="wd_bc_body" class="wd-bc-body" rows="6" placeholder="Markdown OK — **bold**, *italic*, [links](url), :emote:" autocomplete="off"></textarea>
-          </label>
-          <label>
-            <span class="wd-bc-lbl">Type <span class="wd-bc-hint">— how it surfaces on the client</span></span>
-            <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
-              <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-                <input type="radio" name="wd-bc-kind" value="announcement" checked>
-                <span><b>News</b> — toast + OS notification, no popup</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-                <input type="radio" name="wd-bc-kind" value="alert">
-                <span><b>Alert</b> — critical popup + toast + OS notification (global, not clan-scoped)</span>
-              </label>
-            </div>
-          </label>
-          <div class="wd-bc-warn">⚠ This will reach every registered user.</div>
-        </div>
-      </div>
-      <div class="wd-bc-btns">
-        <button class="wd-bc-btn wd-bc-cancel">Cancel</button>
-        <button class="wd-bc-btn primary wd-bc-send">📣 Send</button>
-      </div>
-      <div class="wd-bc-status"><span class="left">Ready</span><span class="right">Admin Console</span></div>
-    </div>`;
-  document.body.appendChild(wrap);
-
-  const titleInput = wrap.querySelector<HTMLInputElement>(".wd-bc-title")!;
-  const bodyInput = wrap.querySelector<HTMLTextAreaElement>(".wd-bc-body")!;
-  const statusLeft = wrap.querySelector<HTMLElement>(".wd-bc-status .left")!;
-  titleInput.focus();
-
-  await new Promise<void>((resolve) => {
-    const close = () => {
-      wrap.remove();
-      window.removeEventListener("keydown", onKey, true);
-      document.removeEventListener("wd:theme-changed", onThemeChange);
-      resolve();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.preventDefault(); close(); }
-    };
-    window.addEventListener("keydown", onKey, true);
-
-    wrap.querySelector(".wd-bc-cancel")!.addEventListener("click", close);
-    wrap.querySelector(".wd-bc-x")!.addEventListener("click", close);
-    wrap.querySelector(".wd-bc-back")!.addEventListener("click", close);
-
-    wrap.querySelector(".wd-bc-send")!.addEventListener("click", async () => {
-      const title = titleInput.value.trim();
-      const body = bodyInput.value.trim();
-      const kindEl = wrap.querySelector<HTMLInputElement>('input[name="wd-bc-kind"]:checked');
-      const kind = kindEl?.value || "announcement";
-      if (!title) {
-        statusLeft.textContent = "Title is required";
-        titleInput.focus();
-        return;
-      }
-      statusLeft.textContent = "Confirming…";
-      const typeLabel = kind === "alert" ? "ALERT (global popup)" : "News (toast)";
-      const ok = await confirmDlg(
-        `Send broadcast "${title}" as ${typeLabel} to ALL users?`,
-        "Final Confirmation",
-      );
-      if (!ok) { statusLeft.textContent = "Cancelled"; return; }
-      statusLeft.textContent = "Sending…";
-      try {
-        await legacyReq("POST", "/admin/broadcast", { title, body, kind });
-        toast("Admin", `broadcast sent as ${typeLabel}`);
-        close();
-      } catch (e: any) {
-        statusLeft.textContent = "Send failed";
-        await errorDlg("Broadcast failed: " + errMsg(e));
-      }
-    });
-  });
 }
 
 // --- sent notifications (LEGACY /admin/notifications) ------------------------
@@ -1384,166 +1363,3 @@ export function wireAdminConsole(): void {
   $("btn-admin-audit-next")?.addEventListener("click", () => auditPageBy(1));
 }
 
-// ---------------------------------------------------------------------------
-// Broadcast dialog CSS (unchanged from the previous console)
-// ---------------------------------------------------------------------------
-
-function injectBroadcastCss(): void {
-  if (document.getElementById("wd-bc-css")) return;
-  const style = document.createElement("style");
-  style.id = "wd-bc-css";
-  style.textContent = `
-  @keyframes wd-bc-pop { from { transform:translate(-50%,-50%) scale(.9); opacity:0 } to { transform:translate(-50%,-50%) scale(1); opacity:1 } }
-  .wd-bc-host {
-    position:fixed; inset:0; z-index:1000002;
-    font:11px "MS Sans Serif",Tahoma,sans-serif;
-    --bg:#c0c0c0; --text:#000; --light:#fff; --shadow:#808080; --dark:#404040;
-    --field:#fff; --fieldtext:#000;
-    --title-a:#000080; --title-b:#1084d0;
-    --accent:#000080; --sub:#555;
-  }
-  .wd-bc-host.wd-dark {
-    --bg:#2c2c2c; --text:#fff; --light:#5a5a5a; --shadow:#141414; --dark:#000;
-    --field:#0f0f0f; --fieldtext:#fff;
-    --title-a:#3838aa; --title-b:#1084d0;
-    --accent:#2889ff; --sub:#aaa;
-  }
-  .wd-bc-back {
-    position:absolute; inset:0; background:rgba(0,0,0,.45);
-  }
-  .wd-bc-dlg {
-    position:absolute; left:50%; top:42%;
-    transform:translate(-50%,-50%);
-    width:460px; max-width:92vw;
-    background:var(--bg); color:var(--text);
-    border:2px solid; border-color:var(--light) var(--dark) var(--dark) var(--light);
-    box-shadow:
-      inset -1px -1px 0 var(--shadow),
-      inset  1px  1px 0 var(--bg),
-      4px 4px 0 rgba(0,0,0,.6);
-    animation:wd-bc-pop .15s ease-out;
-  }
-  .wd-bc-tb {
-    background:linear-gradient(90deg, var(--title-a), var(--title-b));
-    color:#fff; font-weight:bold; font-size:12px;
-    padding:3px 3px 3px 6px;
-    display:flex; align-items:center; justify-content:space-between;
-    height:20px; line-height:14px;
-    user-select:none;
-  }
-  .wd-bc-tb-title { display:flex; align-items:center; gap:6px }
-  .wd-bc-led { width:8px; height:8px; border-radius:50%;
-    background:#3f6; box-shadow:0 0 4px #3f6, inset 0 0 1px rgba(255,255,255,.5) }
-  .wd-bc-x {
-    width:18px; height:16px;
-    display:flex; align-items:center; justify-content:center;
-    background:var(--bg); color:var(--text);
-    border:1px solid; border-color:var(--light) var(--dark) var(--dark) var(--light);
-    box-shadow:inset 1px 1px 0 var(--bg), inset -1px -1px 0 var(--shadow);
-    font:bold 10px Verdana,sans-serif; cursor:pointer; padding:0;
-  }
-  .wd-bc-x:active {
-    border-color:var(--dark) var(--light) var(--light) var(--dark);
-    box-shadow:inset -1px -1px 0 var(--bg), inset 1px 1px 0 var(--shadow);
-    padding:1px 0 0 1px;
-  }
-  .wd-bc-bd {
-    padding:14px 16px;
-    display:flex; gap:14px; align-items:flex-start;
-    background:var(--bg);
-  }
-  .wd-bc-icon {
-    font-size:32px; line-height:1; flex:none;
-    filter:drop-shadow(1px 1px 0 rgba(0,0,0,.4));
-  }
-  .wd-bc-fields { flex:1; display:flex; flex-direction:column; gap:8px; min-width:0 }
-  .wd-bc-host .wd-bc-fields label {
-    display:flex !important;
-    flex-direction:column !important;
-    gap:3px !important;
-    font-size:11px !important;
-    background:transparent !important;
-    color:var(--text) !important;
-    padding:0 !important;
-    margin:0 !important;
-    border:0 !important;
-  }
-  .wd-bc-host .wd-bc-lbl {
-    display:inline-flex !important; align-items:center !important; gap:4px !important;
-    font-weight:bold !important;
-    color:var(--text) !important;
-    background:transparent !important;
-    padding:0 !important;
-    border:0 !important;
-  }
-  .wd-bc-host .wd-bc-hint {
-    font-weight:normal !important;
-    color:var(--sub) !important;
-    background:transparent !important;
-    font-size:10px !important;
-  }
-  /* Force our own values regardless of what the host site sets — pages like
-   * filianislost.com style input { background:#fff !important } which would
-   * otherwise leak through. */
-  .wd-bc-host .wd-bc-title,
-  .wd-bc-host .wd-bc-body {
-    all:revert;
-    display:block !important;
-    width:100% !important; box-sizing:border-box !important;
-    padding:4px 6px !important;
-    margin:0 !important;
-    background:var(--field) !important; color:var(--fieldtext) !important;
-    border:2px solid !important;
-    border-color:var(--dark) var(--light) var(--light) var(--dark) !important;
-    box-shadow:inset 1px 1px 0 var(--shadow), inset -1px -1px 0 var(--bg) !important;
-    font:12px "MS Sans Serif", monospace !important;
-    outline:none !important;
-    resize:none !important;
-  }
-  .wd-bc-host .wd-bc-body {
-    font-family:Consolas,"Courier New",monospace !important;
-    resize:vertical !important;
-    min-height:80px !important;
-  }
-  .wd-bc-host .wd-bc-title:focus,
-  .wd-bc-host .wd-bc-body:focus {
-    outline:1px dotted var(--accent) !important;
-    outline-offset:1px !important;
-  }
-  .wd-bc-warn {
-    background:rgba(228,160,0,.18); color:var(--text);
-    border-left:3px solid #e8a600; padding:6px 8px; font-size:11px;
-  }
-  .wd-bc-host.wd-dark .wd-bc-warn { background:rgba(228,160,0,.22) }
-  .wd-bc-btns {
-    padding:10px 14px 12px;
-    display:flex; gap:6px; justify-content:flex-end;
-    background:var(--bg);
-    border-top:1px solid var(--shadow);
-    box-shadow:inset 0 1px 0 var(--light);
-  }
-  .wd-bc-btn {
-    min-width:96px; padding:5px 14px;
-    background:var(--bg); color:var(--text);
-    border:2px solid; border-color:var(--light) var(--dark) var(--dark) var(--light);
-    box-shadow:inset 1px 1px 0 var(--bg), inset -1px -1px 0 var(--shadow);
-    font:11px "MS Sans Serif",Tahoma,sans-serif;
-    cursor:pointer;
-  }
-  .wd-bc-btn:hover { filter:brightness(1.04) }
-  .wd-bc-btn:active {
-    border-color:var(--dark) var(--light) var(--light) var(--dark);
-    box-shadow:inset -1px -1px 0 var(--bg), inset 1px 1px 0 var(--shadow);
-    padding:6px 13px 4px 15px;
-  }
-  .wd-bc-btn.primary { font-weight:bold }
-  .wd-bc-btn:focus { outline:1px dotted currentColor; outline-offset:-3px }
-  .wd-bc-status {
-    border-top:1px solid var(--shadow); box-shadow:inset 0 1px 0 var(--light);
-    padding:2px 8px; background:var(--bg); color:var(--sub);
-    font:10px "MS Sans Serif",sans-serif;
-    display:flex; justify-content:space-between;
-  }
-  `;
-  document.head.appendChild(style);
-}

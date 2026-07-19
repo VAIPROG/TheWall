@@ -240,3 +240,64 @@ export function roleBadgeKind(role: string): "owner" | "admin" | "mod" | "member
   if (r === "moderator") return "mod";
   return "member";
 }
+
+// ---------------------------------------------------------------------------
+// Broadcast kind (POST /api/v3/admin/broadcast — `kind`)
+// ---------------------------------------------------------------------------
+
+/** The broadcast kinds the console offers, mapped to the alias the backend
+ *  accepts. The backend also takes canonical types (system_announcement, …)
+ *  but the aliases are the clearest UX handle. */
+export const BROADCAST_KINDS = [
+  { value: "news", label: "News" },
+  { value: "announcement", label: "Announcement" },
+  { value: "alert", label: "Alert (global)" },
+] as const;
+
+export type BroadcastKind = (typeof BROADCAST_KINDS)[number]["value"];
+
+/** Normalise a UI/kind string to a value the backend accepts, defaulting to
+ *  "announcement". Accepts the aliases and the canonical types verbatim; any
+ *  unknown value falls back to the default so the request never 400s on kind. */
+export function normalizeBroadcastKind(raw: string | null | undefined): string {
+  const k = (raw || "").trim().toLowerCase();
+  const known = new Set<string>([
+    // aliases
+    "news",
+    "announcement",
+    "alert",
+    // canonical types
+    "system_announcement",
+    "news_announcement",
+    "mod_action",
+    "restriction_update",
+    "mention",
+  ]);
+  return known.has(k) ? k : "announcement";
+}
+
+// ---------------------------------------------------------------------------
+// Restriction lifted/active state (RestrictionView.removedAt/expiresAt)
+// ---------------------------------------------------------------------------
+
+export interface RestrictionState {
+  /** "active" | "lifted" (revoked early) | "expired" (past expiresAt). */
+  status: "active" | "lifted" | "expired";
+  /** Human tail describing WHY it's no longer active ("" when active). */
+  detail: string;
+}
+
+/** Classify a restriction row from its `removedAt`/`expiresAt` (pure; `now`
+ *  is injectable for tests). A `removedAt` (manual lift) wins over expiry. */
+export function restrictionState(
+  r: { removedAt?: string | null; expiresAt?: string | null },
+  now: number = Date.now(),
+): RestrictionState {
+  if (r.removedAt) {
+    return { status: "lifted", detail: `lifted ${fmtWhen(r.removedAt)}` };
+  }
+  if (r.expiresAt && new Date(r.expiresAt).getTime() <= now) {
+    return { status: "expired", detail: `expired ${fmtWhen(r.expiresAt)}` };
+  }
+  return { status: "active", detail: "" };
+}

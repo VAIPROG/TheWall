@@ -193,12 +193,37 @@ export function buildAdminApi(client: BackendClient) {
     setMaintenance: (body: { enabled: boolean; reason?: string; estimatedDurationMinutes?: number }) =>
       client.post<MaintenanceStatusWire>("/admin/maintenance", body),
 
-    /** V3 broadcast (admin.rs:1005): plain message + optional role/user
-     *  targeting. It lands as a `system_announcement` notification titled
-     *  "Broadcast" — the richer title/kind composer stays on the legacy
-     *  `/admin/broadcast` (see ui/admin-ui.ts broadcastNotification). */
-    broadcast: (body: { message: string; targetRole?: string; targetUserIds?: string[] }) =>
-      client.post<{ ok: boolean; recipients?: number }>("/admin/broadcast", body),
+    /** V3 broadcast (admin.rs:1005): plain message + optional `title` (≤200)
+     *  and `kind`. `kind` accepts the canonical notification types
+     *  (system_announcement | news_announcement | mod_action |
+     *  restriction_update | mention) PLUS the aliases news | announcement |
+     *  alert. Optional role/user targeting. Returns `{ok, recipients?}`. */
+    broadcast: (body: {
+      message: string;
+      title?: string;
+      kind?: string;
+      targetRole?: string;
+      targetUserIds?: string[];
+    }) => client.post<{ ok: boolean; recipients?: number }>("/admin/broadcast", body),
+
+    // --- clan governance (global-admin overrides) ---------------------------
+    /** Set a member's clan role without holding any rank inside the clan
+     *  (admin.rs:1425). `role` is member|moderator|admin — ownership goes
+     *  through {@link transferClanOwner}. 409 if target is the owner, 404 if
+     *  they're not an active member. */
+    setClanMemberRole: (clanId: string, userRef: string, role: "member" | "moderator" | "admin") =>
+      client.post<{ ok: boolean }>(
+        `/admin/clans/${encodeURIComponent(clanId)}/members/${encodeURIComponent(userRef)}/role`,
+        { role },
+      ),
+
+    /** Transfer clan ownership to `userRef` (admin.rs:1500). The previous owner
+     *  steps down to clan admin. 409 if the new owner already owns a clan. */
+    transferClanOwner: (clanId: string, userRef: string) =>
+      client.post<{ ok: boolean }>(
+        `/admin/clans/${encodeURIComponent(clanId)}/transfer-owner`,
+        { userRef },
+      ),
 
     // Deliberately NOT exposed: POST /admin/shutdown and /admin/restart. The
     // handlers can't actually stop the process (they only audit-log and ask

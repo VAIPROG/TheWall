@@ -19,6 +19,8 @@ import {
   parseMetrics,
   fmtUptime,
   roleBadgeKind,
+  normalizeBroadcastKind,
+  restrictionState,
   USER_ROLE_FILTERS,
   type AdminStats,
 } from "../../src/ui/admin-model";
@@ -216,5 +218,48 @@ console.log("parseMetrics/fmtUptime OK");
   assert.strictEqual(roleBadgeKind("whatever"), "member");
 }
 console.log("roleBadgeKind OK");
+
+// ── normalizeBroadcastKind ───────────────────────────────────────────────────
+{
+  // aliases pass through
+  assert.strictEqual(normalizeBroadcastKind("news"), "news");
+  assert.strictEqual(normalizeBroadcastKind("announcement"), "announcement");
+  assert.strictEqual(normalizeBroadcastKind("alert"), "alert");
+  // case-insensitive + trims
+  assert.strictEqual(normalizeBroadcastKind("  Alert "), "alert");
+  // canonical types pass through
+  assert.strictEqual(normalizeBroadcastKind("system_announcement"), "system_announcement");
+  assert.strictEqual(normalizeBroadcastKind("mod_action"), "mod_action");
+  // unknown / empty → safe default
+  assert.strictEqual(normalizeBroadcastKind("nonsense"), "announcement");
+  assert.strictEqual(normalizeBroadcastKind(""), "announcement");
+  assert.strictEqual(normalizeBroadcastKind(null), "announcement");
+  assert.strictEqual(normalizeBroadcastKind(undefined), "announcement");
+}
+console.log("normalizeBroadcastKind OK");
+
+// ── restrictionState ─────────────────────────────────────────────────────────
+{
+  const now = Date.parse("2026-07-19T00:00:00Z");
+  // active: no removedAt, no expiry (permanent)
+  assert.strictEqual(restrictionState({}, now).status, "active");
+  // active: future expiry
+  assert.strictEqual(
+    restrictionState({ expiresAt: "2026-08-01T00:00:00Z" }, now).status,
+    "active",
+  );
+  // lifted: removedAt set (wins over any expiry)
+  const lifted = restrictionState(
+    { removedAt: "2026-07-10T12:00:00Z", expiresAt: "2026-08-01T00:00:00Z" },
+    now,
+  );
+  assert.strictEqual(lifted.status, "lifted");
+  assert.ok(lifted.detail.startsWith("lifted "));
+  // expired: past expiry, no removedAt
+  const expired = restrictionState({ expiresAt: "2026-07-01T00:00:00Z" }, now);
+  assert.strictEqual(expired.status, "expired");
+  assert.ok(expired.detail.startsWith("expired "));
+}
+console.log("restrictionState OK");
 
 console.log("admin-model.test.ts: all assertions passed");

@@ -20,9 +20,9 @@ export interface CreateReportRequest {
 // Wire shapes — verified against backend/src/routes/v3/moderation/* + models.
 // ---------------------------------------------------------------------------
 
-/** `RestrictionView` (models/moderation.rs:74). NOTE: the view omits
- *  `removedAt` — a lifted restriction is indistinguishable from an active
- *  permanent one on this wire (flagged as a backend gap). */
+/** `RestrictionView` (models/moderation.rs:74). A LIFTED restriction now
+ *  carries `removedAt` (+ `removedBy`) — it is set when a moderator revoked
+ *  the restriction ahead of any expiry (distinct from an expired `expiresAt`). */
 export interface RestrictionViewWire {
   id: string;
   userId: string;
@@ -31,6 +31,10 @@ export interface RestrictionViewWire {
   appliedBy?: string | null;
   appliedAt: string;
   expiresAt?: string | null;
+  /** Set when the restriction was lifted early (revoked by a moderator). */
+  removedAt?: string | null;
+  /** User id of the moderator who lifted it. */
+  removedBy?: string | null;
   reason?: string | null;
   sanctions: {
     mute: boolean;
@@ -138,12 +142,16 @@ export function buildModerationApi(client: BackendClient) {
     deleteRestriction: (id: string) => client.delete(`/restrictions/${encodeURIComponent(id)}`),
 
     /** Paginated envelope (restrictions.rs:494 returns RestrictionPage, not a
-     *  bare array). Lists ALL rows newest-first — `UserRestrictionsQuery` has
-     *  no `active` filter (only the global `/restrictions` list does). */
-    userRestrictions: (userRef: string, params?: { page?: number; perPage?: number }) =>
+     *  bare array). `active` filters the set: true → only active (not lifted,
+     *  not expired), false → only inactive; omitted → ALL rows newest-first. */
+    userRestrictions: (
+      userRef: string,
+      params?: { page?: number; perPage?: number; active?: boolean },
+    ) =>
       client.get<RestrictionPageWire>(`/users/${encodeURIComponent(userRef)}/restrictions`, {
         page: params?.page,
         per_page: params?.perPage,
+        active: params?.active,
       }),
 
     // Reports ------------------------------------------------------------

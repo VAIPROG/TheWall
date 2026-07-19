@@ -5,7 +5,7 @@ import { toast } from "../notify";
 import { confirmDlg, errorDlg, infoDlg } from "../dialog";
 import { log } from "../log";
 import { getActiveClient } from "../backend/index";
-import { wireAdminConsole, broadcastNotification } from "./admin-ui";
+import { wireAdminConsole } from "./admin-ui";
 import { segmented, loading } from "./kit/primitives";
 import {
   listCatalogue,
@@ -21,7 +21,6 @@ export function wireAdmin(_win: HTMLElement): void {
   // wires itself — see ui/admin-ui.ts wireAdminConsole. Everything below is
   // the Tools section: achievements admin + the legacy preview backfill.
   wireAdminConsole();
-  $("btn-broadcast")?.addEventListener("click", broadcastNotification);
 
   // Admin: achievement grant/revoke. Populate the picker from the catalogue
   // the first time the tab is opened (we lazy-load so non-admins never see it).
@@ -316,15 +315,17 @@ export function buildAdminPane(): string {
         `)}
       </div>
 
-      <!-- 4 · Broadcast — legacy titled composer + V3 role-targeted -->
+      <!-- 4 · Broadcast — V3 titled + kind + role-targeted -->
       <div class="wd-adm-sec" id="admin-sec-bc">
-        ${grp("bell", "Broadcast (title + news/alert)", `
-          <button class="wp-btn primary" id="btn-broadcast">${ic("bell")}Compose broadcast…</button>
-          <div class="wp-note" style="color:var(--sub)">Titled news/alert via the legacy pipe — the V3 broadcast can't carry a title or the alert kind yet.</div>
-        `)}
-        ${grp("bell", "Targeted broadcast (V3)", `
-          <textarea id="admin-bc-msg" name="admin_bc_msg" class="wp-input" rows="3" placeholder="plain message, 1–2000 chars" autocomplete="off"></textarea>
+        ${grp("bell", "Broadcast (V3)", `
+          <input id="admin-bc-title" name="admin_bc_title" autocomplete="off" type="text" class="wp-input" placeholder="title (optional, ≤200 chars)" maxlength="200">
+          <textarea id="admin-bc-msg" name="admin_bc_msg" class="wp-input" rows="3" placeholder="message, 1–2000 chars" autocomplete="off" style="margin-top:4px"></textarea>
           <div class="wd-adm-bar" style="margin-top:4px">
+            <select id="admin-bc-kind" name="admin_bc_kind" class="wp-input" style="font:11px sans-serif;width:auto">
+              <option value="news">News</option>
+              <option value="announcement" selected>Announcement</option>
+              <option value="alert">Alert (global)</option>
+            </select>
             <select id="admin-bc-role" name="admin_bc_role" class="wp-input" style="font:11px sans-serif;width:auto">
               <option value="all">everyone</option>
               <option value="member">members</option>
@@ -334,7 +335,7 @@ export function buildAdminPane(): string {
             </select>
             <button class="wd-btn wd-btn--sm wd-btn--primary" id="btn-admin-bc-v3">Send</button>
           </div>
-          <div class="wp-note" style="color:var(--sub)">Lands as a "Broadcast" system notification for the picked role.</div>
+          <div class="wp-note" style="color:var(--sub)">Titled + kind (News / Announcement / Alert) notification for the picked role.</div>
         `)}
         ${grp("bell", "Sent notifications (legacy)", `
           <div class="wd-list wd-list--scroll" id="admin-notifs" style="max-height:200px">${loading()}</div>
