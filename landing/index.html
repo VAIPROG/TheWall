@@ -6,7 +6,7 @@
         <title>The Wall Dev — Win95 overlay for filianislost.com</title>
         <meta
             name="description"
-            content="Win95-styled overlay extension for filianislost.com. Drawing aids, clan chat, templates, Discord & Telegram sync. Does NOT modify the site's code — uses only built-in public APIs."
+            content="Win95-styled overlay extension for filianislost.com. Community hub with clans, chats & DMs, drawing aids, templates, avatars, Discord & Telegram bots. Does NOT modify the site's code — uses only built-in public APIs."
         />
         <link
             rel="icon"
@@ -79,6 +79,13 @@
             .feat-card .ic {
                 font-size: 22px;
             }
+            .feat-card.hl {
+                grid-column: 1 / -1;
+                border: 2px outset var(--accent);
+            }
+            .feat-card.hl b {
+                font-size: 16px;
+            }
         </style>
     </head>
     <body>
@@ -118,6 +125,13 @@
                             >
                         </h1>
                         <p data-i18n="index.tagline_en"></p>
+                        <p style="margin-top: 6px">
+                            <span class="tag95">NEW</span>
+                            <span
+                                data-i18n="index.new_banner"
+                                style="font-size: 13px"
+                            ></span>
+                        </p>
 
                         <div class="hero-cta">
                             <a
@@ -803,6 +817,16 @@
                             >
                         </div>
                         <div class="feat-grid">
+                            <div class="feat-card hl">
+                                <b
+                                    ><span class="ic">🏛</span>
+                                    <span
+                                        data-i18n="features.community.title"
+                                    ></span></b
+                                ><span
+                                    data-i18n="features.community.body"
+                                ></span>
+                            </div>
                             <div class="feat-card">
                                 <b
                                     ><span class="ic">📐</span>
@@ -813,19 +837,21 @@
                             </div>
                             <div class="feat-card">
                                 <b
+                                    ><span class="ic">🖼</span>
+                                    <span
+                                        data-i18n="features.templates.title"
+                                    ></span></b
+                                ><span
+                                    data-i18n="features.templates.body"
+                                ></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
                                     ><span class="ic">🛡</span>
                                     <span
                                         data-i18n="features.clan.title"
                                     ></span></b
                                 ><span data-i18n="features.clan.body"></span>
-                            </div>
-                            <div class="feat-card">
-                                <b
-                                    ><span class="ic">📬</span>
-                                    <span
-                                        data-i18n="features.mailbox.title"
-                                    ></span></b
-                                ><span data-i18n="features.mailbox.body"></span>
                             </div>
                             <div class="feat-card">
                                 <b
@@ -844,6 +870,22 @@
                                 ><span
                                     data-i18n="features.snapshots.body"
                                 ></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">👤</span>
+                                    <span
+                                        data-i18n="features.avatars.title"
+                                    ></span></b
+                                ><span data-i18n="features.avatars.body"></span>
+                            </div>
+                            <div class="feat-card">
+                                <b
+                                    ><span class="ic">🤖</span>
+                                    <span
+                                        data-i18n="features.bots.title"
+                                    ></span></b
+                                ><span data-i18n="features.bots.body"></span>
                             </div>
                             <div class="feat-card">
                                 <b
@@ -1541,6 +1583,83 @@
                             <li data-i18n="install.safari_step4"></li>
                         </ol>
                         <div class="note" data-i18n="install.safari_note"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMMUNITY shortcuts -->
+            <div class="win wide">
+                <div class="titlebar">
+                    <span>community.lnk</span
+                    ><span class="tbtns"><span class="tbtn">_</span></span>
+                </div>
+                <div class="content">
+                    <div class="group accent">
+                        <div class="legend">
+                            <span data-i18n="community.title"
+                                >Community</span
+                            >
+                        </div>
+                        <div class="shortcut-row">
+                            <a
+                                class="shortcut"
+                                href="https://vai-rice.space"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <span class="sc-ic">🍚</span>
+                                <span>
+                                    <b>vai-rice.space</b>
+                                    <small data-i18n="community.vai_sub"
+                                        >Author hub — projects &amp;
+                                        donate</small
+                                    >
+                                </span>
+                            </a>
+                            <a
+                                class="shortcut"
+                                href="https://snackers.vai-rice.space"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <span class="sc-ic">📖</span>
+                                <span>
+                                    <b>SnackersWiki</b>
+                                    <small data-i18n="community.wiki_sub"
+                                        >The community wiki of the wall</small
+                                    >
+                                </span>
+                            </a>
+                            <a
+                                class="shortcut"
+                                href="https://discord.gg/filian"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <span class="sc-ic">💬</span>
+                                <span>
+                                    <b>discord.gg/filian</b>
+                                    <small data-i18n="community.discord_sub"
+                                        >Snackers — the main Discord</small
+                                    >
+                                </span>
+                            </a>
+                            <a
+                                class="shortcut"
+                                href="https://discord.gg/snackersru"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <span class="sc-ic">🪆</span>
+                                <span>
+                                    <b>SnackersRU</b>
+                                    <small data-i18n="community.discordru_sub"
+                                        >Russian-speaking Snackers
+                                        Discord</small
+                                    >
+                                </span>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

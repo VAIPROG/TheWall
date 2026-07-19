@@ -73,8 +73,10 @@
                                 <b>VAI_PROG (vai on wall)</b> — first as a quick
                                 aiming helper for fixing tiny specks on the
                                 canvas, then steadily grown into a full
-                                Win95-themed companion: clan chat, templates,
-                                Discord sync.
+                                Win95-themed companion: a Community hub with
+                                clans, chats &amp; DMs, templates, and Discord
+                                &amp; Telegram bots that sync the wall both
+                                ways.
                             </p>
                             <p>
                                 Everything is fair-play. No autopainting, no
@@ -96,8 +98,10 @@
                                 <b>VAI_PROG (vai на стене)</b>. Сначала как
                                 быстрый помощник прицеливания для правки мелких
                                 клякс на холсте, потом постепенно выросло в
-                                полноценный Win95-приложение: клановый чат,
-                                шаблоны, синхронизация Discord.
+                                полноценное Win95-приложение: Community-хаб с
+                                кланами, чатами и личками, шаблоны, а также
+                                Discord- и Telegram-боты, синхронизирующие стену
+                                в обе стороны.
                             </p>
                             <p>
                                 Всё по-честному. Нет автопейнта, нет обхода
@@ -121,8 +125,10 @@
                                 Filian-Community von
                                 <b>VAI_PROG (vai an der Wand)</b> — anfangs als
                                 schnelle Ziel-Hilfe, dann zu einem vollständigen
-                                Win95-Begleiter ausgebaut: Clan-Chat, Vorlagen,
-                                Discord-Sync.
+                                Win95-Begleiter ausgebaut: Community-Hub mit
+                                Clans, Chats &amp; DMs, Vorlagen sowie Discord-
+                                und Telegram-Bots, die die Wall in beide
+                                Richtungen synchronisieren.
                             </p>
                             <p>
                                 Alles ist fair-play. Kein Auto-Malen, kein
@@ -144,8 +150,10 @@
                                 Créé par la partie russophone de la communauté
                                 Filian, par <b>VAI_PROG (vai sur le mur)</b> —
                                 d'abord comme une aide rapide pour viser, puis
-                                développé en un compagnon Win95 complet : chat
-                                de clan, modèles, synchronisation Discord.
+                                développé en un compagnon Win95 complet : hub
+                                Community avec clans, chats &amp; DMs, modèles,
+                                et des bots Discord &amp; Telegram qui
+                                synchronisent le mur dans les deux sens.
                             </p>
                             <p>
                                 Tout est fair-play. Pas de peinture automatique,
@@ -357,12 +365,19 @@
                                 IIFE bundle, no runtime deps.
                             </li>
                             <li>
-                                <b>Backend:</b> Rust + Axum + SQLx + Postgres.
-                                WebP via the <code>image</code> crate.
+                                <b>Backend:</b> Rust + Axum + SQLx + Postgres,
+                                serving the <b>V3 API</b> at
+                                <code>/api/v3/*</code>. WebP via the
+                                <code>image</code> crate.
+                            </li>
+                            <li>
+                                <b>Bots:</b> Discord + Telegram on one unified
+                                command framework, syncing the wall and clans
+                                both ways.
                             </li>
                             <li>
                                 <b>Browser support:</b> Chrome / Edge / Brave
-                                (MV3), Firefox 128+, Tampermonkey.
+                                (MV3), Firefox 128+, Safari 16.4+, Tampermonkey.
                             </li>
                             <li>
                                 <b>Build:</b> <code>bun run build</code> →
@@ -391,6 +406,116 @@
                                 >Contact &amp; contribuer</span
                             >
                         </div>
+                        <div class="shortcut-row" style="margin-bottom: 10px">
+                            <a
+                                class="shortcut"
+                                href="https://vai-rice.space"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <span class="sc-ic">🍚</span>
+                                <span>
+                                    <b>vai-rice.space</b>
+                                    <small>
+                                        <span data-lang="en" data-inline
+                                            >Author hub — projects &amp;
+                                            donate</span
+                                        >
+                                        <span data-lang="ru" data-inline
+                                            >Хаб автора — проекты и донат</span
+                                        >
+                                        <span data-lang="de" data-inline
+                                            >Autoren-Hub — Projekte &amp;
+                                            Spenden</span
+                                        >
+                                        <span data-lang="fr" data-inline
+                                            >Hub de l'auteur — projets &amp;
+                                            dons</span
+                                        >
+                                    </small>
+                                </span>
+                            </a>
+                            <a
+                                class="shortcut"
+                                href="https://snackers.vai-rice.space"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <span class="sc-ic">📖</span>
+                                <span>
+                                    <b>SnackersWiki</b>
+                                    <small>
+                                        <span data-lang="en" data-inline
+                                            >The community wiki of the
+                                            wall</span
+                                        >
+                                        <span data-lang="ru" data-inline
+                                            >Вики сообщества стены</span
+                                        >
+                                        <span data-lang="de" data-inline
+                                            >Das Community-Wiki der Wall</span
+                                        >
+                                        <span data-lang="fr" data-inline
+                                            >Le wiki communautaire du mur</span
+                                        >
+                                    </small>
+                                </span>
+                            </a>
+                            <a
+                                class="shortcut"
+                                href="https://discord.gg/filian"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <span class="sc-ic">💬</span>
+                                <span>
+                                    <b>discord.gg/filian</b>
+                                    <small>
+                                        <span data-lang="en" data-inline
+                                            >Snackers — the main Discord</span
+                                        >
+                                        <span data-lang="ru" data-inline
+                                            >Snackers — основной Discord</span
+                                        >
+                                        <span data-lang="de" data-inline
+                                            >Snackers — der Haupt-Discord</span
+                                        >
+                                        <span data-lang="fr" data-inline
+                                            >Snackers — le Discord
+                                            principal</span
+                                        >
+                                    </small>
+                                </span>
+                            </a>
+                            <a
+                                class="shortcut"
+                                href="https://discord.gg/snackersru"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <span class="sc-ic">🪆</span>
+                                <span>
+                                    <b>SnackersRU</b>
+                                    <small>
+                                        <span data-lang="en" data-inline
+                                            >Russian-speaking Snackers
+                                            Discord</span
+                                        >
+                                        <span data-lang="ru" data-inline
+                                            >Русскоязычный Discord
+                                            Snackers</span
+                                        >
+                                        <span data-lang="de" data-inline
+                                            >Russischsprachiger
+                                            Snackers-Discord</span
+                                        >
+                                        <span data-lang="fr" data-inline
+                                            >Discord Snackers russophone</span
+                                        >
+                                    </small>
+                                </span>
+                            </a>
+                        </div>
                         <p>
                             Email:
                             <a
@@ -411,12 +536,6 @@
                                 href="https://github.com/Vadim-Khristenko"
                                 class="link"
                                 >Vadim-Khristenko</a
-                            >
-                        </p>
-                        <p>
-                            Discord:
-                            <a href="https://discord.gg/snackersru" class="link"
-                                >Snackers RU</a
                             >
                         </p>
                     </div>

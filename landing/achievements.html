@@ -31,7 +31,7 @@
         <div class="legend"><span data-i18n="achievements.title">Achievements</span></div>
         <p data-i18n="achievements.intro"></p>
         <div id="ach-grid" class="ach-grid">
-          <p data-i18n="achievements.loading">Loading…</p>
+          <div class="state95" style="grid-column:1/-1"><span class="hourglass">⌛</span><span data-i18n="achievements.loading">Loading…</span></div>
         </div>
       </div>
     </div>
@@ -53,11 +53,12 @@ async function loadAchievements() {
     if (r.ok) {
       items = await r.json();
     } else {
-      // Public fallback — fetch without auth shows just the catalogue
-      // (server returns 401 if signed-out, so we manually map to "locked all").
-      items = SEED_CATALOGUE;
+      // Signed-out (401) — there is no public catalogue endpoint, so explain
+      // where achievements live now instead of showing a bare "none".
+      box.innerHTML = '<div class="state95" style="grid-column:1/-1">'+esc(wd_t('achievements.signed_out'))+'</div>';
+      return;
     }
-    if (!items.length) { box.innerHTML = '<i>None yet.</i>'; return; }
+    if (!items.length) { box.innerHTML = '<div class="state95" style="grid-column:1/-1">'+esc(wd_t('achievements.none'))+'</div>'; return; }
     box.innerHTML = items.map(a => `
       <div class="ach-card ${a.unlocked_at ? '' : 'locked'}" title="${esc(a.description)}">
         <div class="ach-pts">+${a.points}</div>
@@ -68,7 +69,7 @@ async function loadAchievements() {
       </div>
     `).join('');
   } catch (e) {
-    box.innerHTML = '<i>Error: '+esc(e.message)+'</i>';
+    box.innerHTML = '<div class="state95 error" style="grid-column:1/-1">'+esc(wd_t('achievements.offline'))+'</div>';
   }
 }
 function walledevAuthHeaders() {
@@ -80,7 +81,6 @@ function walledevAuthHeaders() {
   return t ? { Authorization: 'Bearer ' + t } : {};
 }
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-const SEED_CATALOGUE = []; // empty fallback; server is the source of truth
 document.addEventListener('DOMContentLoaded', loadAchievements);
 </script>
 </body>
