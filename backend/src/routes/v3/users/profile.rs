@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     AppState,
     auth::AuthUser,
-    models::{ProviderLink, SiteIdentity, SocialAccountPublic, User, UserProfilePublic, UserSelf, UserUpdate},
+    models::{ProviderLink, SiteIdentity, SocialAccountPublic, SocialLinkEntry, User, UserProfilePublic, UserSelf, UserUpdate},
     routes::v3::utils::{audit, users::resolve_user_ref as resolve_user_ref_util},
 };
 
@@ -67,6 +67,11 @@ pub async fn get_me(
         .await
         .or_500()?;
 
+    // Free-form (unverified) links from users.social_links; tolerate any
+    // legacy shape by dropping entries that don't parse.
+    let social_links: Vec<SocialLinkEntry> =
+        serde_json::from_value(user.social_links.clone()).unwrap_or_default();
+
     Ok(Json(UserSelf {
         id: user.id,
         username: user.username,
@@ -81,6 +86,7 @@ pub async fn get_me(
         updated_at: user.updated_at,
         site_identities,
         linked_accounts,
+        social_links,
         api_key_count,
         block_list_count,
     }))
@@ -134,6 +140,34 @@ pub async fn update_me(
         }
     }
 
+    // Free-form social links: same validation as the legacy V2 endpoint
+    // (count/label limits + https + domain whitelist). These stay UNVERIFIED —
+    // OAuth provider links (/users/me/socials/*) are the verified ones.
+    let social_json: Option<serde_json::Value> = match body.social_links {
+        Some(ref links) => {
+            if links.len() > state.config.limits.social_link_count {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    format!("max {} social links", state.config.limits.social_link_count),
+                ));
+            }
+            for link in links {
+                if link.label.trim().is_empty()
+                    || link.label.chars().count() > state.config.limits.social_link_label
+                {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        format!("label must be 1-{} chars", state.config.limits.social_link_label),
+                    ));
+                }
+                crate::routes::v2::profile::validate_url(&link.url)
+                    .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+            }
+            Some(serde_json::to_value(links).or_500()?)
+        }
+        None => None,
+    };
+
     sqlx::query(
         "UPDATE users SET
             display_name = COALESCE($1, display_name),
@@ -141,14 +175,16 @@ pub async fn update_me(
             bio = COALESCE($3, bio),
             preferred_lang = COALESCE($4, preferred_lang),
             telemetry_opt_in = COALESCE($5, telemetry_opt_in),
+            social_links = COALESCE($6, social_links),
             updated_at = NOW()
-         WHERE id = $6",
+         WHERE id = $7",
     )
     .bind(body.display_name.as_deref())
     .bind(body.username.as_deref())
     .bind(body.bio.as_deref())
     .bind(body.lang.as_deref())
     .bind(body.telemetry_opt_in)
+    .bind(social_json)
     .bind(auth.user_id)
     .execute(&state.pool)
     .await

@@ -35,6 +35,14 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
+/// One free-form (unverified) social link — `users.social_links` jsonb entry.
+/// Distinct from `ProviderLink`, which is an OAuth-verified connection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialLinkEntry {
+    pub label: String,
+    pub url: String,
+}
+
 /// Wire shape for `UserSelf` — full account profile.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,6 +60,8 @@ pub struct UserSelf {
     pub updated_at: DateTime<Utc>,
     pub site_identities: Vec<SiteIdentity>,
     pub linked_accounts: Vec<ProviderLink>,
+    /// Free-form (unverified) label/url links — `users.social_links`.
+    pub social_links: Vec<SocialLinkEntry>,
     pub api_key_count: i64,
     pub block_list_count: i64,
 }
@@ -65,6 +75,8 @@ pub struct UserUpdate {
     pub bio: Option<String>,
     pub lang: Option<String>,
     pub telemetry_opt_in: Option<bool>,
+    /// Free-form (unverified) social links; replaces the whole set when present.
+    pub social_links: Option<Vec<SocialLinkEntry>>,
 }
 
 /// Public account projection returned in V3 responses.
