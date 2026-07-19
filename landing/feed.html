@@ -15,6 +15,7 @@
     .snap-card .ts{font-size:11px;color:var(--sub);margin-top:2px}
     .snap-card .links{display:flex;gap:6px;flex-wrap:wrap;padding:0 10px 8px;font-size:11px}
     .snap-card .links a{padding:3px 6px;background:var(--bg);color:var(--text);border:1px outset var(--bg);text-decoration:none}
+    .snap-card .links a:hover{background:var(--group)}
 
     .sig-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
     .sig-card{border:2px outset var(--bg);background:var(--field);color:var(--fieldtext);padding:0;overflow:hidden;display:flex;flex-direction:column}
@@ -26,6 +27,17 @@
     .sig-card .body .when{font-size:11px;color:var(--sub)}
     .sig-card .note{margin-top:8px;padding:6px;background:var(--bg);color:var(--text);border-left:3px solid var(--accent);font-size:12px;line-height:1.4}
     .sig-card .tag{display:inline-block;padding:1px 6px;background:var(--accent);color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+
+    .tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:10px}
+    .tpl-card{border:2px outset var(--bg);background:var(--field);color:var(--fieldtext);overflow:hidden;display:flex;flex-direction:column;text-decoration:none}
+    .tpl-card .thumb{height:140px;background:#1a1a2a;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .tpl-card .thumb img{max-width:100%;max-height:100%;image-rendering:pixelated}
+    .tpl-card .body{padding:8px 10px;font-size:12px}
+    .tpl-card .body b{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--accent);margin-bottom:4px;word-break:break-word}
+    .tpl-card .coords{font:11px monospace;color:var(--sub)}
+
+    .lb-rank{font-weight:bold;color:var(--accent);width:34px}
+    .lb-user{display:flex;align-items:center;gap:8px}
   </style>
 </head>
 <body>
@@ -38,24 +50,74 @@
       <span class="tbtns"><span class="tbtn">_</span><span class="tbtn">▢</span><span class="tbtn">✕</span></span>
     </div>
     <div class="content">
+
+      <!-- LIVE STATUS -->
+      <div class="group accent">
+        <div class="legend"><span data-i18n="feed.status">wall.status</span> <span class="blink95"></span></div>
+        <div class="lcd-strip">
+          <div>
+            <span class="lcd" id="st-state">····</span>
+            <span class="lcd-label" data-i18n="feed.state">status</span>
+          </div>
+          <div>
+            <span class="lcd" id="st-ext">—</span>
+            <span class="lcd-label" data-i18n="feed.extension">extension</span>
+          </div>
+          <div>
+            <span class="lcd" id="st-back">—</span>
+            <span class="lcd-label" data-i18n="feed.backend">backend</span>
+          </div>
+          <div>
+            <span class="lcd amber" id="st-uptime">—</span>
+            <span class="lcd-label" data-i18n="feed.uptime">uptime</span>
+          </div>
+          <div>
+            <span class="lcd amber">4 min</span>
+            <span class="lcd-label" data-i18n="feed.snap_loop">snapshot loop</span>
+          </div>
+        </div>
+        <div class="statusbar">
+          <span class="cell"><span data-i18n="feed.updated">updated</span>: <b id="st-updated">—</b></span>
+          <span class="cell" id="st-maint" style="display:none"><b data-i18n="feed.maintenance">MAINTENANCE MODE</b></span>
+        </div>
+      </div>
+
+      <!-- PHASE 1 TIMELAPSE -->
       <div class="group" style="border-color:var(--accent)">
-        <div class="legend"><span>★ Phase 1 — Wall Timelapse</span></div>
-        <p>The first phase of The Wall is done. Watch the whole event unfold — rebuilt from 5,492 full-resolution snapshots — as a cinematic, MS-DOS-flavoured timelapse. (The full cut lands on YouTube later.)</p>
+        <div class="legend"><span>★ </span><span data-i18n="feed.phase1_title">Phase 1 — Wall Timelapse</span></div>
+        <p data-i18n="feed.phase1_body">The first phase of The Wall is done. Watch the whole event unfold — rebuilt from 5,492 full-resolution snapshots — as a cinematic, MS-DOS-flavoured timelapse. (The full cut lands on YouTube later.)</p>
         <p style="margin-top:8px">
-          <a class="btn" href="/phase1-timelapse.html" style="display:inline-block;font-weight:bold">▶ Watch the Phase 1 Timelapse →</a>
+          <a class="btn primary" href="/phase1-timelapse.html" style="display:inline-block">▶ <span data-i18n="feed.phase1_cta">Watch the Phase 1 Timelapse →</span></a>
         </p>
       </div>
 
+      <!-- SNAPSHOTS -->
       <div class="group">
         <div class="legend"><span data-i18n="feed.snapshots">Recent snapshots</span></div>
         <p data-i18n="feed.intro"></p>
-        <div id="snap-grid" class="snap-grid"><p data-i18n="common.loading">Loading…</p></div>
+        <div id="snap-grid" class="snap-grid"></div>
       </div>
 
+      <!-- PUBLIC TEMPLATES -->
+      <div class="group">
+        <div class="legend"><span data-i18n="feed.templates">Public templates</span></div>
+        <p data-i18n="feed.templates_intro"></p>
+        <div id="tpl-grid" class="tpl-grid"></div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div class="group">
+        <div class="legend"><span data-i18n="feed.leaderboard">Chat leaderboard</span></div>
+        <p data-i18n="feed.leaderboard_intro"></p>
+        <div id="lb-box" style="margin-top:8px"></div>
+      </div>
+
+      <!-- SIGNALS -->
       <div class="group">
         <div class="legend"><span data-i18n="feed.signals">Latest signals</span></div>
-        <div id="sig-grid" class="sig-grid"><p data-i18n="common.loading">Loading…</p></div>
+        <div id="sig-grid" class="sig-grid"></div>
       </div>
+
     </div>
   </div>
 </main>
@@ -67,6 +129,10 @@
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function currentLang(){ return document.documentElement.lang || 'en'; }
 function fmtDate(s){ try { return new Date(s).toLocaleString(); } catch { return s; } }
+function t(k){ return (window.wd_t ? wd_t(k) : k); }
+function stateLoading(el){ el.innerHTML = '<div class="state95" style="grid-column:1/-1"><span class="hourglass">⌛</span>'+esc(t('common.loading'))+'</div>'; }
+function stateEmpty(el, key){ el.innerHTML = '<div class="state95" style="grid-column:1/-1">'+esc(t(key))+'</div>'; }
+function stateError(el){ el.innerHTML = '<div class="state95 error" style="grid-column:1/-1">'+esc(t('feed.offline'))+'</div>'; }
 
 function pickNote(notes){
   if (!notes) return '';
@@ -74,13 +140,43 @@ function pickNote(notes){
   return notes[lang] || notes.en || Object.values(notes)[0] || '';
 }
 
+// ---- wall.status — /api/meta ------------------------------------------
+async function loadMeta(){
+  const S = id => document.getElementById(id);
+  try{
+    const r = await fetch('/api/meta', { cache:'no-store' });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const m = await r.json();
+    const st = S('st-state');
+    if (m.maintenance){
+      st.textContent = 'MAINT'; st.className = 'lcd red';
+      S('st-maint').style.display = '';
+    } else {
+      st.textContent = 'ONLINE'; st.className = 'lcd';
+      S('st-maint').style.display = 'none';
+    }
+    S('st-ext').textContent = 'v' + String(m.extension_version || '?').replace(/^Version\s*/i,'');
+    S('st-back').textContent = 'v' + (m.version || '?');
+    const u = Number(m.uptime_secs || 0);
+    const d = Math.floor(u/86400), h = Math.floor(u%86400/3600), mm = Math.floor(u%3600/60);
+    S('st-uptime').textContent = (d ? d+'d ' : '') + h + 'h ' + mm + 'm';
+    S('st-updated').textContent = new Date().toLocaleTimeString();
+  }catch(e){
+    const st = S('st-state');
+    st.textContent = 'OFFLINE'; st.className = 'lcd red';
+    S('st-ext').textContent = '—'; S('st-back').textContent = '—'; S('st-uptime').textContent = '—';
+    S('st-updated').textContent = new Date().toLocaleTimeString();
+  }
+}
+
+// ---- snapshots — /api/v2/snapshots ------------------------------------
 async function loadSnapshots(){
   const box = document.getElementById('snap-grid');
   try{
     const r = await fetch('/api/v2/snapshots?limit=24', { cache:'no-store' });
     if (!r.ok) throw new Error('HTTP '+r.status);
     const list = await r.json();
-    if (!list.length){ box.innerHTML = '<p>'+wd_t('feed.no_snapshots')+'</p>'; return; }
+    if (!list.length){ stateEmpty(box, 'feed.no_snapshots'); return; }
     // Group by batch_id so we render one card per batch.
     const batches = new Map();
     for (const s of list) {
@@ -113,16 +209,69 @@ async function loadSnapshots(){
         </div>
       `;
     }).join('');
-  } catch(e){ box.innerHTML = '<p style="color:#c33">Error: '+esc(e.message)+'</p>'; }
+  } catch(e){ stateError(box); }
 }
 
+// ---- public templates — /api/v3/templates (public, no auth) -----------
+// Thumbnails come from /api/v3/templates/{id}/png (server-side raster),
+// author avatars from /api/v3/users/{id}/avatar (identicon fallback, never 404).
+async function loadTemplates(){
+  const box = document.getElementById('tpl-grid');
+  try{
+    const r = await fetch('/api/v3/templates?scope=public&status=approved&limit=12', { cache:'no-store' });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const list = await r.json();
+    if (!Array.isArray(list) || !list.length){ stateEmpty(box, 'feed.no_templates'); return; }
+    box.innerHTML = list.map(tp => {
+      const png = '/api/v3/templates/' + encodeURIComponent(tp.id) + '/png';
+      const av = tp.userId ? '/api/v3/users/' + encodeURIComponent(tp.userId) + '/avatar' : '';
+      const scale = tp.scale != null ? Math.round(tp.scale * 100) + '%' : '';
+      return `
+        <a class="tpl-card" href="${png}" target="_blank" rel="noopener">
+          <div class="thumb"><img loading="lazy" src="${png}" alt="" onerror="this.style.display='none'"></div>
+          <div class="body">
+            <b>${av ? `<img class="avatar95" loading="lazy" src="${esc(av)}" alt="">` : ''}${esc(tp.name || '—')}${tp.animated ? ' <span class="tag95 dim">GIF</span>' : ''}</b>
+            <div class="coords">@ ${esc(tp.x)},${esc(tp.y)}${scale ? ' · ' + esc(scale) : ''}</div>
+            <div class="coords">${esc(fmtDate(tp.createdAt))}</div>
+          </div>
+        </a>
+      `;
+    }).join('');
+  } catch(e){ stateError(box); }
+}
+
+// ---- chat leaderboard — /api/stats/leaderboard ------------------------
+async function loadLeaderboard(){
+  const box = document.getElementById('lb-box');
+  try{
+    const r = await fetch('/api/stats/leaderboard', { cache:'no-store' });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const list = await r.json();
+    if (!Array.isArray(list) || !list.length){ stateEmpty(box, 'feed.no_leaderboard'); return; }
+    const medal = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1);
+    box.innerHTML = `
+      <table class="table95">
+        <thead><tr><th style="width:34px">#</th><th>${esc(t('feed.lb_user'))}</th><th style="width:120px">${esc(t('feed.lb_msgs'))}</th></tr></thead>
+        <tbody>
+        ${list.slice(0, 15).map((u, i) => `
+          <tr>
+            <td class="lb-rank">${medal(i)}</td>
+            <td><span class="lb-user"><img class="avatar95" loading="lazy" src="/api/v3/users/${encodeURIComponent(u.username)}/avatar" alt="">${esc(u.username)}</span></td>
+            <td>${esc(u.messages)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e){ stateError(box); }
+}
+
+// ---- signals — /api/v2/signals ----------------------------------------
 async function loadSignals(){
   const box = document.getElementById('sig-grid');
   try{
     const r = await fetch('/api/v2/signals?limit=24', { cache:'no-store' });
     if (!r.ok) throw new Error('HTTP '+r.status);
     const list = await r.json();
-    if (!list.length){ box.innerHTML = '<p>'+wd_t('feed.no_signals')+'</p>'; return; }
+    if (!list.length){ stateEmpty(box, 'feed.no_signals'); return; }
     box.innerHTML = list.map(s => {
       const note = pickNote(s.notes);
       return `
@@ -143,11 +292,18 @@ async function loadSignals(){
         </div>
       `;
     }).join('');
-  } catch(e){ box.innerHTML = '<p style="color:#c33">Error: '+esc(e.message)+'</p>'; }
+  } catch(e){ stateError(box); }
 }
 
-document.addEventListener('DOMContentLoaded', () => { loadSnapshots(); loadSignals(); });
-document.addEventListener('wd:lang-changed', () => { loadSignals(); }); // re-pick notes language
+document.addEventListener('DOMContentLoaded', () => {
+  ['snap-grid','tpl-grid','sig-grid'].forEach(id => stateLoading(document.getElementById(id)));
+  stateLoading(document.getElementById('lb-box'));
+  loadMeta(); loadSnapshots(); loadTemplates(); loadLeaderboard(); loadSignals();
+  // Gentle auto-refresh: status every 60s, heavy sections on the snapshot cadence.
+  setInterval(loadMeta, 60_000);
+  setInterval(() => { loadSnapshots(); loadSignals(); }, 240_000);
+});
+document.addEventListener('wd:lang-changed', () => { loadSignals(); loadLeaderboard(); }); // re-pick notes language + table headers
 </script>
 </body>
 </html>
