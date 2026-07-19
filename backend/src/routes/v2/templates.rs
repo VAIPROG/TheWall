@@ -246,9 +246,22 @@ pub async fn create(
         .filter(|p| !p.is_empty())
         .map(hash_token);
 
+    // Populate the v3 `document` column at creation time so templates created
+    // via this legacy v2 endpoint are immediately "migrated" (same the-wall-dev/2
+    // document the backfill job would produce), instead of landing with a NULL
+    // document. Best-effort: if the share can't be decoded, leave it NULL rather
+    // than failing template creation.
+    let document = crate::formats::decode_share(
+        &body.share,
+        &body.name,
+        auth.user_id,
+        chrono::Utc::now(),
+    )
+    .ok();
+
     let row = sqlx::query_as::<_, TemplateV2>(
-        r#"INSERT INTO templates (id, user_id, name, x, y, scale, scope, status, share, author, clan_id, access_password_hash, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+        r#"INSERT INTO templates (id, user_id, name, x, y, scale, scope, status, share, author, clan_id, access_password_hash, document, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
            RETURNING id, user_id, author, name, x, y, scale, scope, status, share, created_at"#,
     )
     .bind(Uuid::new_v4())
@@ -262,6 +275,7 @@ pub async fn create(
     .bind(&username)
     .bind(clan_id)
     .bind(pass_hash)
+    .bind(document)
     .fetch_one(&state.pool)
     .await
     .or_500()?;

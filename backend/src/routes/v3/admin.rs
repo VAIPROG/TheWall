@@ -63,6 +63,39 @@ async fn load_user(
     .or_500()
 }
 
+/// Active clan memberships for a user, shaped for the admin console: the clan
+/// UUID (copyable — needed for the clan role/transfer-owner admin endpoints),
+/// its name + tag, and the user's role in it. Empty when the user is in no clan.
+async fn load_user_clans(
+    pool: &sqlx::PgPool,
+    user_id: Uuid,
+) -> Result<Vec<serde_json::Value>, (StatusCode, String)> {
+    let rows: Vec<(Uuid, String, Option<String>, String, DateTime<Utc>)> = sqlx::query_as(
+        r#"SELECT c.id, c.name, c.tag, cm.clan_role, cm.joined_at
+             FROM clan_memberships cm
+             JOIN clans c ON c.id = cm.clan_id
+            WHERE cm.user_id = $1 AND cm.active = TRUE
+            ORDER BY cm.joined_at"#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .or_500()?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, name, tag, clan_role, joined_at)| {
+            json!({
+                "clanId": id,
+                "name": name,
+                "tag": tag,
+                "role": clan_role,
+                "joinedAt": joined_at,
+            })
+        })
+        .collect())
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/v3/admin/users/{userRef}
 // ---------------------------------------------------------------------------
@@ -71,13 +104,18 @@ pub async fn admin_get_user(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(user_ref): Path<String>,
-) -> Result<Json<User>, (StatusCode, String)> {
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     require_role(&state.pool, auth.user_id, GlobalRole::Admin).await?;
     let target_id = resolve_user_ref(&state.pool, &user_ref, auth.user_id).await?;
     let user = load_user(&state.pool, target_id)
         .await?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".to_string()))?;
-    Ok(Json(user))
+    // Merge the user's active clan memberships onto the base user payload so the
+    // admin console can show which clan they're in (and copy the clan UUID).
+    let clans = load_user_clans(&state.pool, target_id).await?;
+    let mut body = serde_json::to_value(&user).or_500()?;
+    body["clans"] = serde_json::Value::Array(clans);
+    Ok(Json(body))
 }
 
 // ---------------------------------------------------------------------------
