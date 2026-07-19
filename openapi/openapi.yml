@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: The Wall Dev API
-  version: "3.1.0"
+  version: "3.2.0"
   description: |
     # The Wall Dev API v3
 
@@ -255,6 +255,12 @@ paths:
 
   /admin/users/{userRef}/notes:
     $ref: "./paths/admins-users.yaml#/AdminUserNotes"
+
+  /admin/clans/{clanId}/members/{userRef}/role:
+    $ref: "./paths/admins-users.yaml#/AdminClanMemberRole"
+
+  /admin/clans/{clanId}/transfer-owner:
+    $ref: "./paths/admins-users.yaml#/AdminClanTransferOwner"
 
   # ════════════════════════════════════════════════════════════════════
   # USERS

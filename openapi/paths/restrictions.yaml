@@ -169,6 +169,14 @@ UserRestrictions:
       - $ref: "../components/parameters/common.yaml#/UserRefPath"
       - $ref: "../components/parameters/common.yaml#/PageParam"
       - $ref: "../components/parameters/common.yaml#/PerPageParam"
+      - name: active
+        in: query
+        schema:
+          type: boolean
+        description: |
+          Filter by active status. `true` returns only restrictions that are
+          not yet lifted (`removedAt` is null) and not expired; `false` returns
+          only lifted or expired restrictions. Omit to return all.
     security:
       - BearerAuth: []
       - ApiKeyAuth: []

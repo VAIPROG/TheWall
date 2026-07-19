@@ -4,7 +4,6 @@ RestrictionSet:
     - id
     - userId
     - scope
-    - appliedBy
     - appliedAt
     - sanctions
   properties:
@@ -30,6 +29,7 @@ RestrictionSet:
     appliedBy:
       type: string
       format: uuid
+      nullable: true
       description: Account UUID of the moderator who applied the restriction.
     appliedAt:
       type: string
@@ -44,6 +44,16 @@ RestrictionSet:
       type: string
       nullable: true
       description: Human-readable reason for the restriction.
+    removedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp when the restriction was lifted. Null if still active.
+    removedBy:
+      type: string
+      format: uuid
+      nullable: true
+      description: Account UUID of the moderator who lifted the restriction.
     sanctions:
       type: object
       description: Individual sanction flags — each controls a specific capability.
