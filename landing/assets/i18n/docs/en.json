@@ -40,8 +40,9 @@
     "heading": "4. API",
     "body": "Two surfaces live side by side under <code>/api/</code>:",
     "surfaces": [
-      "<code>/api/v1/*</code> equivalents and shared endpoints under <code>/api/*</code> — frozen, legacy clients.",
-      "<code>/api/v2/*</code> — actively developed, new features land here."
+      "<code>/api/v3/*</code> — the current API: camelCase JSON, cursor pagination, public template browse, avatars with identicon fallback. New features land here.",
+      "<code>/api/v2/*</code> — deprecated, kept for older clients until sunset.",
+      "<code>/api/v1/*</code> equivalents and shared endpoints under <code>/api/*</code> — frozen, legacy clients."
     ],
     "browse": "Browse interactively: <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Raw spec: <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
   },

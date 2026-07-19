@@ -35,8 +35,9 @@
   },
   "index": {
     "title_suffix": "Win95-Overlay für ",
-    "tagline_en": "Zeichenhilfen, Clan-Chat, Vorlagen, Discord- und Telegram-Sync — verändert den Code der Website NICHT. Nutzt ausschließlich die eingebaute öffentliche API der Seite.",
-    "version_pill": "Erweiterung v4 · Backend v2",
+    "tagline_en": "Community-Hub mit Clans, Chats & DMs, Zeichenhilfen, Vorlagen, Avatare überall, Discord- und Telegram-Bots — verändert den Code der Website NICHT. Nutzt ausschließlich die eingebaute öffentliche API der Seite.",
+    "new_banner": "v6 — das Community-Update: ein Hub für Clan, Chats, DMs und den Clan-Browser.",
+    "version_pill": "Erweiterung · Backend",
     "download_tampermonkey": "Tampermonkey",
     "download_chrome": "Chrome",
     "download_firefox": "Firefox",
@@ -46,38 +47,57 @@
     "fair_play_title": "Fair-Play · Kein Code verändert",
     "fair_play_body": "Diese Erweiterung verändert den Quellcode der Website NICHT. Jeder Pixel wird durch Ihren Klick über die eigene öffentliche API der Seite gesetzt — derselbe Endpunkt, den die Seiten-UI aufruft. Wir lesen die öffentliche Tile-Schicht und Ihr bestehendes Session-Cookie (das die Seite beim Login gesetzt hat). Kein Patching, kein Hooking, keine WebSocket-Injection, kein Captcha-Bypass. Das JavaScript der Seite läuft exakt so, wie es die Entwickler ausgeliefert haben."
   },
+  "community": {
+    "title": "Community",
+    "vai_sub": "Autoren-Hub — Projekte & Spenden",
+    "wiki_sub": "Das Community-Wiki der Wall",
+    "discord_sub": "Snackers — der Haupt-Discord",
+    "discordru_sub": "Russischsprachiger Snackers-Discord"
+  },
   "features": {
+    "community": {
+      "title": "Community-Supertab",
+      "body": "Alles Soziale in einem Hub: dein Clan, Chats (Modmail · global · Clan · Direktnachrichten), ein Clan-Browser mit Einladungen & Bewerbungen und die Community-Infokarte. Ersetzt die alten separaten Tabs Social und Clan."
+    },
     "overlay": {
       "title": "Cozy Overlay",
-      "body": "PNG laden, Koordinaten setzen, Skala 5%–1000%."
+      "body": "PNG laden, an Koordinaten anlegen, Skala 5%–1000%, Fortschritt in %."
+    },
+    "templates": {
+      "title": "Vorlagen & Teilen",
+      "body": "Vorlagen in die öffentliche Galerie oder an den Clan veröffentlichen, per Link teilen, Fortschritt verfolgen — mit serverseitig gerenderten PNG-Vorschauen."
     },
     "clan": {
-      "title": "Clan-Toolkit",
-      "body": "Live-Chat, Liste, Vorlagen, modmail, clan_alert."
-    },
-    "mailbox": {
-      "title": "Vereinheitlichter Posteingang",
-      "body": "Announcements, alerts, DMs, modmail, template-events."
+      "title": "Clans 2.0",
+      "body": "Besitzer-verifizierte Erstellung (Discord-Gilde / Website / manuell), Mitgliederliste mit Rollen — Owner, Admin, Mod, Member — Einladungen, Bewerbungen, Einstellungen, Clan-Avatar + Banner."
     },
     "grief": {
       "title": "Anti-Grief",
-      "body": "Vorlage anpinnen — Server prüft alle 4 Min und alarmiert bei Schaden."
+      "body": "Vorlage anpinnen — der Server prüft sie alle 4 Min und alarmiert den Clan bei Schaden über dem Schwellwert."
     },
     "snapshots": {
       "title": "Server-Snapshots",
-      "body": "Alle 4 Min in 3 Qualitäten → Discord + Telegram."
+      "body": "Alle 4 Minuten baut der Server die Wall in drei Qualitäten und liefert sie mit signiertem Link an Discord + Telegram."
+    },
+    "avatars": {
+      "title": "Avatare überall",
+      "body": "Eigener Upload → Discord-Avatar → generiertes Identicon. Nie wieder ein kaputtes Bild — in Chats, Listen, Vorlagen und Leaderboards."
+    },
+    "bots": {
+      "title": "Discord + Telegram Bots",
+      "body": "Ein einheitliches Befehls-Framework — die Bots synchronisieren Wall und Clan in beide Richtungen."
     },
     "achievements": {
       "title": "Achievements",
-      "body": "20+ Badges, einige geheim."
+      "body": "20+ Badges, einige geheim — jetzt im Profil-Tab zusammen mit der Mailbox."
     },
     "themes": {
       "title": "Themes & Skalierung",
-      "body": "Dunkel/Hell/CRT, 80–160% UI, 4 Sprachen."
+      "body": "Dunkel/Hell/CRT, UI 80–160%, 4 Sprachen."
     },
     "accounts": {
       "title": "Verknüpfte Konten",
-      "body": "VAI SSO, Discord & Telegram OIDC, E-Mail per Support."
+      "body": "VAI SSO, Discord- & Telegram-OAuth, freie + OAuth-verifizierte Social-Links im Profil."
     }
   },
   "install": {
@@ -112,21 +132,44 @@
   },
   "feed": {
     "title": "Live-Feed",
-    "intro": "Server-Snapshots (4 Min) + gespiegelte Signale.",
+    "intro": "Server-Snapshots (alle 4 Min) + gespiegelte Signale der Leinwand.",
+    "status": "wall.status",
+    "state": "Status",
+    "extension": "Erweiterung",
+    "backend": "Backend",
+    "uptime": "Uptime",
+    "snap_loop": "Snapshot-Takt",
+    "updated": "aktualisiert",
+    "maintenance": "WARTUNGSMODUS",
+    "offline": "Backend nicht erreichbar — dieser Bereich kommt mit dem Server zurück.",
+    "phase1_title": "Phase 1 — Wall-Timelapse",
+    "phase1_body": "Die erste Phase von The Wall ist abgeschlossen. Sieh das ganze Event — rekonstruiert aus 5.492 Snapshots in voller Auflösung — als kinoreifen Timelapse im MS-DOS-Stil. (Der Full Cut kommt später auf YouTube.)",
+    "phase1_cta": "Phase-1-Timelapse ansehen →",
     "snapshots": "Letzte Snapshots",
     "signals": "Letzte Signale",
+    "templates": "Öffentliche Vorlagen",
+    "templates_intro": "Frisch freigegebene Vorlagen aus der Community-Galerie — serverseitig gerenderte Vorschauen, direkt aus der V3-API.",
+    "no_templates": "Noch keine öffentlichen Vorlagen.",
+    "leaderboard": "Chat-Leaderboard",
+    "leaderboard_intro": "Die aktivsten Stimmen im Wall-Chat.",
+    "no_leaderboard": "Noch keine Nachrichten gezählt.",
+    "lb_user": "Nutzer",
+    "lb_msgs": "Nachrichten",
     "no_snapshots": "Noch keine Snapshots.",
     "no_signals": "Noch keine Signale."
   },
   "achievements": {
     "title": "Achievements",
-    "intro": "Badges durch Nutzung freischalten.",
+    "intro": "Badges durch Nutzung freischalten — sichtbar im Profil-Tab und im öffentlichen Profil.",
     "loading": "Lade Katalog…",
     "category": "Kategorie",
     "points": "Punkte",
     "locked": "Gesperrt",
     "unlocked": "Freigeschaltet",
-    "secret": "Verborgen"
+    "secret": "Verborgen",
+    "signed_out": "Nicht angemeldet — Achievements sind persönlich. Öffne die Erweiterung auf filianislost.com (Profil-Tab) oder melde dich hier an.",
+    "none": "Noch nichts freigeschaltet — geh was malen.",
+    "offline": "Backend nicht erreichbar — später erneut versuchen."
   },
   "changelog": { "title": "Changelog", "intro": "Highlights pro Version." },
   "dashboard": {
@@ -150,7 +193,7 @@
   },
   "api_docs": {
     "title": "API-Dokumentation",
-    "intro": "Öffentliche V2-API. Spec: /openapi.yaml.",
+    "intro": "Öffentliche API (V3 + Legacy V2). Spec: /openapi.yaml.",
     "swagger": "Swagger UI",
     "redoc": "ReDoc"
   }

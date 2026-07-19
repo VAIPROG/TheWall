@@ -53,8 +53,9 @@
     "heading": "5. API",
     "body": "Zwei Oberflächen nebeneinander unter <code>/api/</code>:",
     "surfaces": [
-      "<code>/api/v1/*</code> Äquivalente und gemeinsame Endpunkte unter <code>/api/*</code> — eingefroren, Legacy-Clients.",
-      "<code>/api/v2/*</code> — aktiv entwickelt, neue Features landen hier."
+      "<code>/api/v3/*</code> — die aktuelle API: camelCase-JSON, Cursor-Pagination, öffentlicher Vorlagen-Katalog, Avatare mit Identicon-Fallback. Neue Features landen hier.",
+      "<code>/api/v2/*</code> — veraltet, bleibt für ältere Clients bis zum Sunset.",
+      "<code>/api/v1/*</code> Äquivalente und gemeinsame Endpunkte unter <code>/api/*</code> — eingefroren, Legacy-Clients."
     ],
     "browse": "Interaktiv: <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Spec: <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
   },

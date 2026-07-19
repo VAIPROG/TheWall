@@ -40,8 +40,9 @@
     "heading": "4. API",
     "body": "Две поверхности живут рядом под <code>/api/</code>:",
     "surfaces": [
-      "<code>/api/v1/*</code> эквиваленты и общие эндпоинты под <code>/api/*</code> — заморожены, для старых клиентов.",
-      "<code>/api/v2/*</code> — активно развивается, все новые фичи приходят сюда."
+      "<code>/api/v3/*</code> — актуальный API: camelCase JSON, курсорная пагинация, публичный каталог шаблонов, аватары с identicon-фолбэком. Новые фичи приходят сюда.",
+      "<code>/api/v2/*</code> — устарел, поддерживается для старых клиентов до отключения.",
+      "<code>/api/v1/*</code> эквиваленты и общие эндпоинты под <code>/api/*</code> — заморожены, для старых клиентов."
     ],
     "browse": "Интерактивно: <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Спецификация: <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
   },

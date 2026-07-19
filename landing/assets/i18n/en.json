@@ -35,8 +35,9 @@
   },
   "index": {
     "title_suffix": "Win95-styled overlay for ",
-    "tagline_en": "Drawing aids, clan chat, templates, Discord & Telegram sync — does NOT modify the site's code. Uses only the site's own built-in public API. Made by the Russian-speaking Filian community.",
-    "version_pill": "Extension v4 · Backend v2",
+    "tagline_en": "A Community hub with clans, chats & DMs, drawing aids, templates, avatars everywhere, Discord & Telegram bots — does NOT modify the site's code. Uses only the site's own built-in public API. Made by the Russian-speaking Filian community.",
+    "new_banner": "v6 — the Community update: one hub for your clan, chats, DMs and the clan browser.",
+    "version_pill": "Extension · Backend",
     "download_tampermonkey": "Tampermonkey",
     "download_chrome": "Chrome",
     "download_firefox": "Firefox",
@@ -46,18 +47,29 @@
     "fair_play_title": "Fair-Play · No Code Modification",
     "fair_play_body": "This extension does NOT modify the site's source code. Every pixel is placed by your explicit click through the site's own public API — the same endpoint the site UI calls. We read the public tile layer and your existing session cookie (the one the site already set). No patching, no hooking, no WebSocket injection, no captcha bypass. The site's JavaScript runs exactly as the developers shipped it."
   },
+  "community": {
+    "title": "Community",
+    "vai_sub": "Author hub — projects & donate",
+    "wiki_sub": "The community wiki of the wall",
+    "discord_sub": "Snackers — the main Discord",
+    "discordru_sub": "Russian-speaking Snackers Discord"
+  },
   "features": {
+    "community": {
+      "title": "Community super-tab",
+      "body": "Everything social in one hub: your clan, chats (modmail · global · clan · direct messages), a clan browser with invites & applications, and the community info card. Replaces the old separate Social and Clan tabs."
+    },
     "overlay": {
       "title": "Cozy overlay",
       "body": "Drop a PNG, snap it to coords, scale 5%–1000%, read progress %."
     },
-    "clan": {
-      "title": "Clan toolkit",
-      "body": "Live chat, roster, templates, modmail, clan_alert broadcasts, role management."
+    "templates": {
+      "title": "Templates & sharing",
+      "body": "Publish templates to the public gallery or your clan, share them by link, track progress — with server-rendered PNG previews."
     },
-    "mailbox": {
-      "title": "Unified mailbox",
-      "body": "Announcements, clan alerts, DMs, modmail, template events — one inbox with per-channel preferences."
+    "clan": {
+      "title": "Clans 2.0",
+      "body": "Owner-verified creation (Discord guild / site / manual), roster with roles — owner, admin, mod, member — invites, applications, settings, clan avatar + banner."
     },
     "grief": {
       "title": "Anti-grief alerts",
@@ -67,9 +79,17 @@
       "title": "Server snapshots",
       "body": "Every 4 minutes the server stitches the wall at three qualities and ships them to Discord + Telegram with a signed link."
     },
+    "avatars": {
+      "title": "Avatars everywhere",
+      "body": "Custom upload → Discord avatar → generated identicon. Never a broken image — in chats, rosters, templates and leaderboards."
+    },
+    "bots": {
+      "title": "Discord + Telegram bots",
+      "body": "One unified command framework — the bots sync the wall and your clan both ways."
+    },
     "achievements": {
       "title": "Achievements",
-      "body": "20+ unlockable badges with hidden secrets — public profile shows your collection."
+      "body": "20+ unlockable badges with hidden secrets — now living in your Profile tab together with Mail."
     },
     "themes": {
       "title": "Themes + scaling",
@@ -77,7 +97,7 @@
     },
     "accounts": {
       "title": "Linked accounts",
-      "body": "VAI Account SSO, Discord & Telegram OIDC, email via support — manage all from /me."
+      "body": "VAI Account SSO, Discord & Telegram OAuth, free-form + OAuth-verified social links on your profile."
     }
   },
   "install": {
@@ -113,20 +133,43 @@
   "feed": {
     "title": "Live feed",
     "intro": "Server-built wall snapshots (every 4 min) and mirrored event signals from the canvas.",
+    "status": "wall.status",
+    "state": "status",
+    "extension": "extension",
+    "backend": "backend",
+    "uptime": "uptime",
+    "snap_loop": "snapshot loop",
+    "updated": "updated",
+    "maintenance": "MAINTENANCE MODE",
+    "offline": "Backend unreachable — this section will come back when the server does.",
+    "phase1_title": "Phase 1 — Wall Timelapse",
+    "phase1_body": "The first phase of The Wall is done. Watch the whole event unfold — rebuilt from 5,492 full-resolution snapshots — as a cinematic, MS-DOS-flavoured timelapse. (The full cut lands on YouTube later.)",
+    "phase1_cta": "Watch the Phase 1 Timelapse →",
     "snapshots": "Recent snapshots",
     "signals": "Latest signals",
+    "templates": "Public templates",
+    "templates_intro": "Fresh approved templates from the community gallery — server-rendered previews straight from the V3 API.",
+    "no_templates": "No public templates yet.",
+    "leaderboard": "Chat leaderboard",
+    "leaderboard_intro": "The most active voices in the wall chat.",
+    "no_leaderboard": "No messages counted yet.",
+    "lb_user": "user",
+    "lb_msgs": "messages",
     "no_snapshots": "No snapshots yet.",
     "no_signals": "No signals yet."
   },
   "achievements": {
     "title": "Achievements",
-    "intro": "Collect badges by using the extension. Unlocks are tracked server-side and shown on your public profile.",
+    "intro": "Collect badges by using the extension. Unlocks are tracked server-side and shown in your Profile tab and on your public profile.",
     "loading": "Loading catalogue…",
     "category": "Category",
     "points": "Points",
     "locked": "Locked",
     "unlocked": "Unlocked",
-    "secret": "Hidden until unlocked"
+    "secret": "Hidden until unlocked",
+    "signed_out": "You're not signed in — achievements are personal. Open the extension on filianislost.com (Profile tab) or sign in here to see your collection.",
+    "none": "Nothing unlocked yet — go paint something.",
+    "offline": "Backend unreachable — try again later."
   },
   "changelog": {
     "title": "Changelog",
@@ -153,7 +196,7 @@
   },
   "api_docs": {
     "title": "API Documentation",
-    "intro": "Browse the public V2 API in two flavours below. Spec lives at /openapi.yaml.",
+    "intro": "Browse the public API (V3 + legacy V2) in two flavours below. Spec lives at /openapi.yaml.",
     "swagger": "Swagger UI",
     "redoc": "ReDoc"
   }

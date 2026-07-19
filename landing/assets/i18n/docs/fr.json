@@ -40,8 +40,9 @@
     "heading": "4. API",
     "body": "Deux surfaces côte à côte sous <code>/api/</code> :",
     "surfaces": [
-      "<code>/api/v1/*</code> équivalents et endpoints partagés sous <code>/api/*</code> — gelés, clients legacy.",
-      "<code>/api/v2/*</code> — activement développé, les nouvelles fonctionnalités arrivent ici."
+      "<code>/api/v3/*</code> — l’API actuelle : JSON camelCase, pagination par curseur, catalogue public de modèles, avatars avec repli identicon. Les nouveautés arrivent ici.",
+      "<code>/api/v2/*</code> — déprécié, conservé pour les anciens clients jusqu’au retrait.",
+      "<code>/api/v1/*</code> équivalents et endpoints partagés sous <code>/api/*</code> — gelés, clients legacy."
     ],
     "browse": "Interactif : <a href=\"/api-docs/swagger.html\" class=\"link\">Swagger UI</a> · <a href=\"/api-docs/redoc.html\" class=\"link\">ReDoc</a>. Spec : <a href=\"/openapi.yaml\" class=\"link\">openapi.yaml</a>."
   },

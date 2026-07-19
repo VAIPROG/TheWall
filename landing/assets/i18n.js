@@ -7,7 +7,7 @@
 //     are translated from dot-path keys.
 (function () {
   const LANG_KEY = "wall_landing_lang";
-  const I18N_VER = "20260607a";
+  const I18N_VER = "20260719a";
   const SUPPORTED = ["en", "ru", "de", "fr"];
 
   const I18N = { dict: {}, lang: "en" };
