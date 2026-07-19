@@ -61,7 +61,10 @@ export interface UserSelf extends AccountPublic {
   /** @deprecated use hasCustomAvatar */
   has_custom_avatar?: boolean;
   hasCustomAvatar?: boolean;
-  socialLinks?: Record<string, string>;
+  /** Free-form (unverified) social links — `users.social_links`
+   *  (backend `SocialLinkEntry` = label/url pairs). Distinct from the
+   *  OAuth-verified `linkedAccounts`. */
+  socialLinks?: { label: string; url: string }[];
 }
 
 /**

@@ -302,12 +302,11 @@ export function wireProfile(_win: HTMLElement): void {
       return;
     }
     try {
-      // Bio lives on the V3 user surface (PATCH /api/v3/users/me). Freeform
-      // social links have NO V3 write yet (V3 socials = verified provider
-      // links), so they still ride the V2 profile endpoint via the legacy
-      // facade — see legacy.updateProfileV2 for the gap note.
-      await api(client).users.updateMe({ bio });
-      await api(client).legacy.updateProfileV2({ social_links });
+      // Both bio and the freeform social links now ride the V3 user surface
+      // (PATCH /api/v3/users/me). `socialLinks` replaces the whole set and is
+      // server-validated (count/label-length/https + domain whitelist). These
+      // are distinct from the OAuth-verified provider links (links-wire.ts).
+      await api(client).users.updateMe({ bio, socialLinks: social_links });
       toast("Profile", "saved");
       syncProfile();
     } catch (e: any) {
@@ -361,14 +360,18 @@ export function wireProfile(_win: HTMLElement): void {
     }
   }
 
-  // Hook up initial values whenever profile syncs. The event detail is the
-  // legacy V2 `/v2/auth/me` payload (still the only carrier of freeform
-  // social_links); bio is re-fetched from the V3 self profile so the field
-  // reflects the modern surface, with the V2 value as an instant pre-fill.
+  // Hook up initial values whenever profile syncs. Bio + freeform social links
+  // now both come from the V3 self profile (GET /api/v3/users/me), so the
+  // fields reflect the modern surface. The legacy V2 `/v2/auth/me` payload
+  // (event detail) is used only as an instant pre-fill before the V3 fetch
+  // resolves.
   document.addEventListener("wd:profile-loaded", (e: any) => {
     const p = e.detail || {};
     const bioEl = $("profile-bio") as HTMLTextAreaElement | null;
     if (bioEl && document.activeElement !== bioEl) bioEl.value = p.bio || "";
+    // Instant pre-fill from the V2 payload; the V3 fetch below is authoritative.
+    (window as any).__wallSocialLinks = p.social_links || [];
+    refreshSocial((window as any).__wallSocialLinks);
     const client = getActiveClient();
     if (client?.on) {
       api(client)
@@ -376,11 +379,13 @@ export function wireProfile(_win: HTMLElement): void {
         .then((me) => {
           const el = $("profile-bio") as HTMLTextAreaElement | null;
           if (el && document.activeElement !== el) el.value = me?.bio || "";
+          // V3 socialLinks is the free-form label/url set (distinct from the
+          // OAuth-verified linkedAccounts); it's the source of truth now.
+          (window as any).__wallSocialLinks = me?.socialLinks || [];
+          refreshSocial((window as any).__wallSocialLinks);
         })
         .catch(() => {});
     }
-    (window as any).__wallSocialLinks = p.social_links || [];
-    refreshSocial((window as any).__wallSocialLinks);
     loadPinnedTemplates().catch(() => {});
   });
 

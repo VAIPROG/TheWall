@@ -2,15 +2,17 @@ import { BackendClient } from "./client";
 import { BackendUser } from "./types";
 
 /** Body for PATCH /api/v3/users/me — mirrors backend `UserUpdate`
- *  (backend/src/models/users.rs, camelCase serde). Note: freeform social
- *  links are NOT part of this surface; they still ride the V2 profile
- *  endpoint (see legacy.updateProfileV2). */
+ *  (backend/src/models/users.rs, camelCase serde). `socialLinks` are the
+ *  free-form (unverified) label/url pairs; passing the field REPLACES the
+ *  whole set (server-validated: count/label-length/https + domain whitelist).
+ *  These are distinct from the OAuth-verified provider links (/users/me/socials). */
 export interface ProfileUpdate {
   displayName?: string;
   username?: string;
   bio?: string;
   lang?: string;
   telemetryOptIn?: boolean;
+  socialLinks?: { label: string; url: string }[];
 }
 
 export function buildUsersApi(client: BackendClient) {
