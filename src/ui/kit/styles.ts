@@ -388,5 +388,44 @@ export function kitStyles(): string {
   width:7px; height:7px; border-radius:50%; background:var(--ok);
   box-shadow:inset -1px -1px 0 rgba(0,0,0,.3); display:inline-block; flex:none;
 }
+
+/* ---- Admin console (sectioned V3 console — ui/admin.ts + admin-ui.ts) ---- */
+/* Sub-sections: one visible at a time, toggled by setAdminSection. */
+.wd-adm-sec { display:none; }
+.wd-adm-sec.is-on { display:flex; flex-direction:column; gap:8px; }
+#admin-subnav { margin-bottom:8px; }
+#admin-subnav .wd-seg { display:flex; flex-wrap:wrap; }
+#admin-subnav .wd-seg > button { flex:1 0 auto; }
+/* Small muted secondary text inside admin rows/panels. */
+.wd-adm-sec .sub { color:var(--sub); font-size:10px; }
+.wd-adm-mono { font:10px monospace; color:var(--sub); word-break:break-all; user-select:all; }
+/* Dashboard stat cards (3-up grid; alert = open reports). */
+.wd-adm-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; }
+.wd-adm-stat { border:1px solid var(--shadow); background:var(--group); padding:5px 3px; text-align:center; }
+.wd-adm-stat .k { font-size:9px; color:var(--sub); text-transform:uppercase; letter-spacing:.4px; }
+.wd-adm-stat .v { font:bold 15px monospace; color:var(--accent); }
+.wd-adm-stat.is-alert .v { color:var(--err); }
+.wd-adm-stat[data-goto] { cursor:pointer; }
+.wd-adm-stat[data-goto]:hover { filter:brightness(1.06); }
+.wd-adm-health { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+/* Toolbars (search bar, filter bar) + pagers + button clusters. */
+.wd-adm-bar { display:flex; gap:4px; align-items:center; }
+.wd-adm-bar .wp-input { flex:1; min-width:0; }
+.wd-adm-pager { display:flex; gap:6px; align-items:center; justify-content:flex-end; font-size:10px; color:var(--sub); margin-top:4px; }
+.wd-adm-acts { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+.wd-adm-form { display:flex; flex-direction:column; gap:4px; }
+.wd-adm-cfgrow { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; }
+/* Users: clickable result rows + the per-user action panel. */
+.wd-adm-urow { cursor:pointer; }
+.wd-adm-urow:hover { background:var(--group); }
+.wd-adm-panel { display:flex; flex-direction:column; gap:6px; }
+.wd-adm-phead { display:flex; align-items:center; gap:6px; font-size:12px; }
+.wd-adm-restr { display:flex; flex-direction:column; gap:3px; }
+/* Reports: action column + the inline resolve/dismiss form. */
+.wd-adm-rep { align-items:flex-start; }
+.wd-adm-repacts { display:flex; flex-direction:column; gap:3px; flex:none; }
+.wd-adm-inline { background:var(--group); border:1px solid var(--shadow); padding:5px; margin-top:4px; display:flex; flex-direction:column; gap:4px; }
+/* Clan takedown field checkboxes. */
+.wd-adm-tdfields { display:flex; flex-wrap:wrap; gap:2px 10px; margin-top:4px; }
 `;
 }

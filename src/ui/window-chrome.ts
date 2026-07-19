@@ -14,12 +14,7 @@ import {
   syncProfile,
   refreshNotifications,
 } from "../data";
-import {
-  loadAdminUsers,
-  loadModApps,
-  loadAdminTemplates,
-  loadAdminNotifs,
-} from "./admin-ui";
+import { refreshAdmin } from "./admin-ui";
 import { refreshCommunity } from "./community/shell";
 
 export function wireWindowChrome(win: HTMLElement): void {
@@ -47,10 +42,9 @@ export function wireWindowChrome(win: HTMLElement): void {
         refreshCommunity();
       }
       if ((tab as HTMLElement).dataset.p === "ad") {
-        loadAdminUsers().catch(() => {});
-        loadModApps().catch(() => {});
-        loadAdminTemplates().catch(() => {});
-        loadAdminNotifs().catch(() => {});
+        // Only the visible admin sub-section re-fetches (lazy per-section
+        // loaders live in admin-ui.ts).
+        refreshAdmin();
       }
       if ((tab as HTMLElement).dataset.p === "pr") {
         syncProfile().catch(() => {});
