@@ -125,7 +125,10 @@ export function buildModerationApi(client: BackendClient) {
         per_page: params?.perPage,
       }),
 
-    createRestriction: (body: CreateRestrictionRequest) => client.post<Restriction>("/restrictions", body),
+    // NOTE: no `createRestriction` wrapper — the backend `RestrictionCreate`
+    // takes a nested `sanctions` object (models/moderation.rs), not the flat
+    // shape the old wrapper sent (it would 400). Restrictions are created via
+    // the report-resolve path (`resolveReport({ createRestriction: true })`).
 
     getRestriction: (id: string) => client.get<Restriction>(`/restrictions/${encodeURIComponent(id)}`),
 
