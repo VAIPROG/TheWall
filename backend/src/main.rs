@@ -855,6 +855,8 @@ async fn main() {
         .route("/api/v3/admin/users/{user_ref}/sessions", get(routes::v3::admin::admin_get_user_sessions).delete(routes::v3::admin::admin_terminate_user_sessions))
         .route("/api/v3/admin/users/{user_ref}/notes", get(routes::v3::admin::admin_get_user_notes).post(routes::v3::admin::admin_add_user_note))
         .route("/api/v3/admin/users/{user_ref}/impersonate", post(routes::v3::admin::admin_impersonate_user))
+        .route("/api/v3/admin/clans/{clan_id}/members/{user_ref}/role", post(routes::v3::admin::admin_set_clan_member_role))
+        .route("/api/v3/admin/clans/{clan_id}/transfer-owner", post(routes::v3::admin::admin_transfer_clan_owner))
         .route("/api/v3/admin/audit", get(routes::v3::admin::admin_audit_log))
         .route("/api/v3/admin/config", get(routes::v3::admin::admin_get_config).patch(routes::v3::admin::admin_update_config))
         .route("/api/v3/admin/maintenance", get(routes::v3::admin::admin_get_maintenance).post(routes::v3::admin::admin_set_maintenance))
