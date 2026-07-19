@@ -80,9 +80,14 @@
     f.innerHTML = `
       <footer>
         <p>
+          <a href="https://vai-rice.space" target="_blank">vai-rice.space</a> ·
+          <a href="https://snackers.vai-rice.space" target="_blank">SnackersWiki</a> ·
+          <a href="https://discord.gg/filian" target="_blank">Snackers Discord</a> ·
+          <a href="https://discord.gg/snackersru" target="_blank">SnackersRU</a>
+        </p>
+        <p style="margin-top:4px">
           <a href="https://x.com/VAI_PROG"     target="_blank">x.com/VAI_PROG</a> ·
           <a href="https://github.com/Vadim-Khristenko" target="_blank">GitHub</a> ·
-          <a href="https://discord.gg/snackersru" target="_blank">Snackers RU Discord</a> ·
           <a href="mailto:vadim+the_wall@vai-rice.space" data-i18n="footer.contact">contact</a>
         </p>
         <p style="margin-top:6px;opacity:.85"><span data-i18n-html="footer.made_by"></span></p>
