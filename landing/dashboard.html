@@ -13,6 +13,39 @@
     .dash-card .v{font-size:24px;font-weight:bold}
     .dash-card .l{font-size:12px;color:var(--sub);margin-top:2px}
     .auth-gate{padding:30px;text-align:center;background:var(--field);color:var(--fieldtext);border:2px inset var(--shadow)}
+
+    /* My templates grid */
+    .tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+    .tpl-card{border:2px outset var(--bg);background:var(--field);color:var(--fieldtext);padding:8px;display:flex;flex-direction:column;gap:6px}
+    .tpl-thumb{height:110px;display:flex;align-items:center;justify-content:center;border:2px inset var(--shadow);background:repeating-conic-gradient(rgba(128,128,128,.18) 0% 25%, transparent 0% 50%) 0 0/16px 16px;overflow:hidden}
+    .tpl-thumb img{max-width:100%;max-height:100%;image-rendering:pixelated}
+    .tpl-thumb .noimg{font-size:11px;color:var(--sub)}
+    .tpl-name{font-weight:bold;font-size:13px;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tpl-meta{font-size:11px;color:var(--sub);display:flex;flex-wrap:wrap;gap:4px 8px}
+    .tpl-badges{display:flex;gap:4px;flex-wrap:wrap}
+    .badge95{font-size:10px;padding:1px 5px;border:1px solid var(--shadow);background:var(--group);color:var(--fieldtext)}
+    .badge95.ok{background:#2a7c2a;color:#fff;border-color:#1c521c}
+    .badge95.warn{background:#8a6d1a;color:#fff;border-color:#5c490f}
+    .badge95.err{background:#8a2a2a;color:#fff;border-color:#5c1c1c}
+    .tpl-actions{display:flex;gap:6px;margin-top:auto}
+    .tpl-actions .btn{flex:1;font-size:12px;padding:3px 6px}
+    .state-line{padding:14px;font-size:13px;color:var(--sub)}
+    .state-line.error{color:#c33}
+    .state-line .hourglass{display:inline-block;animation:wd-flip 1.6s steps(2,end) infinite;margin-right:6px}
+
+    /* Edit dialog */
+    .dlg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50}
+    .dlg-overlay.open{display:flex}
+    .dlg{width:min(430px,94vw);box-shadow:4px 4px 0 rgba(0,0,0,.4)}
+    .dlg .content{padding:12px}
+    .dlg .frow{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;margin-bottom:8px;font-size:13px}
+    .dlg .frow input,.dlg .frow select{width:100%;box-sizing:border-box}
+    .dlg .frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+    .dlg-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    .dlg-status{font-size:12px;margin-top:8px;min-height:16px}
+    .dlg-status.error{color:#c33}
+    .dlg-status.ok{color:#2a7c2a}
+    .notif-onoff{font-weight:bold}
   </style>
 </head>
 <body>
@@ -57,7 +90,7 @@
             </div>
           </div>
           <div class="dash-card">
-            <h3>Achievements</h3>
+            <h3 data-i18n="nav.achievements">Achievements</h3>
             <div class="v" id="stat-ach">—</div>
             <div class="l">
               <a href="/achievements.html" class="link" data-i18n="common.open">Open</a>
@@ -66,60 +99,319 @@
         </div>
 
         <div class="group" style="margin-top:14px">
+          <div class="legend"><span data-icon="image"></span> <span data-i18n="dashboard.my_templates">My templates</span></div>
+          <div id="tpl-state" class="state-line"><span class="hourglass" data-icon="hourglass"></span><span data-i18n="common.loading">Loading…</span></div>
+          <div id="tpl-grid" class="tpl-grid" style="display:none"></div>
+        </div>
+
+        <div class="group" style="margin-top:14px">
           <div class="legend" data-i18n="dashboard.notifications">Notification preferences</div>
           <table style="width:100%;font-size:12px" id="notif-table">
-            <thead><tr><th align="left">Kind</th><th align="left">Channels</th></tr></thead>
+            <thead><tr><th align="left" data-i18n="dashboard.notif_kind">Kind</th><th align="left" data-i18n="dashboard.notif_state">State</th></tr></thead>
             <tbody></tbody>
           </table>
+          <p style="font-size:11px;color:var(--sub);margin-top:6px" data-i18n="dashboard.notif_hint"></p>
         </div>
       </div>
     </div>
   </div>
 </main>
 
+<!-- Edit template dialog -->
+<div class="dlg-overlay" id="dlg-overlay">
+  <div class="win dlg">
+    <div class="titlebar">
+      <span><span class="led"></span><span data-i18n="dashboard.edit_title">Edit template</span></span>
+      <span class="tbtns"><span class="tbtn" id="dlg-x">✕</span></span>
+    </div>
+    <div class="content">
+      <div class="frow">
+        <label for="f-name" data-i18n="dashboard.f_name">Name</label>
+        <input id="f-name" class="input" maxlength="120">
+      </div>
+      <div class="frow">
+        <span data-i18n="dashboard.f_position">Position &amp; scale</span>
+        <div class="frow3">
+          <input id="f-x" class="input" type="number" step="1" title="X">
+          <input id="f-y" class="input" type="number" step="1" title="Y">
+          <input id="f-scale" class="input" type="number" step="0.05" min="0.05" max="10" title="Scale">
+        </div>
+      </div>
+      <div class="frow">
+        <label for="f-scope" data-i18n="dashboard.f_scope">Scope</label>
+        <select id="f-scope" class="input">
+          <option value="private" data-i18n="dashboard.tpl_scope_private">private</option>
+          <option value="clan" data-i18n="dashboard.tpl_scope_clan">clan</option>
+          <option value="public" data-i18n="dashboard.tpl_scope_public">public</option>
+        </select>
+      </div>
+      <div class="frow" id="f-clan-row" style="display:none">
+        <label for="f-clan" data-i18n="dashboard.f_clan">Clan</label>
+        <select id="f-clan" class="input"></select>
+      </div>
+      <div class="frow">
+        <label for="f-pass" data-i18n="dashboard.f_password">Access password</label>
+        <input id="f-pass" class="input" type="text" autocomplete="off">
+      </div>
+      <div class="frow">
+        <span></span>
+        <label style="font-size:12px"><input type="checkbox" id="f-pass-clear"> <span data-i18n="dashboard.f_password_clear">Remove password</span></label>
+      </div>
+      <p style="font-size:11px;color:var(--sub);margin:0" data-i18n="dashboard.f_password_hint"></p>
+      <div class="dlg-status" id="dlg-status"></div>
+      <div class="dlg-btns">
+        <button class="btn" id="dlg-cancel" data-i18n="common.cancel">Cancel</button>
+        <button class="btn primary" id="dlg-save" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="footer-root"></div>
 <script src="/assets/i18n.js"></script>
 <script src="/assets/app.js"></script>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function authHeaders(){
+
+function authToken(){
   try{
     const cfg = JSON.parse(localStorage.getItem('walldev_cfg') || '{}');
-    if (cfg.backendToken) return { Authorization: 'Bearer ' + cfg.backendToken };
+    if (cfg.backendToken) return cfg.backendToken;
   }catch{}
-  const t = localStorage.getItem('wall_landing_jwt') || localStorage.getItem('wall_vai_jwt');
-  return t ? { Authorization: 'Bearer ' + t } : null;
+  return localStorage.getItem('wall_landing_jwt') || localStorage.getItem('wall_vai_jwt') || null;
 }
-async function init(){
-  const h = authHeaders();
-  if (!h){
-    document.getElementById('auth-gate').style.display='block';
+
+const TOKEN = authToken();
+const H = TOKEN ? { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' } : null;
+
+async function jfetch(url, opts){
+  const r = await fetch(url, Object.assign({ headers: H, cache: 'no-store' }, opts || {}));
+  if (!r.ok){
+    let msg = 'HTTP ' + r.status;
+    try{ const j = await r.json(); msg = (j.error && j.error.message) || j.message || (typeof j === 'string' ? j : msg); }
+    catch{ try{ msg = (await r.text()).slice(0,200) || msg; }catch{} }
+    const e = new Error(msg); e.status = r.status; throw e;
+  }
+  const ct = r.headers.get('content-type') || '';
+  return ct.includes('json') ? r.json() : r.text();
+}
+
+// ---- state ---------------------------------------------------------------
+let ME = null;
+let TEMPLATES = [];
+let MY_CLANS = [];
+let EDITING = null; // template currently in the dialog
+
+// ---- templates grid ------------------------------------------------------
+function statusBadge(t){
+  const cls = t.status === 'approved' ? 'ok' : (t.status === 'rejected' ? 'err' : 'warn');
+  const key = 'dashboard.tpl_status_' + (['approved','pending','rejected'].includes(t.status) ? t.status : 'pending');
+  return `<span class="badge95 ${cls}">${esc(wd_t(key))}</span>`;
+}
+function scopeBadge(t){
+  const key = 'dashboard.tpl_scope_' + (['public','clan','private'].includes(t.scope) ? t.scope : 'private');
+  return `<span class="badge95">${esc(wd_t(key))}</span>`;
+}
+
+function renderTemplates(){
+  const grid = document.getElementById('tpl-grid');
+  const state = document.getElementById('tpl-state');
+  if (!TEMPLATES.length){
+    state.innerHTML = esc(wd_t('dashboard.tpl_empty'));
+    state.style.display = ''; grid.style.display = 'none';
     return;
   }
-  document.getElementById('dash-body').style.display='block';
-  // Pull /me, count clans, templates by owner.
-  try {
-    const me = await (await fetch('/api/v2/auth/me', { headers: h })).json();
-    document.getElementById('stat-clans').textContent = me.clans?.length || 0;
-    document.getElementById('stat-clans-detail').textContent =
-      (me.clans||[]).map(c => c.clan_name).join(', ');
-    const tpls = await (await fetch('/api/v2/templates?author='+me.id+'&limit=200', { headers:h })).json();
-    document.getElementById('stat-tpls').textContent = tpls.length;
-    const approved = tpls.filter(t=>t.status==='approved').length;
-    document.getElementById('stat-tpls-detail').textContent = approved + ' approved';
-    const links = await (await fetch('/api/v2/me/links', { headers:h })).json();
-    const linkedCount = [links.discord_id, links.telegram_user_id, links.email].filter(Boolean).length;
-    document.getElementById('stat-links').textContent = wd_t('dashboard.links_count', {n: linkedCount});
-    const ach = await (await fetch('/api/v2/me/achievements', { headers:h })).json();
-    const unlocked = ach.filter(a => a.unlocked_at).length;
-    document.getElementById('stat-ach').textContent = unlocked + ' / ' + ach.length;
-    const prefs = await (await fetch('/api/v2/me/notifications', { headers:h })).json();
-    document.querySelector('#notif-table tbody').innerHTML =
-      prefs.map(p => `<tr><td>${esc(p.kind)}</td><td>${p.channels.map(esc).join(', ')}${p.is_default ? ' <i>(default)</i>':''}</td></tr>`).join('');
-  } catch (e) {
-    document.getElementById('dash-body').innerHTML = '<p style="color:#c33">Error: '+esc(e.message)+'</p>';
+  state.style.display = 'none'; grid.style.display = '';
+  grid.innerHTML = TEMPLATES.map(t => {
+    const thumb = t.hasDocument
+      ? `<img loading="lazy" src="/api/v3/templates/${t.id}/preview?size=128&session=${encodeURIComponent(TOKEN)}" alt="" onerror="this.parentNode.innerHTML='<span class=noimg>${esc(wd_t('dashboard.no_preview'))}</span>'">`
+      : `<span class="noimg">${esc(wd_t('dashboard.no_preview'))}</span>`;
+    return `
+    <div class="tpl-card" data-id="${t.id}">
+      <div class="tpl-thumb">${thumb}</div>
+      <div class="tpl-name" title="${esc(t.name)}">${esc(t.name)}</div>
+      <div class="tpl-badges">${statusBadge(t)}${scopeBadge(t)}${t.animated ? '<span class="badge95">GIF</span>' : ''}</div>
+      <div class="tpl-meta">
+        <span>x:${t.x} y:${t.y}</span>
+        <span>×${t.scale}</span>
+        <span>${esc(wd_t('dashboard.tpl_layers', {n: t.templateCount || 1}))}</span>
+        <span>v${t.version}</span>
+      </div>
+      <div class="tpl-actions">
+        <button class="btn" onclick="openEdit('${t.id}')">${wd.icon('pencil')} <span>${esc(wd_t('common.edit'))}</span></button>
+        <button class="btn" style="color:#c33" onclick="delTpl('${t.id}')">${wd.icon('trash')} <span>${esc(wd_t('common.delete'))}</span></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadTemplates(){
+  const state = document.getElementById('tpl-state');
+  try{
+    TEMPLATES = await jfetch('/api/v3/templates?author=' + encodeURIComponent(ME.id) + '&limit=200');
+    document.getElementById('stat-tpls').textContent = TEMPLATES.length;
+    const approved = TEMPLATES.filter(t => t.status === 'approved').length;
+    document.getElementById('stat-tpls-detail').textContent = wd_t('dashboard.approved_n', {n: approved});
+    renderTemplates();
+  }catch(e){
+    state.className = 'state-line error';
+    state.textContent = wd_t('dashboard.tpl_error') + ' (' + esc(e.message) + ')';
   }
 }
+
+// ---- edit dialog ----------------------------------------------------------
+function openEdit(id){
+  const t = TEMPLATES.find(x => x.id === id);
+  if (!t) return;
+  EDITING = t;
+  document.getElementById('f-name').value = t.name;
+  document.getElementById('f-x').value = t.x;
+  document.getElementById('f-y').value = t.y;
+  document.getElementById('f-scale').value = t.scale;
+  document.getElementById('f-scope').value = t.scope;
+  document.getElementById('f-pass').value = '';
+  document.getElementById('f-pass-clear').checked = false;
+  const clanSel = document.getElementById('f-clan');
+  clanSel.innerHTML = MY_CLANS.map(c =>
+    `<option value="${c.id}" ${t.clanId === c.id ? 'selected' : ''}>${esc(c.name)}${c.tag ? ' [' + esc(c.tag) + ']' : ''}</option>`).join('');
+  syncClanRow();
+  setDlgStatus('', '');
+  document.getElementById('dlg-overlay').classList.add('open');
+}
+function closeEdit(){ document.getElementById('dlg-overlay').classList.remove('open'); EDITING = null; }
+function syncClanRow(){
+  const isClan = document.getElementById('f-scope').value === 'clan';
+  document.getElementById('f-clan-row').style.display = (isClan && MY_CLANS.length) ? '' : 'none';
+}
+function setDlgStatus(msg, cls){
+  const el = document.getElementById('dlg-status');
+  el.textContent = msg; el.className = 'dlg-status' + (cls ? ' ' + cls : '');
+}
+
+async function saveEdit(){
+  if (!EDITING) return;
+  const t = EDITING;
+  const name = document.getElementById('f-name').value.trim() || t.name;
+  const x = parseInt(document.getElementById('f-x').value, 10);
+  const y = parseInt(document.getElementById('f-y').value, 10);
+  const scale = parseFloat(document.getElementById('f-scale').value);
+  const scope = document.getElementById('f-scope').value;
+  const pass = document.getElementById('f-pass').value;
+  const passClear = document.getElementById('f-pass-clear').checked;
+
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(scale)){
+    setDlgStatus(wd_t('dashboard.f_invalid'), 'error'); return;
+  }
+
+  const body = {
+    expectedVersion: t.version,
+    doc: { name: name },
+    layerOps: [{ op: 'update', index: 0, patch: { name: name, x: x, y: y, scale: scale } }]
+  };
+  if (scope !== t.scope){
+    body.scope = scope;
+    if (scope === 'clan'){
+      const cid = document.getElementById('f-clan').value;
+      if (cid) body.clanId = cid;
+    }
+  }
+  if (passClear) body.accessPassword = '';
+  else if (pass.trim()) body.accessPassword = pass.trim();
+
+  const btn = document.getElementById('dlg-save');
+  btn.disabled = true;
+  setDlgStatus(wd_t('common.loading'), '');
+  try{
+    await jfetch('/api/v3/templates/' + t.id, { method: 'PATCH', body: JSON.stringify(body) });
+    setDlgStatus(wd_t('dashboard.save_ok'), 'ok');
+    await loadTemplates();
+    setTimeout(closeEdit, 500);
+  }catch(e){
+    if (e.status === 409) setDlgStatus(wd_t('dashboard.save_conflict'), 'error');
+    else setDlgStatus(wd_t('dashboard.save_error', {msg: e.message}), 'error');
+    if (e.status === 409) loadTemplates();
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function delTpl(id){
+  const t = TEMPLATES.find(x => x.id === id);
+  if (!t) return;
+  if (!confirm(wd_t('dashboard.delete_confirm', {name: t.name}))) return;
+  try{
+    await jfetch('/api/v3/templates/' + id, { method: 'DELETE' });
+    TEMPLATES = TEMPLATES.filter(x => x.id !== id);
+    document.getElementById('stat-tpls').textContent = TEMPLATES.length;
+    const approved = TEMPLATES.filter(x => x.status === 'approved').length;
+    document.getElementById('stat-tpls-detail').textContent = wd_t('dashboard.approved_n', {n: approved});
+    renderTemplates();
+  }catch(e){
+    alert(wd_t('dashboard.delete_error', {msg: e.message}));
+  }
+}
+
+// ---- other cards -----------------------------------------------------------
+async function loadClans(){
+  try{
+    MY_CLANS = await jfetch('/api/v3/clans/mine');
+    document.getElementById('stat-clans').textContent = MY_CLANS.length;
+    document.getElementById('stat-clans-detail').textContent =
+      MY_CLANS.map(c => c.name + (c.tag ? ' [' + c.tag + ']' : '')).join(', ');
+  }catch(e){
+    document.getElementById('stat-clans').textContent = '—';
+  }
+}
+async function loadAchievements(){
+  try{
+    const ach = await jfetch('/api/v3/users/me/achievements');
+    document.getElementById('stat-ach').textContent = wd_t('dashboard.ach_count', {n: Array.isArray(ach) ? ach.length : 0});
+  }catch(e){
+    document.getElementById('stat-ach').textContent = '—';
+  }
+}
+async function loadNotifSettings(){
+  try{
+    const s = await jfetch('/api/v3/notifications/settings');
+    const kinds = ['pushEnabled','templateStatusChanges','clanInvites','restrictionUpdates','modActions','systemAnnouncements','newsAnnouncements','mentions'];
+    document.querySelector('#notif-table tbody').innerHTML = kinds
+      .filter(k => k in s)
+      .map(k => `<tr><td>${esc(wd_t('dashboard.notif.' + k))}</td><td class="notif-onoff" style="color:${s[k] ? 'var(--accent)' : 'var(--sub)'}">${esc(wd_t(s[k] ? 'dashboard.notif_on' : 'dashboard.notif_off'))}</td></tr>`)
+      .join('');
+  }catch(e){
+    document.querySelector('#notif-table tbody').innerHTML =
+      `<tr><td colspan="2" style="color:var(--sub)">—</td></tr>`;
+  }
+}
+
+// ---- init -------------------------------------------------------------------
+async function init(){
+  if (!H){
+    document.getElementById('auth-gate').style.display = 'block';
+    return;
+  }
+  try{
+    ME = await jfetch('/api/v3/users/me');
+  }catch(e){
+    // Token invalid/expired → show the gate instead of a broken dashboard.
+    document.getElementById('auth-gate').style.display = 'block';
+    return;
+  }
+  document.getElementById('dash-body').style.display = 'block';
+  const links = (ME.linkedAccounts || []).length + (ME.siteIdentities || []).length;
+  document.getElementById('stat-links').textContent = wd_t('dashboard.links_count', {n: links});
+  // Parallel, each degrades on its own.
+  loadClans().then(loadTemplates);
+  loadAchievements();
+  loadNotifSettings();
+}
+
+document.getElementById('f-scope').addEventListener('change', syncClanRow);
+document.getElementById('dlg-save').addEventListener('click', saveEdit);
+document.getElementById('dlg-cancel').addEventListener('click', closeEdit);
+document.getElementById('dlg-x').addEventListener('click', closeEdit);
+document.getElementById('dlg-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeEdit(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEdit(); });
 document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
