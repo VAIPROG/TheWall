@@ -1,0 +1,282 @@
+# ══════════════════════════════════════════════════════════════════════
+# ACHIEVEMENTS — Catalogue, grants, client events
+# ══════════════════════════════════════════════════════════════════════
+
+UsersMeAchievements:
+  get:
+    tags: [Achievements]
+    summary: List my achievements
+    operationId: listMyAchievements
+    description: |
+      Returns every achievement unlocked by the current account, newest
+      first. Each entry bundles the catalogue definition with the grant
+      metadata (when, by whom/what). Secret achievements are included —
+      you always see your own.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: My unlocked achievements, newest first.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/achievements.yaml#/AchievementGrant"
+            example:
+              - achievement:
+                  id: first_pixel
+                  category: pixels
+                  title: "First Pixel"
+                  description: "Place your first pixel on the wall."
+                  iconUrl: null
+                  rarity: common
+                  unlockCriteria:
+                    kind: condition
+                    condition: "pixels_placed >= 1"
+                  points: 5
+                  secret: false
+                grantedAt: "2026-07-01T12:00:00Z"
+                grantedBy:
+                  kind: system
+                metadata: {}
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+UsersMeAchievementsRecheck:
+  post:
+    tags: [Achievements]
+    summary: Re-evaluate condition-based achievements
+    operationId: recheckMyAchievements
+    description: |
+      Re-evaluates all counter/condition-based achievements (pixels placed,
+      templates approved, clan membership, linked providers, ...) for the
+      current account and grants any that are newly satisfied. Returns the
+      ids of achievements unlocked by this call. Idempotent — already
+      granted achievements are never duplicated.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Recheck complete.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/achievements.yaml#/AchievementRecheckResponse"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+UsersMeAchievementsEvent:
+  post:
+    tags: [Achievements]
+    summary: Record a client-fired achievement event
+    operationId: recordAchievementEvent
+    description: |
+      Reports a client-side action that may unlock an event-based
+      achievement (e.g. installing the extension or finding the dev page).
+      Only allow-listed event names are accepted; unknown events are
+      silently ignored and return `new: false`. The event is also written
+      to an audit log used by the recheck endpoint.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/achievements.yaml#/AchievementEventRequest"
+          example:
+            event: found_the_dev
+    responses:
+      "200":
+        description: Event processed.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/achievements.yaml#/AchievementEventResponse"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+
+UserAchievementsByRef:
+  get:
+    tags: [Achievements]
+    summary: List a user's unlocked achievements
+    operationId: listUserAchievements
+    description: |
+      Returns the achievements unlocked by another user, newest first.
+      Secret achievements are omitted unless the viewer is a global
+      moderator or higher (or is looking at their own profile via
+      `/users/me/achievements`).
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - $ref: "../components/parameters/common.yaml#/UserRefPath"
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: The user's visible unlocked achievements.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/achievements.yaml#/AchievementGrant"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminAchievementsCatalog:
+  get:
+    tags: [Achievements]
+    summary: List the full achievement catalogue (admin)
+    operationId: adminListAchievementCatalog
+    description: |
+      Admin-only. Returns every achievement definition, including secret
+      ones, ordered by category and points.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    responses:
+      "200":
+        description: Full catalogue.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/achievements.yaml#/AchievementCatalog"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminAchievementsGrants:
+  get:
+    tags: [Achievements]
+    summary: List achievement grants (admin)
+    operationId: adminListAchievementGrants
+    description: |
+      Admin-only. Lists grants across all users (or one user via `user_id`),
+      newest first, with offset pagination. NOTE — this endpoint's query
+      parameters use snake_case (`user_id`, `per_page`), unlike most of the
+      V3 API.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: user_id
+        in: query
+        description: Only return grants for this account UUID.
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        description: Page number (1-based).
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: per_page
+        in: query
+        description: Items per page.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+    security:
+      - BearerAuth: []
+    responses:
+      "200":
+        description: Grants, newest first. A plain array — no pagination envelope.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/achievements.yaml#/AchievementGrant"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminAchievementGrant:
+  post:
+    tags: [Achievements]
+    summary: Grant an achievement to a user (admin)
+    operationId: adminGrantAchievement
+    description: |
+      Admin-only. Grants the achievement `{achievementId}` to the user named
+      in the body. Re-granting an already unlocked achievement overwrites
+      the grant's source, reason, metadata, and timestamp.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: achievementId
+        in: path
+        required: true
+        description: "String id of the achievement (e.g. first_pixel). Not a UUID."
+        schema:
+          type: string
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/achievements.yaml#/AdminGrantRequest"
+          example:
+            user_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+            reason: "Event winner"
+    responses:
+      "200":
+        description: Achievement granted. Returns the stored grant.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/achievements.yaml#/AchievementGrant"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+AdminAchievementRevoke:
+  delete:
+    tags: [Achievements]
+    summary: Revoke an achievement from a user (admin)
+    operationId: adminRevokeAchievement
+    description: |
+      Admin-only. Removes the grant of achievement `{achievementId}` from
+      user `{userId}`. Idempotent — revoking a grant that does not exist
+      still returns `204`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: achievementId
+        in: path
+        required: true
+        description: "String id of the achievement (e.g. first_pixel). Not a UUID."
+        schema:
+          type: string
+      - $ref: "../components/parameters/common.yaml#/UserIdPath"
+    security:
+      - BearerAuth: []
+    responses:
+      "204":
+        description: Grant removed (or did not exist). No response body.
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"

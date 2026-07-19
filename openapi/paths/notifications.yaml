@@ -7,16 +7,33 @@ Notifications:
     tags: [Notifications]
     summary: List notifications
     operationId: listNotifications
-    description: Paginated. Filter by read/unread status and type.
+    description: |
+      Offset-paginated list of the caller's notifications, newest first.
+      Dismissed notifications are excluded. Filter by read/unread state via
+      `read`. NOTE — this endpoint's pagination parameters use snake_case
+      (`per_page`), unlike most of the V3 API.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
-      - $ref: "../components/parameters/common.yaml#/PageParam"
-      - $ref: "../components/parameters/common.yaml#/PerPageParam"
+      - name: page
+        in: query
+        description: Page number (1-based).
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: per_page
+        in: query
+        description: Items per page.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
       - name: read
         in: query
         schema:
           type: boolean
-        description: Filter by read status.
+        description: "Filter by read status: true = only read, false = only unread."
     security:
       - BearerAuth: []
       - ApiKeyAuth: []

@@ -8,66 +8,107 @@ Templates:
     summary: List / search templates
     operationId: listTemplates
     description: |
-      Paginated, filterable template discovery. Public approved templates are
-      listed without authentication. Clan and private templates are only
-      included when the caller is authenticated (Bearer, API key, or session).
-      Filter by scope, status, author, clan, position range, text search.
+      Filterable template discovery with **cursor pagination** (newest first).
+      Public approved templates are listed without authentication. Clan and
+      private templates are only included when the caller is authenticated
+      (Bearer, API key, or `?session` token). Filter by `scope`, `status`,
+      and `author`.
+
+      **Pagination.** Results are ordered by `createdAt` descending. Pass the
+      `createdAt` of the last item you received as `cursor` to fetch the next
+      page — the server returns items with `createdAt < cursor`. There is no
+      page/offset pagination on this endpoint.
 
       **Access control.** The document access block (`usersWhitelist`,
       `usersBlocklist`, `allowedToEdit`) is enforced here: templates the caller
       may not view are silently omitted from the list rather than surfaced.
       `domainsWhitelist` is CLIENT-SIDE only and is never enforced by the backend.
+
+      **Anonymity.** `userId` is `null` for templates published anonymously,
+      unless the caller is the owner or global staff.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/SessionQuery"
-      - $ref: "../components/parameters/common.yaml#/PageParam"
-      - $ref: "../components/parameters/common.yaml#/PerPageParam"
       - name: scope
         in: query
+        description: Only return templates with this visibility scope.
         schema:
           type: string
           enum: [public, clan, private]
       - name: status
         in: query
+        description: Only return templates with this moderation status.
         schema:
           type: string
           enum: [pending, approved, rejected]
-      - name: search
+      - name: author
         in: query
-        schema:
-          type: string
-      - name: authorId
-        in: query
+        description: Only return templates created by this account UUID.
         schema:
           type: string
           format: uuid
-      - name: clanId
+      - name: limit
         in: query
+        description: Maximum number of items to return.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: cursor
+        in: query
+        description: |
+          Cursor for pagination — a `createdAt` timestamp. Returns only items
+          with `createdAt` strictly before this instant. Pass the `createdAt`
+          of the last item from the previous page.
         schema:
           type: string
-          format: uuid
-      - name: sortBy
-        in: query
-        schema:
-          type: string
-          enum: [createdAt, updatedAt, name]
-          default: createdAt
-      - name: order
-        in: query
-        schema:
-          $ref: "../components/schemas/common.yaml#/SortOrder"
+          format: date-time
     security:
       - BearerAuth: []
       - ApiKeyAuth: []
     responses:
       "200":
-        description: Paginated template list (light projection — no document field).
+        description: |
+          Template list (light projection — no `document` field), newest
+          first. A JSON array, not a pagination envelope.
         content:
           application/json:
             schema:
               type: array
               items:
                 $ref: "../components/schemas/templates.yaml#/TemplateSummaryV3"
+            example:
+              - id: "3f6f0a4e-8f5a-4f2e-9d3b-2f9c6a1e7b10"
+                userId: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                name: "Snackers banner"
+                x: 120
+                y: 48
+                scale: 1
+                scope: public
+                status: approved
+                version: 3
+                clanId: null
+                verifiedAt: "2026-07-01T12:34:56Z"
+                createdAt: "2026-06-28T09:00:00Z"
+                hasDocument: true
+                templateCount: 1
+                animated: false
+              - id: "b1a7dd93-1c62-47a9-a2f4-c1d2e3f4a5b6"
+                userId: null
+                name: "Anonymous art"
+                x: -300
+                y: 512
+                scale: 2
+                scope: public
+                status: approved
+                version: 1
+                clanId: null
+                verifiedAt: "2026-06-20T08:15:00Z"
+                createdAt: "2026-06-19T22:41:07Z"
+                hasDocument: true
+                templateCount: 2
+                animated: true
 
 TemplatesNew:
   post:
@@ -117,6 +158,26 @@ TemplatesNew:
         application/json:
           schema:
             $ref: "../components/schemas/templates.yaml#/TemplateCreate"
+          examples:
+            nativeV2:
+              summary: Publish a private native the-wall-dev/2 template
+              value:
+                scope: private
+                source:
+                  format: "the-wall-dev/2"
+                  document:
+                    format: "the-wall-dev/2"
+                    createdAt: "2026-07-18T10:00:00Z"
+                    editedAt: "2026-07-18T10:00:00Z"
+                    templates:
+                      - name: "My overlay"
+                        imageSources:
+                          - "data:image/png;base64,iVBORw0KGgo..."
+                        x: 120
+                        y: 48
+                        scale: 1
+                        width: 64
+                        height: 64
     responses:
       "201":
         description: |
@@ -248,18 +309,30 @@ TemplateById:
     operationId: patchTemplate
     description: |
       Flexible partial edit of a stored template. Supports changing scope/clan,
-      patching document-level metadata (notes, contacts, access control,
-      author visibility), and applying layer operations (add, remove, move,
-      update) to document.templates[]. Significant changes may re-trigger the
-      moderation queue.
+      patching document-level metadata (`doc`: name, notes, contacts, access
+      control, author visibility), and applying ordered layer operations
+      (`layerOps`: add, remove, move, update) to `document.templates[]`.
+
+      **Derived columns.** The flat `name` / `x` / `y` / `scale` columns are
+      NOT patched directly — after `doc` and `layerOps` are applied, they are
+      re-derived from `document.templates[0]`. To move or rename a template,
+      update layer 0 via a `{"op": "update", "index": 0, ...}` layer op.
+
+      **Concurrency.** Pass `expectedVersion` (the `version` you last read) to
+      guard against lost updates — the server returns `409 Conflict` when the
+      stored version differs. Each successful PATCH increments `version`.
+
+      **Scope changes.** Only the template owner or a global admin may change
+      `scope` / `clanId`; `clan` scope additionally requires membership of the
+      target clan. `accessPassword` sets the per-template share password; an
+      empty string clears it; omit the field to leave it unchanged.
 
       **Access control.** Edit rights are enforced on PATCH: the owner,
-      moderators, and any co-editor listed in the document `allowedToEdit`
-      block (`userIds` / `clanIds`) may patch; everyone else is rejected. Note
-      that when the caller lacks even *view* access (per `usersWhitelist` /
-      `usersBlocklist`), the endpoint returns **`404 Not Found`** rather than
-      `403` to avoid leaking the template's existence. The access block itself
-      is set here via `doc.access` (co-editors) and mirrored from create.
+      global admins, and any co-editor listed in the document `allowedToEdit`
+      block (`userIds` / `clanIds`) may patch; everyone else receives `403`.
+      The access block itself is set here via `doc.access` (co-editors) and
+      mirrored from create. Rows without a backfilled v2 `document` return
+      `409 Conflict` until the backfill job has run.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
       - $ref: "../components/parameters/common.yaml#/TemplateIdPath"
@@ -272,6 +345,24 @@ TemplateById:
         application/json:
           schema:
             $ref: "../components/schemas/templates.yaml#/TemplatePatch"
+          examples:
+            renameAndMove:
+              summary: Rename the template and move layer 0
+              description: |
+                Typical edit — rename and reposition. The flat columns pick up
+                the new name/x/y/scale from layer 0 after the ops apply.
+              value:
+                expectedVersion: 3
+                doc:
+                  name: "New name"
+                layerOps:
+                  - op: update
+                    index: 0
+                    patch:
+                      name: "New name"
+                      x: 120
+                      y: 48
+                      scale: 1
     responses:
       "200":
         description: Template updated.

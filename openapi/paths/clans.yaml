@@ -827,6 +827,8 @@ ClansMine:
     description: |
       Returns the clans the authenticated caller is an active member of, plus
       any clans they own. Each entry uses the same shape as `GET /clans/{clanId}`.
+      This resolves the caller's clans directly — use it instead of scanning
+      the full `GET /clans` list. An empty array means the caller has no clan.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
     security:

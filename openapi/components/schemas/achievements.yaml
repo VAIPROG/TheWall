@@ -1,0 +1,242 @@
+# ══════════════════════════════════════════════════════════════════════
+# ACHIEVEMENTS — Catalogue, grants, events
+# ══════════════════════════════════════════════════════════════════════
+
+AchievementCatalog:
+  type: object
+  description: One achievement definition from the server catalogue.
+  required:
+    - id
+    - category
+    - title
+    - description
+    - rarity
+    - unlockCriteria
+    - points
+    - secret
+  properties:
+    id:
+      type: string
+      description: "Stable string identifier (e.g. first_pixel, found_the_dev). Not a UUID."
+      example: first_pixel
+    category:
+      type: string
+      description: "Grouping category (e.g. pixels, templates, social)."
+    title:
+      type: string
+      description: Display title.
+    description:
+      type: string
+      description: Display description / unlock hint.
+    iconUrl:
+      type: string
+      format: uri
+      nullable: true
+      description: Optional icon image URL. Null when the achievement has no custom icon.
+    rarity:
+      type: string
+      enum: [common, uncommon, rare, legendary, unique]
+      description: Rarity tier.
+    unlockCriteria:
+      $ref: "#/UnlockCriteria"
+    points:
+      type: integer
+      minimum: 0
+      description: Achievement points awarded on unlock.
+    secret:
+      type: boolean
+      description: |
+        Secret achievements are hidden from other users' public lists — only
+        the owner and global moderators+ can see them once unlocked.
+
+UnlockCriteria:
+  description: |
+    How the achievement unlocks. Tagged union discriminated by `kind`:
+    - `manual` — granted only by an admin.
+    - `event` — unlocked by a client-fired event (see `event` field).
+    - `condition` — unlocked by a server-evaluated condition (recheck endpoint).
+    - `achievementCount` — unlocked after collecting `count` other achievements.
+  oneOf:
+    - type: object
+      title: Manual
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [manual]
+    - type: object
+      title: Event
+      required: [kind, event]
+      properties:
+        kind:
+          type: string
+          enum: [event]
+        event:
+          type: string
+          description: Event name that triggers the unlock.
+          example: found_the_dev
+    - type: object
+      title: Condition
+      required: [kind, condition]
+      properties:
+        kind:
+          type: string
+          enum: [condition]
+        condition:
+          type: string
+          description: Server-side condition descriptor (opaque to clients).
+    - type: object
+      title: AchievementCount
+      required: [kind, count]
+      properties:
+        kind:
+          type: string
+          enum: [achievementCount]
+        count:
+          type: integer
+          minimum: 0
+          description: Number of other achievements required.
+
+AchievementGrant:
+  type: object
+  description: An unlocked achievement — the catalogue entry plus grant metadata.
+  required:
+    - achievement
+    - grantedAt
+    - grantedBy
+    - metadata
+  properties:
+    achievement:
+      $ref: "#/AchievementCatalog"
+    grantedAt:
+      type: string
+      format: date-time
+      description: When the achievement was unlocked or granted.
+    grantedBy:
+      $ref: "#/GrantSource"
+    metadata:
+      type: object
+      additionalProperties: true
+      description: Free-form grant metadata. Empty object when none was recorded.
+
+GrantSource:
+  description: |
+    Who or what granted the achievement. Tagged union discriminated by `kind`:
+    `system` (server-evaluated condition), `admin` (manual grant, includes the
+    granting admin's id and optional reason), `event` (client-fired event,
+    includes the event name), or `selfUnlocked`.
+  oneOf:
+    - type: object
+      title: System
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [system]
+    - type: object
+      title: Admin
+      required: [kind, by]
+      properties:
+        kind:
+          type: string
+          enum: [admin]
+        by:
+          type: string
+          description: Account UUID of the granting admin (as a string; empty when unknown).
+        reason:
+          type: string
+          nullable: true
+          description: Optional reason supplied by the admin.
+    - type: object
+      title: Event
+      required: [kind, name]
+      properties:
+        kind:
+          type: string
+          enum: [event]
+        name:
+          type: string
+          description: Name of the event that unlocked the achievement.
+    - type: object
+      title: SelfUnlocked
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [selfUnlocked]
+
+AchievementEventRequest:
+  type: object
+  description: Client-fired achievement event.
+  required:
+    - event
+  properties:
+    event:
+      type: string
+      description: |
+        Event name. Only allow-listed client events are accepted; unknown
+        events are silently ignored (the response returns `new: false`).
+        Currently allow-listed: `emote_explorer`, `snapshot_viewer`,
+        `compact_mode_enabled`, `precise_place`, `first_pinned`,
+        `extension_installed`, `profile_complete`, `vai_pinged`,
+        `found_the_dev`, `night_owl`.
+      example: extension_installed
+    metadata:
+      type: object
+      additionalProperties: true
+      nullable: true
+      description: Optional free-form context stored in the event log.
+
+AchievementEventResponse:
+  type: object
+  description: Result of a client-fired achievement event.
+  required:
+    - new
+    - achievement
+  properties:
+    new:
+      type: boolean
+      description: True when the event unlocked an achievement mapped to it.
+    achievement:
+      description: The unlocked achievement. Null when nothing was mapped to the event.
+      anyOf:
+        - $ref: "#/AchievementCatalog"
+        - type: object
+          nullable: true
+          title: "null"
+          description: Null — the event did not unlock anything.
+
+AchievementRecheckResponse:
+  type: object
+  description: Result of re-evaluating condition-based achievements.
+  required:
+    - newlyUnlocked
+  properties:
+    newlyUnlocked:
+      type: array
+      items:
+        type: string
+      description: Ids of achievements newly granted by this recheck. Empty when nothing changed.
+      example: [pixels_100, joined_clan]
+
+AdminGrantRequest:
+  type: object
+  description: |
+    Admin body for granting an achievement to a user. NOTE — this body uses
+    snake_case field names (`user_id`), unlike most of the V3 API.
+  required:
+    - user_id
+  properties:
+    user_id:
+      type: string
+      format: uuid
+      description: Account UUID of the user receiving the achievement.
+    reason:
+      type: string
+      nullable: true
+      description: Optional reason recorded on the grant.
+    metadata:
+      type: object
+      additionalProperties: true
+      nullable: true
+      description: Optional free-form metadata stored on the grant.

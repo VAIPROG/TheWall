@@ -56,43 +56,6 @@ OAuthCallbackBody:
         Single-use CSRF/PKCE binding token from `OAuthStart`.
         Must be round-tripped exactly as returned by the start endpoint.
 
-TelegramWidgetAuth:
-  type: object
-  required:
-    - id
-    - first_name
-    - auth_date
-    - hash
-  description: |
-    **Deprecated.** Signed payload from the legacy Telegram Login Widget.
-    The server verifies the `hash` using the bot token secret.
-    Prefer the modern OAuth2 flow via `GET /auth/oauth/telegram/start`.
-  properties:
-    id:
-      type: integer
-      description: Telegram user id.
-    first_name:
-      type: string
-      description: User's first name as reported by Telegram.
-    last_name:
-      type: string
-      nullable: true
-      description: User's last name (optional).
-    username:
-      type: string
-      nullable: true
-      description: Telegram username (optional).
-    photo_url:
-      type: string
-      nullable: true
-      description: URL of the user's profile photo (optional).
-    auth_date:
-      type: integer
-      description: Unix timestamp of authentication (used to check freshness).
-    hash:
-      type: string
-      description: HMAC-SHA256 signature of the data fields, keyed with the bot token secret.
-
 RefreshRequest:
   type: object
   required:
@@ -135,36 +98,94 @@ AuthResponse:
           description: Unique username.
         displayName:
           type: string
-          description: User-visible display name.
+          nullable: true
+          description: User-visible display name. Null when never set.
         role:
           type: string
           description: User role.
 
 SessionInfo:
   type: object
+  description: |
+    Identity snapshot returned by `GET /auth/session`. Contains the public
+    account record plus all linked site identities and OAuth provider links.
+  required:
+    - user
+    - siteIdentities
+    - providers
   properties:
-    sessionId:
+    user:
+      type: object
+      required:
+        - id
+        - username
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique account identifier (UUID).
+        username:
+          type: string
+          description: Unique username.
+        displayName:
+          type: string
+          nullable: true
+          description: User-visible display name. Null when never set.
+        role:
+          type: string
+          description: "Global role (e.g. user, moderator, admin, owner)."
+    siteIdentities:
+      type: array
+      items:
+        $ref: "#/SiteIdentity"
+      description: All pixel-canvas platform identities linked to this account.
+    providers:
+      type: array
+      items:
+        $ref: "#/ProviderLink"
+      description: All OAuth provider identities linked to this account.
+
+ProviderLink:
+  type: object
+  description: One row from provider_links — an OAuth provider connection.
+  required:
+    - id
+    - accountId
+    - provider
+    - providerUid
+    - isVerified
+    - isPublic
+    - linkedAt
+  properties:
+    id:
       type: string
       format: uuid
-      description: Unique session identifier.
-    userId:
+      description: Unique provider-link record identifier.
+    accountId:
       type: string
       format: uuid
-      description: Owner account identifier (UUID).
-    tokenExpiry:
+      description: Owning account UUID.
+    provider:
+      type: string
+      description: "Provider id (telegram, discord, github)."
+    providerUid:
+      type: string
+      description: Provider-assigned user id.
+    username:
+      type: string
+      nullable: true
+      description: Username on the provider, kept for display purposes.
+    isVerified:
+      type: boolean
+      description: Whether the link was proven via a completed OAuth flow.
+    isPublic:
+      type: boolean
+      description: Whether the link is shown on the public profile.
+    linkedAt:
       type: string
       format: date-time
-      description: When the session token expires.
-    permissions:
-      type: array
-      items:
-        type: string
-      description: List of permission strings granted.
-    activeSessions:
-      type: array
-      items:
-        $ref: "#/SessionSummary"
-      description: All active sessions for this user.
+      description: When this provider identity was linked.
 
 SessionSummary:
   type: object
@@ -190,10 +211,12 @@ SessionSummary:
 
 SiteIdentity:
   type: object
+  description: One row from site_identities — a per-platform connection for an account.
   required:
     - id
-    - site
-    - siteUserId
+    - accountId
+    - source
+    - externalId
     - linkedAt
     - lastSeenAt
   properties:
@@ -201,12 +224,16 @@ SiteIdentity:
       type: string
       format: uuid
       description: Unique SiteIdentity record identifier.
-    site:
+    accountId:
+      type: string
+      format: uuid
+      description: Owning account UUID.
+    source:
       type: string
       description: Platform registry id (e.g. filianislost, wplace).
-    siteUserId:
+    externalId:
       type: string
-      description: Provider-assigned user id on that platform.
+      description: Platform-assigned user id on that site.
     siteUsername:
       type: string
       nullable: true

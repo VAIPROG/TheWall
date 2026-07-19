@@ -1,0 +1,183 @@
+# ══════════════════════════════════════════════════════════════════════
+# FEED — Unified wall feed (snapshots, signals, announcements, milestones)
+# ══════════════════════════════════════════════════════════════════════
+
+FeedEvent:
+  type: object
+  description: |
+    One event on the unified wall feed. Everything that appears on the feed
+    (canvas snapshots, mirrored signals, announcements, milestones, ...) is
+    stored as a single event row; consumers render it based on `eventType`
+    and the structured `payload` / `media` fields.
+  required:
+    - id
+    - eventType
+    - source
+    - externalId
+    - payload
+    - media
+    - occurredAt
+    - createdAt
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Unique feed event identifier.
+    eventType:
+      type: string
+      description: |
+        Event kind, lower-case. Well-known values include `snapshot`,
+        `signal`, `announcement`, and `milestone`; not a closed enum — new
+        kinds are added without an API version bump.
+      example: snapshot
+    source:
+      type: string
+      description: |
+        Producer of the event — a platform registry id (e.g. `filianislost`)
+        or `system` for server-generated entries.
+      example: filianislost
+    externalId:
+      type: string
+      description: Producer-side identifier used for deduplication.
+    title:
+      type: string
+      nullable: true
+      description: Optional human-readable title.
+    description:
+      type: string
+      nullable: true
+      description: Optional human-readable description.
+    payload:
+      type: object
+      description: |
+        Structured, event-type-specific data. For `snapshot` events this
+        carries `batchId` and per-size image info; for `signal` events it
+        carries `numId`, `name`, `location`, `imageFile`, `submittedAt`.
+      additionalProperties: true
+    media:
+      type: array
+      items:
+        $ref: "#/FeedMedia"
+      description: Attached media entries. Empty array when the event has none.
+    occurredAt:
+      type: string
+      format: date-time
+      description: When the event actually happened (producer clock).
+    createdAt:
+      type: string
+      format: date-time
+      description: When the event row was stored on the backend.
+
+FeedMedia:
+  type: object
+  description: A single media attachment on a feed event.
+  required:
+    - type
+    - url
+  properties:
+    type:
+      type: string
+      description: "Media kind (e.g. image)."
+      example: image
+    url:
+      type: string
+      format: uri
+      description: Absolute URL of the media resource.
+    label:
+      type: string
+      description: Optional human-readable label. Omitted when absent.
+    size:
+      type: string
+      description: "Optional size hint (e.g. large, thumb). Omitted when absent."
+
+FeedEventNote:
+  type: object
+  description: |
+    A per-language admin note attached to a feed event (used for localised
+    commentary on announcements and snapshots).
+  required:
+    - lang
+    - note
+    - authorId
+    - updatedAt
+  properties:
+    lang:
+      type: string
+      enum: [en, ru, de, fr]
+      description: Language code of this note.
+    note:
+      type: string
+      maxLength: 2000
+      description: Note text (max 2000 characters).
+    authorId:
+      type: string
+      format: uuid
+      nullable: true
+      description: Account UUID of the admin who last wrote the note.
+    updatedAt:
+      type: string
+      format: date-time
+      description: When the note was last created or updated.
+
+FeedEventCreate:
+  type: object
+  description: |
+    Admin request body for creating a feed event (announcement, milestone,
+    or any other kind).
+  required:
+    - eventType
+    - externalId
+  properties:
+    eventType:
+      type: string
+      description: Event kind. Trimmed and lower-cased server-side; must be non-empty.
+      example: announcement
+    source:
+      type: string
+      default: system
+      description: Producer id. Defaults to `system` when omitted.
+    externalId:
+      type: string
+      description: Producer-side identifier used for deduplication. Must be non-empty.
+    title:
+      type: string
+      nullable: true
+      description: Optional title.
+    description:
+      type: string
+      nullable: true
+      description: Optional description.
+    payload:
+      type: object
+      additionalProperties: true
+      description: Structured event data. Defaults to an empty object.
+    media:
+      type: array
+      items:
+        $ref: "#/FeedMedia"
+      description: Media attachments. Defaults to an empty array.
+    occurredAt:
+      type: string
+      format: date-time
+      description: Event timestamp. Defaults to the current server time.
+
+FeedNoteUpsert:
+  type: object
+  description: |
+    Admin request body for creating or replacing a per-language note on a
+    feed event. Submitting an empty (whitespace-only) `note` deletes the
+    note for that language instead.
+  required:
+    - lang
+    - note
+  properties:
+    lang:
+      type: string
+      enum: [en, ru, de, fr]
+      description: Language code. Other values are rejected with 400.
+    note:
+      type: string
+      maxLength: 2000
+      description: |
+        Note text (max 2000 characters — longer input is rejected with 413).
+        An empty string deletes the existing note for this language.

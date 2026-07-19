@@ -1,0 +1,264 @@
+# ══════════════════════════════════════════════════════════════════════
+# FEED — Unified wall feed (snapshots, signals, announcements)
+# ══════════════════════════════════════════════════════════════════════
+
+Feed:
+  get:
+    tags: [Feed]
+    summary: List feed events
+    operationId: listFeedEvents
+    description: |
+      Returns the unified wall feed — canvas snapshots, mirrored signals,
+      announcements, and milestones — as a flat list ordered by `occurredAt`
+      descending (newest first). Filter by `eventType`, `source`, and a
+      `since`/`until` time window. For pagination pass the `id` of the last
+      item you received as `after`; the server returns events created before
+      that event.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: eventType
+        in: query
+        description: "Only return events of this kind (e.g. snapshot, signal, announcement)."
+        schema:
+          type: string
+      - name: source
+        in: query
+        description: "Only return events from this producer (e.g. filianislost, system)."
+        schema:
+          type: string
+      - name: since
+        in: query
+        description: Only return events with `occurredAt` strictly after this instant.
+        schema:
+          type: string
+          format: date-time
+      - name: until
+        in: query
+        description: Only return events with `occurredAt` strictly before this instant.
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        description: Maximum number of items to return.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: after
+        in: query
+        description: |
+          Cursor for pagination — the `id` of the last event from the
+          previous page. Returns only events stored before that event.
+        schema:
+          type: string
+          format: uuid
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Feed events, newest first.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/feed.yaml#/FeedEvent"
+            example:
+              - id: "e2f6a8b0-3c4d-4e5f-8a9b-0c1d2e3f4a5b"
+                eventType: snapshot
+                source: filianislost
+                externalId: "batch-2026-07-18-0700"
+                title: null
+                description: null
+                payload:
+                  batchId: "d1c2b3a4-5e6f-4708-9a0b-1c2d3e4f5a6b"
+                  sizes:
+                    large: "wall-large.png"
+                media:
+                  - type: image
+                    url: "https://the-wall.vai-rice.space/snapshots/wall-large.png"
+                    label: large
+                occurredAt: "2026-07-18T07:00:00Z"
+                createdAt: "2026-07-18T07:00:04Z"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+
+FeedEventById:
+  get:
+    tags: [Feed]
+    summary: Get a single feed event
+    operationId: getFeedEvent
+    description: Returns one feed event by its UUID.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: feedEventId
+        in: path
+        required: true
+        description: Unique identifier of the feed event.
+        schema:
+          type: string
+          format: uuid
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: The feed event.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/feed.yaml#/FeedEvent"
+      "404":
+        $ref: "../components/responses/common.yaml#/NotFound"
+
+FeedEventNotes:
+  get:
+    tags: [Feed]
+    summary: List per-language notes for a feed event
+    operationId: listFeedEventNotes
+    description: |
+      Returns the localised admin notes attached to a feed event, ordered by
+      language code. Clients pick the note matching the user's language and
+      fall back to `en`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: feedEventId
+        in: path
+        required: true
+        description: Unique identifier of the feed event.
+        schema:
+          type: string
+          format: uuid
+    security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+    responses:
+      "200":
+        description: Notes for the event (possibly empty).
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "../components/schemas/feed.yaml#/FeedEventNote"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+
+AdminFeedCreate:
+  post:
+    tags: [Feed]
+    summary: Create a feed event (admin)
+    operationId: adminCreateFeedEvent
+    description: |
+      Admin-only. Inserts a new event onto the unified feed — typically an
+      `announcement` or `milestone`. `eventType` is trimmed and lower-cased;
+      `source` defaults to `system`; `occurredAt` defaults to now.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/feed.yaml#/FeedEventCreate"
+          example:
+            eventType: announcement
+            externalId: "release-6.4.0"
+            title: "The Wall Dev 6.4.0"
+            description: "Community super-tab, clan avatars and more."
+    responses:
+      "200":
+        description: Event created. Returns the stored event.
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/feed.yaml#/FeedEvent"
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+
+AdminFeedNotes:
+  post:
+    tags: [Feed]
+    summary: Upsert a per-language note on a feed event (admin)
+    operationId: adminUpsertFeedEventNote
+    description: |
+      Admin-only. Creates or replaces the note for one language on a feed
+      event. Supported languages: `en`, `ru`, `de`, `fr`. Submitting an
+      empty (whitespace-only) `note` deletes the note for that language and
+      returns `204`. Notes longer than 2000 characters are rejected.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: feedEventId
+        in: path
+        required: true
+        description: Unique identifier of the feed event.
+        schema:
+          type: string
+          format: uuid
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas/feed.yaml#/FeedNoteUpsert"
+          example:
+            lang: en
+            note: "Snapshot taken right after the event finale."
+    responses:
+      "200":
+        description: Note created or replaced. No response body.
+      "204":
+        description: Empty note submitted — the existing note for this language was deleted.
+      "400":
+        $ref: "../components/responses/common.yaml#/BadRequest"
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"
+      "413":
+        $ref: "../components/responses/common.yaml#/PayloadTooLarge"
+
+AdminFeedNoteByLang:
+  delete:
+    tags: [Feed]
+    summary: Delete a per-language note from a feed event (admin)
+    operationId: adminDeleteFeedEventNote
+    description: |
+      Admin-only. Removes the note for the given language from a feed event.
+      Idempotent — deleting a non-existent note still returns `204`.
+    parameters:
+      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
+      - name: feedEventId
+        in: path
+        required: true
+        description: Unique identifier of the feed event.
+        schema:
+          type: string
+          format: uuid
+      - name: lang
+        in: path
+        required: true
+        description: Language code of the note to delete.
+        schema:
+          type: string
+          enum: [en, ru, de, fr]
+    security:
+      - BearerAuth: []
+    responses:
+      "204":
+        description: Note deleted (or did not exist). No response body.
+      "401":
+        $ref: "../components/responses/common.yaml#/Unauthorized"
+      "403":
+        $ref: "../components/responses/common.yaml#/Forbidden"

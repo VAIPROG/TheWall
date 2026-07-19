@@ -8,8 +8,12 @@ Chats:
     summary: List available chats
     operationId: listChats
     description: |
-      Returns all chat rooms/channels accessible to the current
-      user: global chat, clan chats, DM threads.
+      Returns all chat rooms/channels accessible to the current user in one
+      call: the global chat, the clan chats of every clan the caller belongs
+      to, and every DM thread the caller participates in. Each entry carries
+      unread state, so clients use this as the single source for the chat
+      sidebar/badge counts and then open individual chats via
+      `GET /chats/{chatId}` + `GET /chats/{chatId}/messages`.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
     security:
@@ -32,6 +36,11 @@ GlobalChat:
     tags: [Chats]
     summary: Get global chat info and recent messages
     operationId: getGlobalChat
+    description: |
+      Convenience alias — the literal selector `global` is accepted anywhere
+      `{chatId}` is, and resolves to the server-wide global chat (creating it
+      lazily if needed). This is the same handler as `GET /chats/{chatId}`;
+      `/chats/global/messages` works the same way for history and sending.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
     security:

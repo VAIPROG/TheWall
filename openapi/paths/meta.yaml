@@ -1,0 +1,194 @@
+# ══════════════════════════════════════════════════════════════════════
+# META — Server info, health, easter egg
+# ══════════════════════════════════════════════════════════════════════
+#
+# These three endpoints are registered OUTSIDE the authenticated V3 router:
+# they are fully public, require no Authorization header and no
+# X-ClientVersion-TheWallDev-API header. Field names are snake_case (they
+# predate the camelCase V3 convention).
+
+Meta:
+  get:
+    tags: [Meta]
+    summary: Get server metadata
+    operationId: getMeta
+    description: |
+      Public, unauthenticated. Returns backend version, known extension
+      version, supported API versions, build/boot timestamps, uptime, owner
+      contact info, and the current maintenance flag. The landing page uses
+      this to render "Extension vX / Backend vY" in its footer.
+
+      NOTE — response field names are snake_case, not camelCase.
+    security:
+      - {}
+    responses:
+      "200":
+        description: Server metadata.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+                - extension_version
+                - api_versions
+                - started_at
+                - uptime_secs
+                - owner
+                - maintenance
+              properties:
+                version:
+                  type: string
+                  description: Backend Cargo package version.
+                extension_version:
+                  type: string
+                  description: Latest known extension version (env hint or baked-in default).
+                api_versions:
+                  type: array
+                  items:
+                    type: string
+                  description: Supported API generations.
+                  example: [v1, v2, v3]
+                built_at:
+                  type: string
+                  nullable: true
+                  description: Build timestamp baked into the binary. Null for local builds.
+                deployed_at:
+                  type: string
+                  nullable: true
+                  description: Deploy moment — equals the process boot time (RFC 3339).
+                started_at:
+                  type: string
+                  description: Process boot time (RFC 3339).
+                uptime_secs:
+                  type: integer
+                  description: Seconds since boot.
+                owner:
+                  type: object
+                  required: [name, contact]
+                  properties:
+                    name:
+                      type: string
+                    contact:
+                      type: string
+                    link:
+                      type: string
+                      nullable: true
+                maintenance:
+                  type: boolean
+                  description: Whether maintenance mode is currently active.
+                maintenance_reason:
+                  type: string
+                  nullable: true
+                  description: Optional human-readable maintenance reason.
+            example:
+              version: "6.4.0"
+              extension_version: "6.4.0"
+              api_versions: [v1, v2, v3]
+              built_at: "2026-07-18T06:00:00+00:00"
+              deployed_at: "2026-07-18T06:30:00+00:00"
+              started_at: "2026-07-18T06:30:00+00:00"
+              uptime_secs: 3600
+              owner:
+                name: "VAI"
+                contact: "https://t.me/VAI_Programmer"
+                link: "https://github.com/Vadim-Khristenko"
+              maintenance: false
+              maintenance_reason: null
+
+Health:
+  get:
+    tags: [Meta]
+    summary: Health check
+    operationId: getHealth
+    description: |
+      Public, unauthenticated liveness/readiness probe. Runs a `SELECT 1`
+      against the database and checks the maintenance flag. Returns `200`
+      with `status: healthy` when the database responds and maintenance
+      mode is off; otherwise returns `503` with `status: maintenance`.
+      Equivalent to `GET /telemetry/health` inside the authenticated router.
+    security:
+      - {}
+    responses:
+      "200":
+        description: Server is healthy.
+        content:
+          application/json:
+            schema:
+              $ref: "#/HealthStatusSchema"
+            example:
+              status: healthy
+              version: "6.4.0"
+              database: connected
+      "503":
+        description: Database unreachable or maintenance mode active.
+        content:
+          application/json:
+            schema:
+              $ref: "#/HealthStatusSchema"
+            example:
+              status: maintenance
+              version: "6.4.0"
+              database: disconnected
+
+# Shared schema for the health responses above (referenced only in this file).
+HealthStatusSchema:
+  type: object
+  required: [status, version, database]
+  properties:
+    status:
+      type: string
+      enum: [healthy, maintenance]
+      description: Overall server status.
+    version:
+      type: string
+      description: Backend Cargo package version.
+    database:
+      type: string
+      enum: [connected, disconnected]
+      description: Database connectivity as observed by the probe.
+
+WhoIsTheDev:
+  get:
+    tags: [Meta]
+    summary: Who is the dev? (easter egg)
+    operationId: whoIsTheDev
+    description: |
+      Public, unauthenticated easter egg honouring the project author.
+      Content-negotiated via the `Accept` header: `application/json` returns
+      JSON (snake_case fields), `application/xml` / `text/xml` returns XML,
+      `text/plain` returns plain text, and anything else returns a
+      Windows-95-styled HTML page.
+    security:
+      - {}
+    responses:
+      "200":
+        description: Author info in the negotiated representation.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, full_name, title, country]
+              properties:
+                name:
+                  type: string
+                full_name:
+                  type: string
+                title:
+                  type: string
+                country:
+                  type: string
+            example:
+              name: "VAI"
+              full_name: "Vadim Khristenko"
+              title: "The most powerful young dev from <NOT_FOUND_COUNTRY>"
+              country: "<NOT_FOUND_COUNTRY>"
+          application/xml:
+            schema:
+              type: string
+          text/plain:
+            schema:
+              type: string
+          text/html:
+            schema:
+              type: string

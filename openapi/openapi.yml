@@ -56,7 +56,7 @@ info:
 
     > **SECURITY WARNING**: API keys grant **full access** to your account.
     > NEVER share with untrusted parties. Revoke via
-    > `DELETE /users/me/api-keys/{keyId}` if compromised.
+    > `DELETE /users/me/keys/{keyId}` if compromised.
 
     ---
 
@@ -142,6 +142,18 @@ tags:
     description: |
       Client telemetry ingestion, server health check, and
       Prometheus-compatible metrics.
+  - name: Feed
+    description: |
+      Unified wall feed. Canvas snapshots, mirrored signals, announcements,
+      and milestones as a single event stream, plus per-language admin notes.
+  - name: Achievements
+    description: |
+      Achievement catalogue, unlocked grants, client-fired unlock events,
+      and admin grant/revoke management.
+  - name: Meta
+    description: |
+      Public, unauthenticated server metadata: version info, health probe,
+      and one easter egg. No Authorization or client-version header needed.
 
 security:
   - BearerAuth: []
@@ -161,9 +173,6 @@ paths:
   /auth/oauth/{provider}/callback:
     $ref: "./paths/auth.yaml#/OAuthCallback"
 
-  /auth/oauth/telegram:
-    $ref: "./paths/auth.yaml#/OAuthTelegramLegacy"
-
   /auth/refresh:
     $ref: "./paths/auth.yaml#/AuthRefresh"
 
@@ -172,12 +181,6 @@ paths:
 
   /auth/logout:
     $ref: "./paths/auth.yaml#/AuthLogout"
-
-  /auth/session/{sessionId}/logout:
-    $ref: "./paths/auth.yaml#/AuthLogoutSession"
-
-  /auth/session/all/logout:
-    $ref: "./paths/auth.yaml#/AuthLogoutAll"
 
   /auth/merge/initiate:
     $ref: "./paths/auth.yaml#/AuthMergeInitiate"
@@ -569,6 +572,69 @@ paths:
 
   /telemetry/logs/export:
     $ref: "./paths/telemetry.yaml#/TelemetryLogsExport"
+
+  # ════════════════════════════════════════════════════════════════════
+  # FEED
+  # ════════════════════════════════════════════════════════════════════
+
+  /feed:
+    $ref: "./paths/feed.yaml#/Feed"
+
+  /feed/{feedEventId}:
+    $ref: "./paths/feed.yaml#/FeedEventById"
+
+  /feed/{feedEventId}/notes:
+    $ref: "./paths/feed.yaml#/FeedEventNotes"
+
+  /admin/feed:
+    $ref: "./paths/feed.yaml#/AdminFeedCreate"
+
+  /admin/feed/{feedEventId}/notes:
+    $ref: "./paths/feed.yaml#/AdminFeedNotes"
+
+  /admin/feed/{feedEventId}/notes/{lang}:
+    $ref: "./paths/feed.yaml#/AdminFeedNoteByLang"
+
+  # ════════════════════════════════════════════════════════════════════
+  # ACHIEVEMENTS
+  # ════════════════════════════════════════════════════════════════════
+
+  /users/me/achievements:
+    $ref: "./paths/achievements.yaml#/UsersMeAchievements"
+
+  /users/me/achievements/recheck:
+    $ref: "./paths/achievements.yaml#/UsersMeAchievementsRecheck"
+
+  /users/me/achievements/event:
+    $ref: "./paths/achievements.yaml#/UsersMeAchievementsEvent"
+
+  /users/{userRef}/achievements:
+    $ref: "./paths/achievements.yaml#/UserAchievementsByRef"
+
+  /admin/achievements/catalog:
+    $ref: "./paths/achievements.yaml#/AdminAchievementsCatalog"
+
+  /admin/achievements/grants:
+    $ref: "./paths/achievements.yaml#/AdminAchievementsGrants"
+
+  /admin/achievements/{achievementId}/grant:
+    $ref: "./paths/achievements.yaml#/AdminAchievementGrant"
+
+  /admin/achievements/{achievementId}/revoke/{userId}:
+    $ref: "./paths/achievements.yaml#/AdminAchievementRevoke"
+
+  # ════════════════════════════════════════════════════════════════════
+  # META
+  # ════════════════════════════════════════════════════════════════════
+
+  /meta:
+    $ref: "./paths/meta.yaml#/Meta"
+
+  /health:
+    $ref: "./paths/meta.yaml#/Health"
+
+  /who-is-the-dev:
+    $ref: "./paths/meta.yaml#/WhoIsTheDev"
 
 components:
   securitySchemes:

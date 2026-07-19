@@ -380,8 +380,12 @@ TemplateSummaryV3:
     - scope
     - status
     - version
-    - hasDocument
+    - clanId
+    - verifiedAt
     - createdAt
+    - hasDocument
+    - templateCount
+    - animated
   properties:
     id:
       type: string
@@ -390,7 +394,11 @@ TemplateSummaryV3:
     userId:
       type: string
       format: uuid
-      description: Account UUID of the template owner.
+      nullable: true
+      description: |
+        Account UUID of the template owner. `null` when the template was
+        published anonymously and the viewer is neither the owner nor global
+        staff (the id is redacted so the creator cannot be recovered).
     name:
       type: string
       description: Template name (copied from the primary document layer).
@@ -751,9 +759,34 @@ TemplatePatch:
                 description: Partial WallDevLayer — only provided fields are updated.
 
 TemplatePage:
-  allOf:
-    - $ref: "#/Template"
-    - $ref: "./common.yaml#/Pagination"
+  type: object
+  description: |
+    Offset-paginated template list. Used by endpoints that paginate by page
+    number (e.g. `GET /templates/pinned`). Items use the same light
+    projection as the main list endpoint.
+  required:
+    - items
+    - page
+    - perPage
+    - total
+    - totalPages
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/TemplateSummaryV3"
+    page:
+      type: integer
+      description: Current page number (1-based).
+    perPage:
+      type: integer
+      description: Number of items per page.
+    total:
+      type: integer
+      description: Total number of matching templates.
+    totalPages:
+      type: integer
+      description: Total number of pages.
 
 TemplateVerifyRequest:
   type: object

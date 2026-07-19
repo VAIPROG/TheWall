@@ -55,7 +55,7 @@ info:
 
     > **SECURITY WARNING**: API keys grant **full access** to your account.
     > NEVER share with untrusted parties. Revoke via
-    > `DELETE /users/me/api-keys/{keyId}` if compromised.
+    > `DELETE /users/me/keys/{keyId}` if compromised.
 
     ---
 
@@ -141,6 +141,18 @@ tags:
     description: |
       Client telemetry ingestion, server health check, and
       Prometheus-compatible metrics.
+  - name: Feed
+    description: |
+      Unified wall feed. Canvas snapshots, mirrored signals, announcements,
+      and milestones as a single event stream, plus per-language admin notes.
+  - name: Achievements
+    description: |
+      Achievement catalogue, unlocked grants, client-fired unlock events,
+      and admin grant/revoke management.
+  - name: Meta
+    description: |
+      Public, unauthenticated server metadata: version info, health probe,
+      and one easter egg. No Authorization or client-version header needed.
 paths:
   /auth/site:
     post:
@@ -170,6 +182,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AuthSiteRequest'
+            example:
+              site: filianislost
+              token: s%3AqX2v...site-session-cookie-value
       responses:
         '200':
           description: Successfully authenticated (or site identity attached).
@@ -177,6 +192,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
+              example:
+                accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                refreshToken: 8f14e45fceea167a5a36dedd4bea2543...
+                expiresIn: 3600
+                tokenType: Bearer
+                user:
+                  id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  username: snackers_fan
+                  displayName: Snackers Fan
+                  role: user
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -299,41 +324,6 @@ paths:
           $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
-  /auth/oauth/telegram:
-    post:
-      tags:
-        - Auth
-      summary: Authenticate via Telegram Login Widget (legacy)
-      operationId: oauthTelegramLegacy
-      deprecated: true
-      description: |
-        **Deprecated.** Accepts the signed hash payload emitted by the old
-        Telegram Login Widget and exchanges it for a Wall-Dev session.
-
-        The server verifies the `hash` field using the bot token secret
-        (HMAC-SHA256 over the sorted data fields). Prefer the modern
-        OAuth2 flow: `GET /auth/oauth/telegram/start`.
-      parameters:
-        - $ref: '#/components/parameters/ClientVersionHeader'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TelegramWidgetAuth'
-      responses:
-        '200':
-          description: Successfully authenticated via Telegram Login Widget.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
   /auth/refresh:
     post:
       tags:
@@ -369,9 +359,12 @@ paths:
       summary: Introspect current session
       operationId: authSession
       description: |
-        Returns information about the current authenticated session
-        including token expiry, user identity, active permissions,
-        and a list of all active sessions for the current user.
+        Returns the identity behind the current token: the public account
+        record (`user`), every linked site identity (`siteIdentities` — one per
+        pixel-canvas platform the account is attached to), and every linked
+        OAuth provider (`providers` — Telegram, Discord, GitHub). This is the
+        canonical "who am I" call clients make on startup to hydrate their
+        account state.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
       security:
@@ -384,87 +377,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SessionInfo'
+              example:
+                user:
+                  id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  username: snackers_fan
+                  displayName: Snackers Fan
+                  role: user
+                siteIdentities:
+                  - id: 0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9
+                    accountId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                    source: filianislost
+                    externalId: usr_193562
+                    siteUsername: snackers_fan
+                    linkedAt: '2026-05-01T18:22:00Z'
+                    lastSeenAt: '2026-07-18T07:45:12Z'
+                providers:
+                  - id: 1b2c3d4e-5f60-7182-93a4-b5c6d7e8f90a
+                    accountId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                    provider: discord
+                    providerUid: '280903102874845184'
+                    username: snackers_fan#0
+                    isVerified: true
+                    isPublic: false
+                    linkedAt: '2026-05-02T10:00:00Z'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /auth/logout:
     post:
       tags:
         - Auth
-      summary: Logout current session
+      summary: Logout (invalidate all sessions)
       operationId: authLogout
       description: |
-        Invalidates the current session token and refresh token.
-        The client should discard stored credentials after this call.
+        Invalidates **all** active sessions for the current account — the one
+        making this request and every other device. There is no per-session
+        logout in V3; a subsequent request with any previously issued token
+        returns `401`. The client should discard stored access and refresh
+        tokens after this call.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
       security:
         - BearerAuth: []
         - ApiKeyAuth: []
       responses:
-        '200':
-          description: Successfully logged out.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessMessage'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /auth/session/{sessionId}/logout:
-    post:
-      tags:
-        - Auth
-      summary: Logout a specific session
-      operationId: authLogoutSession
-      description: |
-        Remotely invalidates a specific session by its ID. Useful for
-        revoking access on a lost or compromised device. Users can only
-        target their own sessions unless they have admin privileges.
-      parameters:
-        - $ref: '#/components/parameters/ClientVersionHeader'
-        - name: sessionId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: ID of the session to invalidate.
-      security:
-        - BearerAuth: []
-        - ApiKeyAuth: []
-      responses:
-        '200':
-          description: Session invalidated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessMessage'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /auth/session/all/logout:
-    post:
-      tags:
-        - Auth
-      summary: Logout all sessions except current
-      operationId: authLogoutAll
-      description: |
-        Invalidates all active sessions for the current user **except**
-        the session making this request. Equivalent to "log out
-        everywhere else."
-      parameters:
-        - $ref: '#/components/parameters/ClientVersionHeader'
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: All other sessions invalidated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessMessage'
+        '204':
+          description: All sessions invalidated. No response body.
         '401':
           $ref: '#/components/responses/Unauthorized'
   /auth/merge/initiate:
@@ -2579,6 +2536,8 @@ paths:
       description: |
         Returns the clans the authenticated caller is an active member of, plus
         any clans they own. Each entry uses the same shape as `GET /clans/{clanId}`.
+        This resolves the caller's clans directly — use it instead of scanning
+        the full `GET /clans` list. An empty array means the caller has no clan.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
       security:
@@ -2716,8 +2675,7 @@ paths:
                     type: string
                     format: uuid
         '409':
-          description: No site clan to import
-          or the clan already exists.: null
+          description: No site clan to import, or the clan already exists.
   /clans/{clanId}/verify-ownership:
     post:
       tags:
@@ -2748,8 +2706,7 @@ paths:
                     type: string
                     format: uuid
         '403':
-          description: Not a clan admin
-          or guild ownership not verified.: null
+          description: Not a clan admin, or guild ownership not verified.
         '409':
           description: Clan has no Discord server to verify.
   /clans/{clanId}:
@@ -3630,8 +3587,12 @@ paths:
       summary: List available chats
       operationId: listChats
       description: |
-        Returns all chat rooms/channels accessible to the current
-        user: global chat, clan chats, DM threads.
+        Returns all chat rooms/channels accessible to the current user in one
+        call: the global chat, the clan chats of every clan the caller belongs
+        to, and every DM thread the caller participates in. Each entry carries
+        unread state, so clients use this as the single source for the chat
+        sidebar/badge counts and then open individual chats via
+        `GET /chats/{chatId}` + `GET /chats/{chatId}/messages`.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
       security:
@@ -3654,6 +3615,11 @@ paths:
         - Chats
       summary: Get global chat info and recent messages
       operationId: getGlobalChat
+      description: |
+        Convenience alias — the literal selector `global` is accepted anywhere
+        `{chatId}` is, and resolves to the server-wide global chat (creating it
+        lazily if needed). This is the same handler as `GET /chats/{chatId}`;
+        `/chats/global/messages` works the same way for history and sending.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
       security:
@@ -4154,22 +4120,30 @@ paths:
       summary: List / search templates
       operationId: listTemplates
       description: |
-        Paginated, filterable template discovery. Public approved templates are
-        listed without authentication. Clan and private templates are only
-        included when the caller is authenticated (Bearer, API key, or session).
-        Filter by scope, status, author, clan, position range, text search.
+        Filterable template discovery with **cursor pagination** (newest first).
+        Public approved templates are listed without authentication. Clan and
+        private templates are only included when the caller is authenticated
+        (Bearer, API key, or `?session` token). Filter by `scope`, `status`,
+        and `author`.
+
+        **Pagination.** Results are ordered by `createdAt` descending. Pass the
+        `createdAt` of the last item you received as `cursor` to fetch the next
+        page — the server returns items with `createdAt < cursor`. There is no
+        page/offset pagination on this endpoint.
 
         **Access control.** The document access block (`usersWhitelist`,
         `usersBlocklist`, `allowedToEdit`) is enforced here: templates the caller
         may not view are silently omitted from the list rather than surfaced.
         `domainsWhitelist` is CLIENT-SIDE only and is never enforced by the backend.
+
+        **Anonymity.** `userId` is `null` for templates published anonymously,
+        unless the caller is the owner or global staff.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
         - $ref: '#/components/parameters/SessionQuery'
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/PerPageParam'
         - name: scope
           in: query
+          description: Only return templates with this visibility scope.
           schema:
             type: string
             enum:
@@ -4178,51 +4152,81 @@ paths:
               - private
         - name: status
           in: query
+          description: Only return templates with this moderation status.
           schema:
             type: string
             enum:
               - pending
               - approved
               - rejected
-        - name: search
+        - name: author
           in: query
-          schema:
-            type: string
-        - name: authorId
-          in: query
+          description: Only return templates created by this account UUID.
           schema:
             type: string
             format: uuid
-        - name: clanId
+        - name: limit
           in: query
+          description: Maximum number of items to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: cursor
+          in: query
+          description: |
+            Cursor for pagination — a `createdAt` timestamp. Returns only items
+            with `createdAt` strictly before this instant. Pass the `createdAt`
+            of the last item from the previous page.
           schema:
             type: string
-            format: uuid
-        - name: sortBy
-          in: query
-          schema:
-            type: string
-            enum:
-              - createdAt
-              - updatedAt
-              - name
-            default: createdAt
-        - name: order
-          in: query
-          schema:
-            $ref: '#/components/schemas/SortOrder'
+            format: date-time
       security:
         - BearerAuth: []
         - ApiKeyAuth: []
       responses:
         '200':
-          description: Paginated template list (light projection — no document field).
+          description: |
+            Template list (light projection — no `document` field), newest
+            first. A JSON array, not a pagination envelope.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/TemplateSummaryV3'
+              example:
+                - id: 3f6f0a4e-8f5a-4f2e-9d3b-2f9c6a1e7b10
+                  userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  name: Snackers banner
+                  x: 120
+                  'y': 48
+                  scale: 1
+                  scope: public
+                  status: approved
+                  version: 3
+                  clanId: null
+                  verifiedAt: '2026-07-01T12:34:56Z'
+                  createdAt: '2026-06-28T09:00:00Z'
+                  hasDocument: true
+                  templateCount: 1
+                  animated: false
+                - id: b1a7dd93-1c62-47a9-a2f4-c1d2e3f4a5b6
+                  userId: null
+                  name: Anonymous art
+                  x: -300
+                  'y': 512
+                  scale: 2
+                  scope: public
+                  status: approved
+                  version: 1
+                  clanId: null
+                  verifiedAt: '2026-06-20T08:15:00Z'
+                  createdAt: '2026-06-19T22:41:07Z'
+                  hasDocument: true
+                  templateCount: 2
+                  animated: true
   /templates/new:
     post:
       tags:
@@ -4272,6 +4276,26 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/TemplateCreate'
+            examples:
+              nativeV2:
+                summary: Publish a private native the-wall-dev/2 template
+                value:
+                  scope: private
+                  source:
+                    format: the-wall-dev/2
+                    document:
+                      format: the-wall-dev/2
+                      createdAt: '2026-07-18T10:00:00Z'
+                      editedAt: '2026-07-18T10:00:00Z'
+                      templates:
+                        - name: My overlay
+                          imageSources:
+                            - data:image/png;base64,iVBORw0KGgo...
+                          x: 120
+                          'y': 48
+                          scale: 1
+                          width: 64
+                          height: 64
       responses:
         '201':
           description: |
@@ -4354,18 +4378,30 @@ paths:
       operationId: patchTemplate
       description: |
         Flexible partial edit of a stored template. Supports changing scope/clan,
-        patching document-level metadata (notes, contacts, access control,
-        author visibility), and applying layer operations (add, remove, move,
-        update) to document.templates[]. Significant changes may re-trigger the
-        moderation queue.
+        patching document-level metadata (`doc`: name, notes, contacts, access
+        control, author visibility), and applying ordered layer operations
+        (`layerOps`: add, remove, move, update) to `document.templates[]`.
+
+        **Derived columns.** The flat `name` / `x` / `y` / `scale` columns are
+        NOT patched directly — after `doc` and `layerOps` are applied, they are
+        re-derived from `document.templates[0]`. To move or rename a template,
+        update layer 0 via a `{"op": "update", "index": 0, ...}` layer op.
+
+        **Concurrency.** Pass `expectedVersion` (the `version` you last read) to
+        guard against lost updates — the server returns `409 Conflict` when the
+        stored version differs. Each successful PATCH increments `version`.
+
+        **Scope changes.** Only the template owner or a global admin may change
+        `scope` / `clanId`; `clan` scope additionally requires membership of the
+        target clan. `accessPassword` sets the per-template share password; an
+        empty string clears it; omit the field to leave it unchanged.
 
         **Access control.** Edit rights are enforced on PATCH: the owner,
-        moderators, and any co-editor listed in the document `allowedToEdit`
-        block (`userIds` / `clanIds`) may patch; everyone else is rejected. Note
-        that when the caller lacks even *view* access (per `usersWhitelist` /
-        `usersBlocklist`), the endpoint returns **`404 Not Found`** rather than
-        `403` to avoid leaking the template's existence. The access block itself
-        is set here via `doc.access` (co-editors) and mirrored from create.
+        global admins, and any co-editor listed in the document `allowedToEdit`
+        block (`userIds` / `clanIds`) may patch; everyone else receives `403`.
+        The access block itself is set here via `doc.access` (co-editors) and
+        mirrored from create. Rows without a backfilled v2 `document` return
+        `409 Conflict` until the backfill job has run.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
         - $ref: '#/components/parameters/TemplateIdPath'
@@ -4378,6 +4414,24 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/TemplatePatch'
+            examples:
+              renameAndMove:
+                summary: Rename the template and move layer 0
+                description: |
+                  Typical edit — rename and reposition. The flat columns pick up
+                  the new name/x/y/scale from layer 0 after the ops apply.
+                value:
+                  expectedVersion: 3
+                  doc:
+                    name: New name
+                  layerOps:
+                    - op: update
+                      index: 0
+                      patch:
+                        name: New name
+                        x: 120
+                        'y': 48
+                        scale: 1
       responses:
         '200':
           description: Template updated.
@@ -5089,16 +5143,33 @@ paths:
         - Notifications
       summary: List notifications
       operationId: listNotifications
-      description: Paginated. Filter by read/unread status and type.
+      description: |
+        Offset-paginated list of the caller's notifications, newest first.
+        Dismissed notifications are excluded. Filter by read/unread state via
+        `read`. NOTE — this endpoint's pagination parameters use snake_case
+        (`per_page`), unlike most of the V3 API.
       parameters:
         - $ref: '#/components/parameters/ClientVersionHeader'
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/PerPageParam'
+        - name: page
+          in: query
+          description: Page number (1-based).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          description: Items per page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
         - name: read
           in: query
           schema:
             type: boolean
-          description: Filter by read status.
+          description: 'Filter by read status: true = only read, false = only unread.'
       security:
         - BearerAuth: []
         - ApiKeyAuth: []
@@ -5922,6 +5993,731 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /feed:
+    get:
+      tags:
+        - Feed
+      summary: List feed events
+      operationId: listFeedEvents
+      description: |
+        Returns the unified wall feed — canvas snapshots, mirrored signals,
+        announcements, and milestones — as a flat list ordered by `occurredAt`
+        descending (newest first). Filter by `eventType`, `source`, and a
+        `since`/`until` time window. For pagination pass the `id` of the last
+        item you received as `after`; the server returns events created before
+        that event.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: eventType
+          in: query
+          description: Only return events of this kind (e.g. snapshot, signal, announcement).
+          schema:
+            type: string
+        - name: source
+          in: query
+          description: Only return events from this producer (e.g. filianislost, system).
+          schema:
+            type: string
+        - name: since
+          in: query
+          description: Only return events with `occurredAt` strictly after this instant.
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          description: Only return events with `occurredAt` strictly before this instant.
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Maximum number of items to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: after
+          in: query
+          description: |
+            Cursor for pagination — the `id` of the last event from the
+            previous page. Returns only events stored before that event.
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Feed events, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeedEvent'
+              example:
+                - id: e2f6a8b0-3c4d-4e5f-8a9b-0c1d2e3f4a5b
+                  eventType: snapshot
+                  source: filianislost
+                  externalId: batch-2026-07-18-0700
+                  title: null
+                  description: null
+                  payload:
+                    batchId: d1c2b3a4-5e6f-4708-9a0b-1c2d3e4f5a6b
+                    sizes:
+                      large: wall-large.png
+                  media:
+                    - type: image
+                      url: https://the-wall.vai-rice.space/snapshots/wall-large.png
+                      label: large
+                  occurredAt: '2026-07-18T07:00:00Z'
+                  createdAt: '2026-07-18T07:00:04Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /feed/{feedEventId}:
+    get:
+      tags:
+        - Feed
+      summary: Get a single feed event
+      operationId: getFeedEvent
+      description: Returns one feed event by its UUID.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: feedEventId
+          in: path
+          required: true
+          description: Unique identifier of the feed event.
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: The feed event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedEvent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /feed/{feedEventId}/notes:
+    get:
+      tags:
+        - Feed
+      summary: List per-language notes for a feed event
+      operationId: listFeedEventNotes
+      description: |
+        Returns the localised admin notes attached to a feed event, ordered by
+        language code. Clients pick the note matching the user's language and
+        fall back to `en`.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: feedEventId
+          in: path
+          required: true
+          description: Unique identifier of the feed event.
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Notes for the event (possibly empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeedEventNote'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /admin/feed:
+    post:
+      tags:
+        - Feed
+      summary: Create a feed event (admin)
+      operationId: adminCreateFeedEvent
+      description: |
+        Admin-only. Inserts a new event onto the unified feed — typically an
+        `announcement` or `milestone`. `eventType` is trimmed and lower-cased;
+        `source` defaults to `system`; `occurredAt` defaults to now.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedEventCreate'
+            example:
+              eventType: announcement
+              externalId: release-6.4.0
+              title: The Wall Dev 6.4.0
+              description: Community super-tab, clan avatars and more.
+      responses:
+        '200':
+          description: Event created. Returns the stored event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedEvent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/feed/{feedEventId}/notes:
+    post:
+      tags:
+        - Feed
+      summary: Upsert a per-language note on a feed event (admin)
+      operationId: adminUpsertFeedEventNote
+      description: |
+        Admin-only. Creates or replaces the note for one language on a feed
+        event. Supported languages: `en`, `ru`, `de`, `fr`. Submitting an
+        empty (whitespace-only) `note` deletes the note for that language and
+        returns `204`. Notes longer than 2000 characters are rejected.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: feedEventId
+          in: path
+          required: true
+          description: Unique identifier of the feed event.
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedNoteUpsert'
+            example:
+              lang: en
+              note: Snapshot taken right after the event finale.
+      responses:
+        '200':
+          description: Note created or replaced. No response body.
+        '204':
+          description: Empty note submitted — the existing note for this language was deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+  /admin/feed/{feedEventId}/notes/{lang}:
+    delete:
+      tags:
+        - Feed
+      summary: Delete a per-language note from a feed event (admin)
+      operationId: adminDeleteFeedEventNote
+      description: |
+        Admin-only. Removes the note for the given language from a feed event.
+        Idempotent — deleting a non-existent note still returns `204`.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: feedEventId
+          in: path
+          required: true
+          description: Unique identifier of the feed event.
+          schema:
+            type: string
+            format: uuid
+        - name: lang
+          in: path
+          required: true
+          description: Language code of the note to delete.
+          schema:
+            type: string
+            enum:
+              - en
+              - ru
+              - de
+              - fr
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Note deleted (or did not exist). No response body.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/me/achievements:
+    get:
+      tags:
+        - Achievements
+      summary: List my achievements
+      operationId: listMyAchievements
+      description: |
+        Returns every achievement unlocked by the current account, newest
+        first. Each entry bundles the catalogue definition with the grant
+        metadata (when, by whom/what). Secret achievements are included —
+        you always see your own.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: My unlocked achievements, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AchievementGrant'
+              example:
+                - achievement:
+                    id: first_pixel
+                    category: pixels
+                    title: First Pixel
+                    description: Place your first pixel on the wall.
+                    iconUrl: null
+                    rarity: common
+                    unlockCriteria:
+                      kind: condition
+                      condition: pixels_placed >= 1
+                    points: 5
+                    secret: false
+                  grantedAt: '2026-07-01T12:00:00Z'
+                  grantedBy:
+                    kind: system
+                  metadata: {}
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /users/me/achievements/recheck:
+    post:
+      tags:
+        - Achievements
+      summary: Re-evaluate condition-based achievements
+      operationId: recheckMyAchievements
+      description: |
+        Re-evaluates all counter/condition-based achievements (pixels placed,
+        templates approved, clan membership, linked providers, ...) for the
+        current account and grants any that are newly satisfied. Returns the
+        ids of achievements unlocked by this call. Idempotent — already
+        granted achievements are never duplicated.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Recheck complete.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementRecheckResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /users/me/achievements/event:
+    post:
+      tags:
+        - Achievements
+      summary: Record a client-fired achievement event
+      operationId: recordAchievementEvent
+      description: |
+        Reports a client-side action that may unlock an event-based
+        achievement (e.g. installing the extension or finding the dev page).
+        Only allow-listed event names are accepted; unknown events are
+        silently ignored and return `new: false`. The event is also written
+        to an audit log used by the recheck endpoint.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AchievementEventRequest'
+            example:
+              event: found_the_dev
+      responses:
+        '200':
+          description: Event processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementEventResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /users/{userRef}/achievements:
+    get:
+      tags:
+        - Achievements
+      summary: List a user's unlocked achievements
+      operationId: listUserAchievements
+      description: |
+        Returns the achievements unlocked by another user, newest first.
+        Secret achievements are omitted unless the viewer is a global
+        moderator or higher (or is looking at their own profile via
+        `/users/me/achievements`).
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - $ref: '#/components/parameters/UserRefPath'
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: The user's visible unlocked achievements.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AchievementGrant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/achievements/catalog:
+    get:
+      tags:
+        - Achievements
+      summary: List the full achievement catalogue (admin)
+      operationId: adminListAchievementCatalog
+      description: |
+        Admin-only. Returns every achievement definition, including secret
+        ones, ordered by category and points.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Full catalogue.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AchievementCatalog'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/achievements/grants:
+    get:
+      tags:
+        - Achievements
+      summary: List achievement grants (admin)
+      operationId: adminListAchievementGrants
+      description: |
+        Admin-only. Lists grants across all users (or one user via `user_id`),
+        newest first, with offset pagination. NOTE — this endpoint's query
+        parameters use snake_case (`user_id`, `per_page`), unlike most of the
+        V3 API.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: user_id
+          in: query
+          description: Only return grants for this account UUID.
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          description: Page number (1-based).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          description: Items per page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Grants, newest first. A plain array — no pagination envelope.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AchievementGrant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/achievements/{achievementId}/grant:
+    post:
+      tags:
+        - Achievements
+      summary: Grant an achievement to a user (admin)
+      operationId: adminGrantAchievement
+      description: |
+        Admin-only. Grants the achievement `{achievementId}` to the user named
+        in the body. Re-granting an already unlocked achievement overwrites
+        the grant's source, reason, metadata, and timestamp.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: achievementId
+          in: path
+          required: true
+          description: String id of the achievement (e.g. first_pixel). Not a UUID.
+          schema:
+            type: string
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminGrantRequest'
+            example:
+              user_id: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              reason: Event winner
+      responses:
+        '200':
+          description: Achievement granted. Returns the stored grant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementGrant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/achievements/{achievementId}/revoke/{userId}:
+    delete:
+      tags:
+        - Achievements
+      summary: Revoke an achievement from a user (admin)
+      operationId: adminRevokeAchievement
+      description: |
+        Admin-only. Removes the grant of achievement `{achievementId}` from
+        user `{userId}`. Idempotent — revoking a grant that does not exist
+        still returns `204`.
+      parameters:
+        - $ref: '#/components/parameters/ClientVersionHeader'
+        - name: achievementId
+          in: path
+          required: true
+          description: String id of the achievement (e.g. first_pixel). Not a UUID.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/UserIdPath'
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Grant removed (or did not exist). No response body.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /meta:
+    get:
+      tags:
+        - Meta
+      summary: Get server metadata
+      operationId: getMeta
+      description: |
+        Public, unauthenticated. Returns backend version, known extension
+        version, supported API versions, build/boot timestamps, uptime, owner
+        contact info, and the current maintenance flag. The landing page uses
+        this to render "Extension vX / Backend vY" in its footer.
+
+        NOTE — response field names are snake_case, not camelCase.
+      security:
+        - {}
+      responses:
+        '200':
+          description: Server metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - version
+                  - extension_version
+                  - api_versions
+                  - started_at
+                  - uptime_secs
+                  - owner
+                  - maintenance
+                properties:
+                  version:
+                    type: string
+                    description: Backend Cargo package version.
+                  extension_version:
+                    type: string
+                    description: Latest known extension version (env hint or baked-in default).
+                  api_versions:
+                    type: array
+                    items:
+                      type: string
+                    description: Supported API generations.
+                    example:
+                      - v1
+                      - v2
+                      - v3
+                  built_at:
+                    type: string
+                    nullable: true
+                    description: Build timestamp baked into the binary. Null for local builds.
+                  deployed_at:
+                    type: string
+                    nullable: true
+                    description: Deploy moment — equals the process boot time (RFC 3339).
+                  started_at:
+                    type: string
+                    description: Process boot time (RFC 3339).
+                  uptime_secs:
+                    type: integer
+                    description: Seconds since boot.
+                  owner:
+                    type: object
+                    required:
+                      - name
+                      - contact
+                    properties:
+                      name:
+                        type: string
+                      contact:
+                        type: string
+                      link:
+                        type: string
+                        nullable: true
+                  maintenance:
+                    type: boolean
+                    description: Whether maintenance mode is currently active.
+                  maintenance_reason:
+                    type: string
+                    nullable: true
+                    description: Optional human-readable maintenance reason.
+              example:
+                version: 6.4.0
+                extension_version: 6.4.0
+                api_versions:
+                  - v1
+                  - v2
+                  - v3
+                built_at: '2026-07-18T06:00:00+00:00'
+                deployed_at: '2026-07-18T06:30:00+00:00'
+                started_at: '2026-07-18T06:30:00+00:00'
+                uptime_secs: 3600
+                owner:
+                  name: VAI
+                  contact: https://t.me/VAI_Programmer
+                  link: https://github.com/Vadim-Khristenko
+                maintenance: false
+                maintenance_reason: null
+  /health:
+    get:
+      tags:
+        - Meta
+      summary: Health check
+      operationId: getHealth
+      description: |
+        Public, unauthenticated liveness/readiness probe. Runs a `SELECT 1`
+        against the database and checks the maintenance flag. Returns `200`
+        with `status: healthy` when the database responds and maintenance
+        mode is off; otherwise returns `503` with `status: maintenance`.
+        Equivalent to `GET /telemetry/health` inside the authenticated router.
+      security:
+        - {}
+      responses:
+        '200':
+          description: Server is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatusSchema'
+              example:
+                status: healthy
+                version: 6.4.0
+                database: connected
+        '503':
+          description: Database unreachable or maintenance mode active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatusSchema'
+              example:
+                status: maintenance
+                version: 6.4.0
+                database: disconnected
+  /who-is-the-dev:
+    get:
+      tags:
+        - Meta
+      summary: Who is the dev? (easter egg)
+      operationId: whoIsTheDev
+      description: |
+        Public, unauthenticated easter egg honouring the project author.
+        Content-negotiated via the `Accept` header: `application/json` returns
+        JSON (snake_case fields), `application/xml` / `text/xml` returns XML,
+        `text/plain` returns plain text, and anything else returns a
+        Windows-95-styled HTML page.
+      security:
+        - {}
+      responses:
+        '200':
+          description: Author info in the negotiated representation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - name
+                  - full_name
+                  - title
+                  - country
+                properties:
+                  name:
+                    type: string
+                  full_name:
+                    type: string
+                  title:
+                    type: string
+                  country:
+                    type: string
+              example:
+                name: VAI
+                full_name: Vadim Khristenko
+                title: The most powerful young dev from <NOT_FOUND_COUNTRY>
+                country: <NOT_FOUND_COUNTRY>
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+            text/html:
+              schema:
+                type: string
 components:
   securitySchemes:
     BearerAuth:
@@ -6131,7 +6927,8 @@ components:
               description: Unique username.
             displayName:
               type: string
-              description: User-visible display name.
+              nullable: true
+              description: User-visible display name. Null when never set.
             role:
               type: string
               description: User role.
@@ -6209,42 +7006,6 @@ components:
         state:
           type: string
           description: Single-use CSRF/PKCE binding token from `OAuthStart`. Must be round-tripped exactly as returned by the start endpoint.
-    TelegramWidgetAuth:
-      type: object
-      required:
-        - id
-        - first_name
-        - auth_date
-        - hash
-      description: |
-        **Deprecated.** Signed payload from the legacy Telegram Login Widget.
-        The server verifies the `hash` using the bot token secret.
-        Prefer the modern OAuth2 flow via `GET /auth/oauth/telegram/start`.
-      properties:
-        id:
-          type: integer
-          description: Telegram user id.
-        first_name:
-          type: string
-          description: User's first name as reported by Telegram.
-        last_name:
-          type: string
-          nullable: true
-          description: User's last name (optional).
-        username:
-          type: string
-          nullable: true
-          description: Telegram username (optional).
-        photo_url:
-          type: string
-          nullable: true
-          description: URL of the user's profile photo (optional).
-        auth_date:
-          type: integer
-          description: Unix timestamp of authentication (used to check freshness).
-        hash:
-          type: string
-          description: HMAC-SHA256 signature of the data fields, keyed with the bot token secret.
     RefreshRequest:
       type: object
       required:
@@ -6253,60 +7014,124 @@ components:
         refreshToken:
           type: string
           description: Refresh token to exchange for a new access token.
-    SessionSummary:
+    SiteIdentity:
       type: object
+      description: One row from site_identities — a per-platform connection for an account.
+      required:
+        - id
+        - accountId
+        - source
+        - externalId
+        - linkedAt
+        - lastSeenAt
       properties:
-        sessionId:
+        id:
           type: string
           format: uuid
-          description: Unique session identifier.
-        ip:
+          description: Unique SiteIdentity record identifier.
+        accountId:
           type: string
-          description: Client IP address.
-        userAgent:
+          format: uuid
+          description: Owning account UUID.
+        source:
           type: string
-          description: Client user-agent string.
-        createdAt:
+          description: Platform registry id (e.g. filianislost, wplace).
+        externalId:
+          type: string
+          description: Platform-assigned user id on that site.
+        siteUsername:
+          type: string
+          nullable: true
+          description: Per-site display username, kept for display purposes.
+        linkedAt:
           type: string
           format: date-time
-          description: Session creation timestamp.
-        lastActivityAt:
+          description: When this site identity was linked to the account.
+        lastSeenAt:
           type: string
           format: date-time
-          description: Last activity timestamp.
+          description: Last time the account authenticated via this identity.
+    ProviderLink:
+      type: object
+      description: One row from provider_links — an OAuth provider connection.
+      required:
+        - id
+        - accountId
+        - provider
+        - providerUid
+        - isVerified
+        - isPublic
+        - linkedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique provider-link record identifier.
+        accountId:
+          type: string
+          format: uuid
+          description: Owning account UUID.
+        provider:
+          type: string
+          description: Provider id (telegram, discord, github).
+        providerUid:
+          type: string
+          description: Provider-assigned user id.
+        username:
+          type: string
+          nullable: true
+          description: Username on the provider, kept for display purposes.
+        isVerified:
+          type: boolean
+          description: Whether the link was proven via a completed OAuth flow.
+        isPublic:
+          type: boolean
+          description: Whether the link is shown on the public profile.
+        linkedAt:
+          type: string
+          format: date-time
+          description: When this provider identity was linked.
     SessionInfo:
       type: object
+      description: |
+        Identity snapshot returned by `GET /auth/session`. Contains the public
+        account record plus all linked site identities and OAuth provider links.
+      required:
+        - user
+        - siteIdentities
+        - providers
       properties:
-        sessionId:
-          type: string
-          format: uuid
-          description: Unique session identifier.
-        userId:
-          type: string
-          format: uuid
-          description: Owner account identifier (UUID).
-        tokenExpiry:
-          type: string
-          format: date-time
-          description: When the session token expires.
-        permissions:
+        user:
+          type: object
+          required:
+            - id
+            - username
+            - role
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Unique account identifier (UUID).
+            username:
+              type: string
+              description: Unique username.
+            displayName:
+              type: string
+              nullable: true
+              description: User-visible display name. Null when never set.
+            role:
+              type: string
+              description: Global role (e.g. user, moderator, admin, owner).
+        siteIdentities:
           type: array
           items:
-            type: string
-          description: List of permission strings granted.
-        activeSessions:
+            $ref: '#/components/schemas/SiteIdentity'
+          description: All pixel-canvas platform identities linked to this account.
+        providers:
           type: array
           items:
-            $ref: '#/components/schemas/SessionSummary'
-          description: All active sessions for this user.
-    SuccessMessage:
-      type: object
-      properties:
-        message:
-          type: string
-          default: Success
-          description: Status message.
-          example: Success
+            $ref: '#/components/schemas/ProviderLink'
+          description: All OAuth provider identities linked to this account.
     MergeInitiateResponse:
       type: object
       required:
@@ -6519,6 +7344,14 @@ components:
         confirm:
           type: boolean
           description: Must be true to confirm destructive actions.
+    SuccessMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          default: Success
+          description: Status message.
+          example: Success
     BroadcastRequest:
       type: object
       required:
@@ -6638,6 +7471,27 @@ components:
           format: date-time
           description: Last update timestamp.
           example: '2025-06-20T14:22:00Z'
+    SessionSummary:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: Unique session identifier.
+        ip:
+          type: string
+          description: Client IP address.
+        userAgent:
+          type: string
+          description: Client user-agent string.
+        createdAt:
+          type: string
+          format: date-time
+          description: Session creation timestamp.
+        lastActivityAt:
+          type: string
+          format: date-time
+          description: Last activity timestamp.
     RestrictionSet:
       type: object
       required:
@@ -6980,37 +7834,6 @@ components:
           description: |
             New owner — UUID, `@username`, or bare username. Must be an existing user.
             Returns `409 Conflict` if the target already owns another clan.
-    SiteIdentity:
-      type: object
-      required:
-        - id
-        - site
-        - siteUserId
-        - linkedAt
-        - lastSeenAt
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique SiteIdentity record identifier.
-        site:
-          type: string
-          description: Platform registry id (e.g. filianislost, wplace).
-        siteUserId:
-          type: string
-          description: Provider-assigned user id on that platform.
-        siteUsername:
-          type: string
-          nullable: true
-          description: Per-site display username, kept for display purposes.
-        linkedAt:
-          type: string
-          format: date-time
-          description: When this site identity was linked to the account.
-        lastSeenAt:
-          type: string
-          format: date-time
-          description: Last time the account authenticated via this identity.
     SocialAccount:
       type: object
       required:
@@ -7379,413 +8202,62 @@ components:
           type: string
           format: date-time
           description: When the account was linked.
-    WallDevAuthor:
+    TemplateSummaryV3:
       type: object
-      description: Structured author information.
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Author's unique identifier.
-        name:
-          type: string
-          description: Human-readable display name.
-        backendUrl:
-          type: string
-          format: uri
-          description: API backend URL. Omit for offline/self-contained files.
-        clanId:
-          type: string
-          format: uuid
-          description: Author's clan UUID.
-        clanName:
-          type: string
-          description: Human-readable clan name.
-    WallDevContacts:
-      type: object
-      description: Contact information. All fields are arrays — multiple entries per platform.
-      properties:
-        discord:
-          type: array
-          items:
-            type: object
-            required:
-              - type
-              - link
-            properties:
-              type:
-                type: string
-                enum:
-                  - user
-                  - guild
-                description: '''user'' = profile/DM. ''guild'' = server invite.'
-              link:
-                type: string
-                format: uri
-              notes:
-                type: array
-                items:
-                  type: string
-        telegram:
-          type: array
-          items:
-            type: object
-            required:
-              - type
-              - link
-            properties:
-              type:
-                type: string
-                enum:
-                  - user
-                  - group
-                  - channel
-                  - bot
-              link:
-                type: string
-                format: uri
-                description: Full Telegram URL (e.g. https://t.me/...).
-              startParam:
-                type: string
-                description: Deep-link ?start= parameter for bots.
-              notes:
-                type: array
-                items:
-                  type: string
-        x:
-          type: array
-          items:
-            type: object
-            required:
-              - link
-            properties:
-              link:
-                type: string
-                format: uri
-              notes:
-                type: array
-                items:
-                  type: string
-        matrix:
-          type: array
-          items:
-            type: object
-            required:
-              - type
-              - link
-            properties:
-              type:
-                type: string
-                enum:
-                  - user
-                  - group
-                  - bot
-                description: '''bot'' = protocol-level user treated as bot by clients for UI purposes.'
-              link:
-                type: string
-                description: Matrix ID or matrix.to URL.
-              notes:
-                type: array
-                items:
-                  type: string
-        sites:
-          type: array
-          items:
-            type: object
-            required:
-              - url
-            properties:
-              url:
-                type: string
-                format: uri
-              notes:
-                type: array
-                items:
-                  type: string
-        other:
-          type: array
-          items:
-            type: object
-            required:
-              - label
-              - url
-            properties:
-              label:
-                type: string
-                description: Human-readable platform name (e.g. 'Bluesky', 'YouTube').
-              type:
-                type: string
-                description: Optional machine-readable type hint. Free-form.
-              url:
-                type: string
-                format: uri
-              notes:
-                type: array
-                items:
-                  type: string
-    WallDevAccessControl:
-      type: object
-      description: Co-editors beyond the owner. BACKEND MUST ENFORCE on PATCH.
-      properties:
-        userIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-        clanIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-    WallDevFrameOverride:
-      type: object
-      description: Per-frame override. Controls timing, visibility, and optionally replaces the frame image entirely. When imageSources is provided, the client renders that image instead of slicing the sprite sheet at this index.
+      description: |
+        Light projection returned by `GET /api/v3/templates` (list). The `document`
+        field is intentionally omitted — v3-native documents embed base64 inline
+        images and returning them in a list would be very large. Use
+        `GET /api/v3/templates/{id}` or `GET /api/v3/templates/{id}/wall-dev` to
+        fetch the full document for a single template.
       required:
-        - index
-      properties:
-        index:
-          type: integer
-          minimum: 0
-          description: Zero-based frame index in traversal order (as defined by sheet.order).
-        durationMs:
-          type: number
-          minimum: 1
-          description: Custom display duration (ms). Overrides timing.defaultFrameMs.
-        skip:
-          type: boolean
-          default: false
-          description: Exclude this frame from playback entirely. When true, imageSources and scale are ignored.
-        imageSources:
-          type: array
-          minItems: 1
-          items:
-            type: string
-            description: URL or inline data URI pointing to an image.
-          description: Replacement image for this frame. Ordered fallback list — client tries each in order. Last entry SHOULD be a base64 data URI as offline fallback.
-        width:
-          type: integer
-          minimum: 1
-          description: Width of the replacement image in pixels.
-        height:
-          type: integer
-          minimum: 1
-          description: Height of the replacement image in pixels.
-        scale:
-          type: number
-          minimum: 0
-          exclusiveMinimum: true
-          description: Scale multiplier for the replacement image relative to the frame slot. 1.0 = render at frameWidth × frameHeight.
-    WallDevAnimation:
-      type: object
-      description: Sprite-sheet animation descriptor. Absent for static templates. Supports per-frame image replacement via WallDevFrameOverride.imageSources.
-      required:
-        - sheet
-        - timing
-      properties:
-        sheet:
-          type: object
-          description: Physical layout of frames within the sprite-sheet image.
-          required:
-            - frameWidth
-            - frameHeight
-            - frameCount
-            - layout
-            - order
-          properties:
-            frameWidth:
-              type: integer
-              minimum: 1
-              description: Width of each frame (pixels).
-            frameHeight:
-              type: integer
-              minimum: 1
-              description: Height of each frame (pixels).
-            frameCount:
-              type: integer
-              minimum: 1
-              description: Total number of frames in the sheet.
-            layout:
-              type: string
-              enum:
-                - line
-                - grid
-              description: '''line'' = all frames in a single row or column. ''grid'' = frames arranged in a 2D grid.'
-            order:
-              type: string
-              enum:
-                - row
-                - column
-                - serpentine
-              description: '''row'' = left-to-right, top-to-bottom. ''column'' = top-to-bottom, left-to-right. ''serpentine'' = alternating direction per row (boustrophedon scan).'
-        timing:
-          type: object
-          description: Playback timing, sync anchor, and looping.
-          required:
-            - startTime
-            - defaultFrameMs
-            - looping
-          properties:
-            startTime:
-              type: number
-              description: Epoch ms when timeline begins. All clients sync to this absolute time.
-            defaultFrameMs:
-              type: number
-              minimum: 1
-              description: Default per-frame duration (ms).
-            looping:
-              type: boolean
-              description: Restart from frame 0 after last frame.
-            frames:
-              type: array
-              description: Per-frame overrides. Unlisted frames use defaults and are rendered from the sprite sheet normally.
-              items:
-                $ref: '#/components/schemas/WallDevFrameOverride'
-        scaleMode:
-          type: string
-          enum:
-            - native
-            - scaled
-          default: native
-          description: '''native'' = render at original pixel size (crispy pixel art). ''scaled'' = apply template scale to animation frames.'
-    WallDevLayer:
-      type: object
-      description: A single template layer (TemplateEntry in the frozen schema).
-      required:
+        - id
+        - userId
         - name
-        - imageSources
         - x
         - 'y'
         - scale
-        - width
-        - height
-      properties:
-        name:
-          type: string
-          description: Display name of this template layer.
-        description:
-          type: string
-          description: Optional description or instructions.
-        imageSources:
-          type: array
-          minItems: 1
-          items:
-            type: string
-            description: URL or inline data URI pointing to an image.
-          description: Ordered fallback list. Client tries each in order. Last entry SHOULD be a base64 data URI as offline fallback.
-        x:
-          type: integer
-          description: Horizontal position (px) of top-left corner on canvas.
-        'y':
-          type: integer
-          description: Vertical position (px) of top-left corner on canvas.
-        z:
-          type: integer
-          description: Depth position. Reserved for future 3D support.
-        scale:
-          type: number
-          minimum: 0
-          exclusiveMinimum: true
-          description: Scale multiplier. 1.0 = native.
-        width:
-          type: integer
-          minimum: 1
-          description: Frame width in pixels (before scaling).
-        height:
-          type: integer
-          minimum: 1
-          description: Frame height in pixels (before scaling).
-        animation:
-          $ref: '#/components/schemas/WallDevAnimation'
-    WallDevDocument:
-      type: object
-      required:
-        - format
-        - createdAt
-        - editedAt
-        - templates
-      properties:
-        format:
-          type: string
-          enum:
-            - the-wall-dev/2
-          description: Format identifier. Must be 'the-wall-dev/2'.
-        createdAt:
-          type: string
-          format: date-time
-          description: ISO 8601 timestamp of original creation.
-        editedAt:
-          type: string
-          format: date-time
-          description: ISO 8601 timestamp of last modification.
-        author:
-          description: |
-            Author identification. Three modes:
-            1. Full object — structured info with UUID.
-            2. String 'anon' — explicitly anonymous.
-            3. Null — silent anonymous.
-            Clients MUST handle all three.
-          oneOf:
-            - $ref: '#/components/schemas/WallDevAuthor'
-            - type: string
-              enum:
-                - anon
-              description: Explicitly anonymous author.
-        notes:
-          type: array
-          items:
-            type: string
-          description: Free-form notes. Changelogs, instructions, warnings.
-        contacts:
-          $ref: '#/components/schemas/WallDevContacts'
-        domainsWhitelist:
-          type: array
-          items:
-            type: string
-            format: hostname
-          description: Allowed domains. CLIENT-SIDE enforcement only (the backend never gates on domain).
-        usersWhitelist:
-          type: array
-          items:
-            type: string
-            format: uuid
-          description: User IDs ALLOWED to view. BACKEND MUST ENFORCE. Empty/absent = no restriction.
-        usersBlocklist:
-          type: array
-          items:
-            type: string
-            format: uuid
-          description: User IDs BLOCKED from viewing. BACKEND MUST ENFORCE.
-        allowedToEdit:
-          $ref: '#/components/schemas/WallDevAccessControl'
-        templates:
-          type: array
-          minItems: 1
-          description: Template layers. At least one required.
-          items:
-            $ref: '#/components/schemas/WallDevLayer'
-    Template:
-      type: object
-      description: Server metadata record wrapping an embedded the-wall-dev/2 document.
-      required:
-        - id
         - scope
         - status
-        - author
+        - version
+        - clanId
+        - verifiedAt
         - createdAt
-        - updatedAt
-        - document
+        - hasDocument
+        - templateCount
+        - animated
       properties:
         id:
           type: string
           format: uuid
           description: Unique template identifier.
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Account UUID of the template owner. `null` when the template was
+            published anonymously and the viewer is neither the owner nor global
+            staff (the id is redacted so the creator cannot be recovered).
+        name:
+          type: string
+          description: Template name (copied from the primary document layer).
+        x:
+          type: integer
+          description: Horizontal canvas position (px) of the primary layer.
+        'y':
+          type: integer
+          description: Vertical canvas position (px) of the primary layer.
+        scale:
+          type: number
+          description: Scale multiplier. 1.0 = native.
         scope:
           type: string
           enum:
             - public
             - clan
             - private
-          description: Template visibility scope.
+          description: Visibility scope.
         status:
           type: string
           enum:
@@ -7793,99 +8265,67 @@ components:
             - approved
             - rejected
           description: Moderation status.
-        author:
-          type: object
-          required:
-            - id
-            - username
-          properties:
-            id:
-              type: string
-              format: uuid
-              description: Author's account UUID.
-            username:
-              type: string
-              description: Author's username.
+        version:
+          type: integer
+          description: Optimistic concurrency token. Incremented on each update.
         clanId:
           type: string
           format: uuid
           nullable: true
-          description: UUID of the clan if scoped to a clan.
-        previewUrl:
-          type: string
-          format: uri
-          nullable: true
-          description: URL to a rendered preview image.
-        isPinnedByUser:
-          type: boolean
-          nullable: true
-          description: Whether the current user has pinned this template.
-        createdAt:
-          type: string
-          format: date-time
-          description: Creation timestamp.
-        updatedAt:
-          type: string
-          format: date-time
-          description: Last update timestamp.
-        document:
-          $ref: '#/components/schemas/WallDevDocument'
-        version:
-          type: integer
-          description: Optimistic concurrency token. Incremented on each update. Pass as `expectedVersion` in TemplatePatch to guard against lost updates.
-        verifiedBy:
-          type: string
-          format: uuid
-          nullable: true
-          description: Account UUID of the moderator who approved or rejected this template. Null until a moderation decision is made.
+          description: UUID of the owning clan for clan-scoped templates.
         verifiedAt:
           type: string
           format: date-time
           nullable: true
-          description: Timestamp when the moderation decision was recorded. Null until a decision is made.
-        rejectionReason:
+          description: Timestamp when the moderation decision was recorded.
+        createdAt:
           type: string
-          nullable: true
-          description: Human-readable reason supplied by the moderator when the template was rejected. Null if not rejected or no reason was provided.
-        viewer:
-          type: object
-          readOnly: true
-          nullable: true
+          format: date-time
+          description: Creation timestamp.
+        hasDocument:
+          type: boolean
           description: |
-            Caller's allowed actions on this template. Null when unauthenticated.
-            Clients should use these flags to gate UI affordances rather than
-            inferring from role alone.
-          properties:
-            canEdit:
-              type: boolean
-              description: Whether the caller may patch this template.
-            canDelete:
-              type: boolean
-              description: Whether the caller may delete this template.
-            canVerify:
-              type: boolean
-              description: Whether the caller may approve or reject this template via `POST /templates/{templateId}/verify`.
-        bounds:
-          type: object
-          readOnly: true
-          description: Read-only convenience bounds computed from all layers in document.templates.
-          properties:
-            x:
-              type: integer
-              description: Leftmost x across all layers.
-            'y':
-              type: integer
-              description: Topmost y across all layers.
-            w:
-              type: integer
-              description: Total width spanning all layers.
-            h:
-              type: integer
-              description: Total height spanning all layers.
+            True when the `document` column is non-NULL (i.e. the row has been
+            backfilled to the the-wall-dev/2 format). When false, the `/wall-dev`
+            and `/charity` export endpoints will return 409 Conflict.
+        templateCount:
+          type: integer
+          description: Number of templates in the document bundle (`document.templates[]`); 1 for a single template.
+        animated:
+          type: boolean
+          description: |
+            True when any layer carries a sprite-sheet `animation` block — i.e. the
+            template renders as an animated GIF via `/animated`. False for static
+            templates and rows without a backfilled document.
     TemplatePage:
-      allOf:
-        - $ref: '#/components/schemas/Template'
-        - $ref: '#/components/schemas/Pagination'
+      type: object
+      description: |
+        Offset-paginated template list. Used by endpoints that paginate by page
+        number (e.g. `GET /templates/pinned`). Items use the same light
+        projection as the main list endpoint.
+      required:
+        - items
+        - page
+        - perPage
+        - total
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateSummaryV3'
+        page:
+          type: integer
+          description: Current page number (1-based).
+        perPage:
+          type: integer
+          description: Number of items per page.
+        total:
+          type: integer
+          description: Total number of matching templates.
+        totalPages:
+          type: integer
+          description: Total number of pages.
     SortOrder:
       type: string
       enum:
@@ -8889,93 +9329,6 @@ components:
           type: string
           format: uuid
           description: Mark messages up to this ID as read.
-    TemplateSummaryV3:
-      type: object
-      description: |
-        Light projection returned by `GET /api/v3/templates` (list). The `document`
-        field is intentionally omitted — v3-native documents embed base64 inline
-        images and returning them in a list would be very large. Use
-        `GET /api/v3/templates/{id}` or `GET /api/v3/templates/{id}/wall-dev` to
-        fetch the full document for a single template.
-      required:
-        - id
-        - userId
-        - name
-        - x
-        - 'y'
-        - scale
-        - scope
-        - status
-        - version
-        - hasDocument
-        - createdAt
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique template identifier.
-        userId:
-          type: string
-          format: uuid
-          description: Account UUID of the template owner.
-        name:
-          type: string
-          description: Template name (copied from the primary document layer).
-        x:
-          type: integer
-          description: Horizontal canvas position (px) of the primary layer.
-        'y':
-          type: integer
-          description: Vertical canvas position (px) of the primary layer.
-        scale:
-          type: number
-          description: Scale multiplier. 1.0 = native.
-        scope:
-          type: string
-          enum:
-            - public
-            - clan
-            - private
-          description: Visibility scope.
-        status:
-          type: string
-          enum:
-            - pending
-            - approved
-            - rejected
-          description: Moderation status.
-        version:
-          type: integer
-          description: Optimistic concurrency token. Incremented on each update.
-        clanId:
-          type: string
-          format: uuid
-          nullable: true
-          description: UUID of the owning clan for clan-scoped templates.
-        verifiedAt:
-          type: string
-          format: date-time
-          nullable: true
-          description: Timestamp when the moderation decision was recorded.
-        createdAt:
-          type: string
-          format: date-time
-          description: Creation timestamp.
-        hasDocument:
-          type: boolean
-          description: |
-            True when the `document` column is non-NULL (i.e. the row has been
-            backfilled to the the-wall-dev/2 format). When false, the `/wall-dev`
-            and `/charity` export endpoints will return 409 Conflict.
-        templateCount:
-          type: integer
-          description: Number of templates in the document bundle (`document.templates[]`); 1 for a single template.
-        animated:
-          type: boolean
-          description: |
-            True when any layer carries a sprite-sheet `animation` block — i.e. the
-            template renders as an animated GIF via `/animated`. False for static
-            templates and rows without a backfilled document.
     TemplateCreate:
       type: object
       description: |
@@ -9026,6 +9379,509 @@ components:
             Optional per-template share password. When set, anyone with the
             template id and this password can read the template regardless of
             its scope (clan or private). Pass an empty string to clear the password.
+    WallDevAuthor:
+      type: object
+      description: Structured author information.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Author's unique identifier.
+        name:
+          type: string
+          description: Human-readable display name.
+        backendUrl:
+          type: string
+          format: uri
+          description: API backend URL. Omit for offline/self-contained files.
+        clanId:
+          type: string
+          format: uuid
+          description: Author's clan UUID.
+        clanName:
+          type: string
+          description: Human-readable clan name.
+    WallDevContacts:
+      type: object
+      description: Contact information. All fields are arrays — multiple entries per platform.
+      properties:
+        discord:
+          type: array
+          items:
+            type: object
+            required:
+              - type
+              - link
+            properties:
+              type:
+                type: string
+                enum:
+                  - user
+                  - guild
+                description: '''user'' = profile/DM. ''guild'' = server invite.'
+              link:
+                type: string
+                format: uri
+              notes:
+                type: array
+                items:
+                  type: string
+        telegram:
+          type: array
+          items:
+            type: object
+            required:
+              - type
+              - link
+            properties:
+              type:
+                type: string
+                enum:
+                  - user
+                  - group
+                  - channel
+                  - bot
+              link:
+                type: string
+                format: uri
+                description: Full Telegram URL (e.g. https://t.me/...).
+              startParam:
+                type: string
+                description: Deep-link ?start= parameter for bots.
+              notes:
+                type: array
+                items:
+                  type: string
+        x:
+          type: array
+          items:
+            type: object
+            required:
+              - link
+            properties:
+              link:
+                type: string
+                format: uri
+              notes:
+                type: array
+                items:
+                  type: string
+        matrix:
+          type: array
+          items:
+            type: object
+            required:
+              - type
+              - link
+            properties:
+              type:
+                type: string
+                enum:
+                  - user
+                  - group
+                  - bot
+                description: '''bot'' = protocol-level user treated as bot by clients for UI purposes.'
+              link:
+                type: string
+                description: Matrix ID or matrix.to URL.
+              notes:
+                type: array
+                items:
+                  type: string
+        sites:
+          type: array
+          items:
+            type: object
+            required:
+              - url
+            properties:
+              url:
+                type: string
+                format: uri
+              notes:
+                type: array
+                items:
+                  type: string
+        other:
+          type: array
+          items:
+            type: object
+            required:
+              - label
+              - url
+            properties:
+              label:
+                type: string
+                description: Human-readable platform name (e.g. 'Bluesky', 'YouTube').
+              type:
+                type: string
+                description: Optional machine-readable type hint. Free-form.
+              url:
+                type: string
+                format: uri
+              notes:
+                type: array
+                items:
+                  type: string
+    WallDevAccessControl:
+      type: object
+      description: Co-editors beyond the owner. BACKEND MUST ENFORCE on PATCH.
+      properties:
+        userIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        clanIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+    WallDevFrameOverride:
+      type: object
+      description: Per-frame override. Controls timing, visibility, and optionally replaces the frame image entirely. When imageSources is provided, the client renders that image instead of slicing the sprite sheet at this index.
+      required:
+        - index
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          description: Zero-based frame index in traversal order (as defined by sheet.order).
+        durationMs:
+          type: number
+          minimum: 1
+          description: Custom display duration (ms). Overrides timing.defaultFrameMs.
+        skip:
+          type: boolean
+          default: false
+          description: Exclude this frame from playback entirely. When true, imageSources and scale are ignored.
+        imageSources:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            description: URL or inline data URI pointing to an image.
+          description: Replacement image for this frame. Ordered fallback list — client tries each in order. Last entry SHOULD be a base64 data URI as offline fallback.
+        width:
+          type: integer
+          minimum: 1
+          description: Width of the replacement image in pixels.
+        height:
+          type: integer
+          minimum: 1
+          description: Height of the replacement image in pixels.
+        scale:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Scale multiplier for the replacement image relative to the frame slot. 1.0 = render at frameWidth × frameHeight.
+    WallDevAnimation:
+      type: object
+      description: Sprite-sheet animation descriptor. Absent for static templates. Supports per-frame image replacement via WallDevFrameOverride.imageSources.
+      required:
+        - sheet
+        - timing
+      properties:
+        sheet:
+          type: object
+          description: Physical layout of frames within the sprite-sheet image.
+          required:
+            - frameWidth
+            - frameHeight
+            - frameCount
+            - layout
+            - order
+          properties:
+            frameWidth:
+              type: integer
+              minimum: 1
+              description: Width of each frame (pixels).
+            frameHeight:
+              type: integer
+              minimum: 1
+              description: Height of each frame (pixels).
+            frameCount:
+              type: integer
+              minimum: 1
+              description: Total number of frames in the sheet.
+            layout:
+              type: string
+              enum:
+                - line
+                - grid
+              description: '''line'' = all frames in a single row or column. ''grid'' = frames arranged in a 2D grid.'
+            order:
+              type: string
+              enum:
+                - row
+                - column
+                - serpentine
+              description: '''row'' = left-to-right, top-to-bottom. ''column'' = top-to-bottom, left-to-right. ''serpentine'' = alternating direction per row (boustrophedon scan).'
+        timing:
+          type: object
+          description: Playback timing, sync anchor, and looping.
+          required:
+            - startTime
+            - defaultFrameMs
+            - looping
+          properties:
+            startTime:
+              type: number
+              description: Epoch ms when timeline begins. All clients sync to this absolute time.
+            defaultFrameMs:
+              type: number
+              minimum: 1
+              description: Default per-frame duration (ms).
+            looping:
+              type: boolean
+              description: Restart from frame 0 after last frame.
+            frames:
+              type: array
+              description: Per-frame overrides. Unlisted frames use defaults and are rendered from the sprite sheet normally.
+              items:
+                $ref: '#/components/schemas/WallDevFrameOverride'
+        scaleMode:
+          type: string
+          enum:
+            - native
+            - scaled
+          default: native
+          description: '''native'' = render at original pixel size (crispy pixel art). ''scaled'' = apply template scale to animation frames.'
+    WallDevLayer:
+      type: object
+      description: A single template layer (TemplateEntry in the frozen schema).
+      required:
+        - name
+        - imageSources
+        - x
+        - 'y'
+        - scale
+        - width
+        - height
+      properties:
+        name:
+          type: string
+          description: Display name of this template layer.
+        description:
+          type: string
+          description: Optional description or instructions.
+        imageSources:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            description: URL or inline data URI pointing to an image.
+          description: Ordered fallback list. Client tries each in order. Last entry SHOULD be a base64 data URI as offline fallback.
+        x:
+          type: integer
+          description: Horizontal position (px) of top-left corner on canvas.
+        'y':
+          type: integer
+          description: Vertical position (px) of top-left corner on canvas.
+        z:
+          type: integer
+          description: Depth position. Reserved for future 3D support.
+        scale:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Scale multiplier. 1.0 = native.
+        width:
+          type: integer
+          minimum: 1
+          description: Frame width in pixels (before scaling).
+        height:
+          type: integer
+          minimum: 1
+          description: Frame height in pixels (before scaling).
+        animation:
+          $ref: '#/components/schemas/WallDevAnimation'
+    WallDevDocument:
+      type: object
+      required:
+        - format
+        - createdAt
+        - editedAt
+        - templates
+      properties:
+        format:
+          type: string
+          enum:
+            - the-wall-dev/2
+          description: Format identifier. Must be 'the-wall-dev/2'.
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of original creation.
+        editedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of last modification.
+        author:
+          description: |
+            Author identification. Three modes:
+            1. Full object — structured info with UUID.
+            2. String 'anon' — explicitly anonymous.
+            3. Null — silent anonymous.
+            Clients MUST handle all three.
+          oneOf:
+            - $ref: '#/components/schemas/WallDevAuthor'
+            - type: string
+              enum:
+                - anon
+              description: Explicitly anonymous author.
+        notes:
+          type: array
+          items:
+            type: string
+          description: Free-form notes. Changelogs, instructions, warnings.
+        contacts:
+          $ref: '#/components/schemas/WallDevContacts'
+        domainsWhitelist:
+          type: array
+          items:
+            type: string
+            format: hostname
+          description: Allowed domains. CLIENT-SIDE enforcement only (the backend never gates on domain).
+        usersWhitelist:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: User IDs ALLOWED to view. BACKEND MUST ENFORCE. Empty/absent = no restriction.
+        usersBlocklist:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: User IDs BLOCKED from viewing. BACKEND MUST ENFORCE.
+        allowedToEdit:
+          $ref: '#/components/schemas/WallDevAccessControl'
+        templates:
+          type: array
+          minItems: 1
+          description: Template layers. At least one required.
+          items:
+            $ref: '#/components/schemas/WallDevLayer'
+    Template:
+      type: object
+      description: Server metadata record wrapping an embedded the-wall-dev/2 document.
+      required:
+        - id
+        - scope
+        - status
+        - author
+        - createdAt
+        - updatedAt
+        - document
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique template identifier.
+        scope:
+          type: string
+          enum:
+            - public
+            - clan
+            - private
+          description: Template visibility scope.
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - rejected
+          description: Moderation status.
+        author:
+          type: object
+          required:
+            - id
+            - username
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Author's account UUID.
+            username:
+              type: string
+              description: Author's username.
+        clanId:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the clan if scoped to a clan.
+        previewUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: URL to a rendered preview image.
+        isPinnedByUser:
+          type: boolean
+          nullable: true
+          description: Whether the current user has pinned this template.
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp.
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp.
+        document:
+          $ref: '#/components/schemas/WallDevDocument'
+        version:
+          type: integer
+          description: Optimistic concurrency token. Incremented on each update. Pass as `expectedVersion` in TemplatePatch to guard against lost updates.
+        verifiedBy:
+          type: string
+          format: uuid
+          nullable: true
+          description: Account UUID of the moderator who approved or rejected this template. Null until a moderation decision is made.
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the moderation decision was recorded. Null until a decision is made.
+        rejectionReason:
+          type: string
+          nullable: true
+          description: Human-readable reason supplied by the moderator when the template was rejected. Null if not rejected or no reason was provided.
+        viewer:
+          type: object
+          readOnly: true
+          nullable: true
+          description: |
+            Caller's allowed actions on this template. Null when unauthenticated.
+            Clients should use these flags to gate UI affordances rather than
+            inferring from role alone.
+          properties:
+            canEdit:
+              type: boolean
+              description: Whether the caller may patch this template.
+            canDelete:
+              type: boolean
+              description: Whether the caller may delete this template.
+            canVerify:
+              type: boolean
+              description: Whether the caller may approve or reject this template via `POST /templates/{templateId}/verify`.
+        bounds:
+          type: object
+          readOnly: true
+          description: Read-only convenience bounds computed from all layers in document.templates.
+          properties:
+            x:
+              type: integer
+              description: Leftmost x across all layers.
+            'y':
+              type: integer
+              description: Topmost y across all layers.
+            w:
+              type: integer
+              description: Total width spanning all layers.
+            h:
+              type: integer
+              description: Total height spanning all layers.
     TemplateCreated:
       type: object
       description: |
@@ -9942,6 +10798,470 @@ components:
         rejected:
           type: integer
           description: Number of log entries rejected (e.g. failed validation, exceeded per-entry size limit, or filtered by server policy).
+    FeedMedia:
+      type: object
+      description: A single media attachment on a feed event.
+      required:
+        - type
+        - url
+      properties:
+        type:
+          type: string
+          description: Media kind (e.g. image).
+          example: image
+        url:
+          type: string
+          format: uri
+          description: Absolute URL of the media resource.
+        label:
+          type: string
+          description: Optional human-readable label. Omitted when absent.
+        size:
+          type: string
+          description: Optional size hint (e.g. large, thumb). Omitted when absent.
+    FeedEvent:
+      type: object
+      description: |
+        One event on the unified wall feed. Everything that appears on the feed
+        (canvas snapshots, mirrored signals, announcements, milestones, ...) is
+        stored as a single event row; consumers render it based on `eventType`
+        and the structured `payload` / `media` fields.
+      required:
+        - id
+        - eventType
+        - source
+        - externalId
+        - payload
+        - media
+        - occurredAt
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique feed event identifier.
+        eventType:
+          type: string
+          description: |
+            Event kind, lower-case. Well-known values include `snapshot`,
+            `signal`, `announcement`, and `milestone`; not a closed enum — new
+            kinds are added without an API version bump.
+          example: snapshot
+        source:
+          type: string
+          description: |
+            Producer of the event — a platform registry id (e.g. `filianislost`)
+            or `system` for server-generated entries.
+          example: filianislost
+        externalId:
+          type: string
+          description: Producer-side identifier used for deduplication.
+        title:
+          type: string
+          nullable: true
+          description: Optional human-readable title.
+        description:
+          type: string
+          nullable: true
+          description: Optional human-readable description.
+        payload:
+          type: object
+          description: |
+            Structured, event-type-specific data. For `snapshot` events this
+            carries `batchId` and per-size image info; for `signal` events it
+            carries `numId`, `name`, `location`, `imageFile`, `submittedAt`.
+          additionalProperties: true
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedMedia'
+          description: Attached media entries. Empty array when the event has none.
+        occurredAt:
+          type: string
+          format: date-time
+          description: When the event actually happened (producer clock).
+        createdAt:
+          type: string
+          format: date-time
+          description: When the event row was stored on the backend.
+    FeedEventNote:
+      type: object
+      description: |
+        A per-language admin note attached to a feed event (used for localised
+        commentary on announcements and snapshots).
+      required:
+        - lang
+        - note
+        - authorId
+        - updatedAt
+      properties:
+        lang:
+          type: string
+          enum:
+            - en
+            - ru
+            - de
+            - fr
+          description: Language code of this note.
+        note:
+          type: string
+          maxLength: 2000
+          description: Note text (max 2000 characters).
+        authorId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Account UUID of the admin who last wrote the note.
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the note was last created or updated.
+    FeedEventCreate:
+      type: object
+      description: |
+        Admin request body for creating a feed event (announcement, milestone,
+        or any other kind).
+      required:
+        - eventType
+        - externalId
+      properties:
+        eventType:
+          type: string
+          description: Event kind. Trimmed and lower-cased server-side; must be non-empty.
+          example: announcement
+        source:
+          type: string
+          default: system
+          description: Producer id. Defaults to `system` when omitted.
+        externalId:
+          type: string
+          description: Producer-side identifier used for deduplication. Must be non-empty.
+        title:
+          type: string
+          nullable: true
+          description: Optional title.
+        description:
+          type: string
+          nullable: true
+          description: Optional description.
+        payload:
+          type: object
+          additionalProperties: true
+          description: Structured event data. Defaults to an empty object.
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedMedia'
+          description: Media attachments. Defaults to an empty array.
+        occurredAt:
+          type: string
+          format: date-time
+          description: Event timestamp. Defaults to the current server time.
+    FeedNoteUpsert:
+      type: object
+      description: |
+        Admin request body for creating or replacing a per-language note on a
+        feed event. Submitting an empty (whitespace-only) `note` deletes the
+        note for that language instead.
+      required:
+        - lang
+        - note
+      properties:
+        lang:
+          type: string
+          enum:
+            - en
+            - ru
+            - de
+            - fr
+          description: Language code. Other values are rejected with 400.
+        note:
+          type: string
+          maxLength: 2000
+          description: |
+            Note text (max 2000 characters — longer input is rejected with 413).
+            An empty string deletes the existing note for this language.
+    UnlockCriteria:
+      description: |
+        How the achievement unlocks. Tagged union discriminated by `kind`:
+        - `manual` — granted only by an admin.
+        - `event` — unlocked by a client-fired event (see `event` field).
+        - `condition` — unlocked by a server-evaluated condition (recheck endpoint).
+        - `achievementCount` — unlocked after collecting `count` other achievements.
+      oneOf:
+        - type: object
+          title: Manual
+          required:
+            - kind
+          properties:
+            kind:
+              type: string
+              enum:
+                - manual
+        - type: object
+          title: Event
+          required:
+            - kind
+            - event
+          properties:
+            kind:
+              type: string
+              enum:
+                - event
+            event:
+              type: string
+              description: Event name that triggers the unlock.
+              example: found_the_dev
+        - type: object
+          title: Condition
+          required:
+            - kind
+            - condition
+          properties:
+            kind:
+              type: string
+              enum:
+                - condition
+            condition:
+              type: string
+              description: Server-side condition descriptor (opaque to clients).
+        - type: object
+          title: AchievementCount
+          required:
+            - kind
+            - count
+          properties:
+            kind:
+              type: string
+              enum:
+                - achievementCount
+            count:
+              type: integer
+              minimum: 0
+              description: Number of other achievements required.
+    AchievementCatalog:
+      type: object
+      description: One achievement definition from the server catalogue.
+      required:
+        - id
+        - category
+        - title
+        - description
+        - rarity
+        - unlockCriteria
+        - points
+        - secret
+      properties:
+        id:
+          type: string
+          description: Stable string identifier (e.g. first_pixel, found_the_dev). Not a UUID.
+          example: first_pixel
+        category:
+          type: string
+          description: Grouping category (e.g. pixels, templates, social).
+        title:
+          type: string
+          description: Display title.
+        description:
+          type: string
+          description: Display description / unlock hint.
+        iconUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Optional icon image URL. Null when the achievement has no custom icon.
+        rarity:
+          type: string
+          enum:
+            - common
+            - uncommon
+            - rare
+            - legendary
+            - unique
+          description: Rarity tier.
+        unlockCriteria:
+          $ref: '#/components/schemas/UnlockCriteria'
+        points:
+          type: integer
+          minimum: 0
+          description: Achievement points awarded on unlock.
+        secret:
+          type: boolean
+          description: |
+            Secret achievements are hidden from other users' public lists — only
+            the owner and global moderators+ can see them once unlocked.
+    GrantSource:
+      description: |
+        Who or what granted the achievement. Tagged union discriminated by `kind`:
+        `system` (server-evaluated condition), `admin` (manual grant, includes the
+        granting admin's id and optional reason), `event` (client-fired event,
+        includes the event name), or `selfUnlocked`.
+      oneOf:
+        - type: object
+          title: System
+          required:
+            - kind
+          properties:
+            kind:
+              type: string
+              enum:
+                - system
+        - type: object
+          title: Admin
+          required:
+            - kind
+            - by
+          properties:
+            kind:
+              type: string
+              enum:
+                - admin
+            by:
+              type: string
+              description: Account UUID of the granting admin (as a string; empty when unknown).
+            reason:
+              type: string
+              nullable: true
+              description: Optional reason supplied by the admin.
+        - type: object
+          title: Event
+          required:
+            - kind
+            - name
+          properties:
+            kind:
+              type: string
+              enum:
+                - event
+            name:
+              type: string
+              description: Name of the event that unlocked the achievement.
+        - type: object
+          title: SelfUnlocked
+          required:
+            - kind
+          properties:
+            kind:
+              type: string
+              enum:
+                - selfUnlocked
+    AchievementGrant:
+      type: object
+      description: An unlocked achievement — the catalogue entry plus grant metadata.
+      required:
+        - achievement
+        - grantedAt
+        - grantedBy
+        - metadata
+      properties:
+        achievement:
+          $ref: '#/components/schemas/AchievementCatalog'
+        grantedAt:
+          type: string
+          format: date-time
+          description: When the achievement was unlocked or granted.
+        grantedBy:
+          $ref: '#/components/schemas/GrantSource'
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Free-form grant metadata. Empty object when none was recorded.
+    AchievementRecheckResponse:
+      type: object
+      description: Result of re-evaluating condition-based achievements.
+      required:
+        - newlyUnlocked
+      properties:
+        newlyUnlocked:
+          type: array
+          items:
+            type: string
+          description: Ids of achievements newly granted by this recheck. Empty when nothing changed.
+          example:
+            - pixels_100
+            - joined_clan
+    AchievementEventRequest:
+      type: object
+      description: Client-fired achievement event.
+      required:
+        - event
+      properties:
+        event:
+          type: string
+          description: |
+            Event name. Only allow-listed client events are accepted; unknown
+            events are silently ignored (the response returns `new: false`).
+            Currently allow-listed: `emote_explorer`, `snapshot_viewer`,
+            `compact_mode_enabled`, `precise_place`, `first_pinned`,
+            `extension_installed`, `profile_complete`, `vai_pinged`,
+            `found_the_dev`, `night_owl`.
+          example: extension_installed
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Optional free-form context stored in the event log.
+    AchievementEventResponse:
+      type: object
+      description: Result of a client-fired achievement event.
+      required:
+        - new
+        - achievement
+      properties:
+        new:
+          type: boolean
+          description: True when the event unlocked an achievement mapped to it.
+        achievement:
+          description: The unlocked achievement. Null when nothing was mapped to the event.
+          anyOf:
+            - $ref: '#/components/schemas/AchievementCatalog'
+            - type: object
+              nullable: true
+              title: 'null'
+              description: Null — the event did not unlock anything.
+    AdminGrantRequest:
+      type: object
+      description: |
+        Admin body for granting an achievement to a user. NOTE — this body uses
+        snake_case field names (`user_id`), unlike most of the V3 API.
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: Account UUID of the user receiving the achievement.
+        reason:
+          type: string
+          nullable: true
+          description: Optional reason recorded on the grant.
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Optional free-form metadata stored on the grant.
+    HealthStatusSchema:
+      type: object
+      required:
+        - status
+        - version
+        - database
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - maintenance
+          description: Overall server status.
+        version:
+          type: string
+          description: Backend Cargo package version.
+        database:
+          type: string
+          enum:
+            - connected
+            - disconnected
+          description: Database connectivity as observed by the probe.
   responses:
     BadRequest:
       description: Invalid request

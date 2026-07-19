@@ -29,6 +29,9 @@ AuthSite:
         application/json:
           schema:
             $ref: "../components/schemas/auth.yaml#/AuthSiteRequest"
+          example:
+            site: filianislost
+            token: "s%3AqX2v...site-session-cookie-value"
     responses:
       "200":
         description: Successfully authenticated (or site identity attached).
@@ -36,6 +39,16 @@ AuthSite:
           application/json:
             schema:
               $ref: "../components/schemas/auth.yaml#/AuthResponse"
+            example:
+              accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              refreshToken: "8f14e45fceea167a5a36dedd4bea2543..."
+              expiresIn: 3600
+              tokenType: Bearer
+              user:
+                id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                username: "snackers_fan"
+                displayName: "Snackers Fan"
+                role: user
       "400":
         $ref: "../components/responses/common.yaml#/BadRequest"
       "401":
@@ -169,41 +182,6 @@ OAuthCallback:
       "429":
         $ref: "../components/responses/common.yaml#/TooManyRequests"
 
-OAuthTelegramLegacy:
-  post:
-    tags: [Auth]
-    summary: "Authenticate via Telegram Login Widget (legacy)"
-    operationId: oauthTelegramLegacy
-    deprecated: true
-    description: |
-      **Deprecated.** Accepts the signed hash payload emitted by the old
-      Telegram Login Widget and exchanges it for a Wall-Dev session.
-
-      The server verifies the `hash` field using the bot token secret
-      (HMAC-SHA256 over the sorted data fields). Prefer the modern
-      OAuth2 flow: `GET /auth/oauth/telegram/start`.
-    parameters:
-      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: "../components/schemas/auth.yaml#/TelegramWidgetAuth"
-    responses:
-      "200":
-        description: Successfully authenticated via Telegram Login Widget.
-        content:
-          application/json:
-            schema:
-              $ref: "../components/schemas/auth.yaml#/AuthResponse"
-      "400":
-        $ref: "../components/responses/common.yaml#/BadRequest"
-      "409":
-        $ref: "../components/responses/common.yaml#/Conflict"
-      "429":
-        $ref: "../components/responses/common.yaml#/TooManyRequests"
-
 AuthRefresh:
   post:
     tags: [Auth]
@@ -238,9 +216,12 @@ AuthSession:
     summary: Introspect current session
     operationId: authSession
     description: |
-      Returns information about the current authenticated session
-      including token expiry, user identity, active permissions,
-      and a list of all active sessions for the current user.
+      Returns the identity behind the current token: the public account
+      record (`user`), every linked site identity (`siteIdentities` — one per
+      pixel-canvas platform the account is attached to), and every linked
+      OAuth provider (`providers` — Telegram, Discord, GitHub). This is the
+      canonical "who am I" call clients make on startup to hydrate their
+      account state.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
     security:
@@ -253,87 +234,51 @@ AuthSession:
           application/json:
             schema:
               $ref: "../components/schemas/auth.yaml#/SessionInfo"
+            example:
+              user:
+                id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                username: "snackers_fan"
+                displayName: "Snackers Fan"
+                role: user
+              siteIdentities:
+                - id: "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9"
+                  accountId: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                  source: filianislost
+                  externalId: "usr_193562"
+                  siteUsername: "snackers_fan"
+                  linkedAt: "2026-05-01T18:22:00Z"
+                  lastSeenAt: "2026-07-18T07:45:12Z"
+              providers:
+                - id: "1b2c3d4e-5f60-7182-93a4-b5c6d7e8f90a"
+                  accountId: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                  provider: discord
+                  providerUid: "280903102874845184"
+                  username: "snackers_fan#0"
+                  isVerified: true
+                  isPublic: false
+                  linkedAt: "2026-05-02T10:00:00Z"
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
 
 AuthLogout:
   post:
     tags: [Auth]
-    summary: Logout current session
+    summary: Logout (invalidate all sessions)
     operationId: authLogout
     description: |
-      Invalidates the current session token and refresh token.
-      The client should discard stored credentials after this call.
+      Invalidates **all** active sessions for the current account — the one
+      making this request and every other device. There is no per-session
+      logout in V3; a subsequent request with any previously issued token
+      returns `401`. The client should discard stored access and refresh
+      tokens after this call.
     parameters:
       - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
     security:
       - BearerAuth: []
       - ApiKeyAuth: []
     responses:
-      "200":
-        description: Successfully logged out.
-        content:
-          application/json:
-            schema:
-              $ref: "../components/schemas/common.yaml#/SuccessMessage"
-      "401":
-        $ref: "../components/responses/common.yaml#/Unauthorized"
-
-AuthLogoutSession:
-  post:
-    tags: [Auth]
-    summary: Logout a specific session
-    operationId: authLogoutSession
-    description: |
-      Remotely invalidates a specific session by its ID. Useful for
-      revoking access on a lost or compromised device. Users can only
-      target their own sessions unless they have admin privileges.
-    parameters:
-      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
-      - name: sessionId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-        description: ID of the session to invalidate.
-    security:
-      - BearerAuth: []
-      - ApiKeyAuth: []
-    responses:
-      "200":
-        description: Session invalidated.
-        content:
-          application/json:
-            schema:
-              $ref: "../components/schemas/common.yaml#/SuccessMessage"
-      "401":
-        $ref: "../components/responses/common.yaml#/Unauthorized"
-      "403":
-        $ref: "../components/responses/common.yaml#/Forbidden"
-      "404":
-        $ref: "../components/responses/common.yaml#/NotFound"
-
-AuthLogoutAll:
-  post:
-    tags: [Auth]
-    summary: Logout all sessions except current
-    operationId: authLogoutAll
-    description: |
-      Invalidates all active sessions for the current user **except**
-      the session making this request. Equivalent to "log out
-      everywhere else."
-    parameters:
-      - $ref: "../components/parameters/common.yaml#/ClientVersionHeader"
-    security:
-      - BearerAuth: []
-    responses:
-      "200":
-        description: All other sessions invalidated.
-        content:
-          application/json:
-            schema:
-              $ref: "../components/schemas/common.yaml#/SuccessMessage"
+      "204":
+        description: All sessions invalidated. No response body.
       "401":
         $ref: "../components/responses/common.yaml#/Unauthorized"
 
