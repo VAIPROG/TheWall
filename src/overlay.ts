@@ -117,6 +117,11 @@ export function initLayers(): void {
     overlayImg.draggable = false;
     overlayImg.setAttribute("draggable", "false");
     overlayImg.style.userSelect = "none";
+    // Honour the persisted opacity on a fresh mount (e.g. after a reload the img
+    // is recreated). Without this the element falls back to the CSS default
+    // (.6) and any saved `cfg.defaultOpacity` visibly "resets". Dots mode forces
+    // full opacity, mirroring the display-segment handler.
+    overlayImg.style.opacity = cfg.compactMarkers ? "1" : String(cfg.defaultOpacity);
     overlayImg.addEventListener("dragstart", (e) => e.preventDefault());
     layers.appendChild(overlayImg);
   }
