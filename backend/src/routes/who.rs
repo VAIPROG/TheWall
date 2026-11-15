@@ -23,7 +23,7 @@ struct WhoIsTheDev {
 
 const DATA: WhoIsTheDev = WhoIsTheDev {
     name: "VAI",
-    full_name: "Vadim Khristenko",
+    full_name: "VAI_PROG (Vadim)",
     title: "The most powerful young dev from <NOT_FOUND_COUNTRY>",
     country: "<NOT_FOUND_COUNTRY>",
 };

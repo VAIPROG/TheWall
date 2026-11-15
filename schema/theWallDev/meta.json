@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/meta.json",
+  "$id": "https://raw.githubusercontent.com/VAIPROG/TheWall/main/schema/theWallDev/meta.json",
   "title": "The Wall Dev Format — Meta Schema",
   "description": "Dispatcher schema for all versions of The Wall Dev format. Inspects the 'format' field and routes validation to the appropriate versioned schema. Clients SHOULD use this meta schema for format detection and version routing rather than sniffing fields manually.",
   "$comment": "Add a new entry to the 'oneOf' array each time a new versioned schema is published.",
@@ -27,7 +27,7 @@
         "required": ["format"]
       },
       "then": {
-        "$ref": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/1.json"
+        "$ref": "https://raw.githubusercontent.com/VAIPROG/TheWall/main/schema/theWallDev/1.json"
       }
     },
     {
@@ -39,7 +39,7 @@
         "required": ["format"]
       },
       "then": {
-        "$ref": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/2.json"
+        "$ref": "https://raw.githubusercontent.com/VAIPROG/TheWall/main/schema/theWallDev/2.json"
       }
     }
   ]

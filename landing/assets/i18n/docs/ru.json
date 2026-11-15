@@ -74,7 +74,7 @@
     "items": [
       "<b>Панель не появляется</b>: убедитесь, что вы на <code>https://filianislost.com</code> (без <code>www.</code>); перезагрузите страницу после установки.",
       "<b>Precise Place неактивен</b>: выключена Deep Integration — включите её в настройках и перезагрузите страницу.",
-      "<b>Deep Integration «WARN: missing probes»</b>: бандл сайта изменился — дождитесь обновления расширения или сообщите на <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
+      "<b>Deep Integration «WARN: missing probes»</b>: бандл сайта изменился — дождитесь обновления расширения или сообщите на <a href=\"https://github.com/VAIPROG\" class=\"link\">GitHub</a>.",
       "<b>Всё ещё видны отдельные вкладки Social / Clan</b>: обновитесь до v6+ — они объединены в супер-вкладку Community.",
       "<b>Ошибки CORS</b>: очистите кэш сервис-воркеров и перезагрузите. Прод-nginx теперь выставляет заголовки явно.",
       "<b>Тост «out of paint»</b>: это кулдаун сайта — дождитесь пополнения краски или отправьте отложенные пиксели."

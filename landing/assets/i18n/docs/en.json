@@ -74,7 +74,7 @@
     "items": [
       "<b>Panel doesn't appear</b>: ensure you're on <code>https://filianislost.com</code> (not <code>www.</code>); reload after install.",
       "<b>Precise Place greyed out</b>: Deep Integration is off, enable it in Settings and reload.",
-      "<b>Deep Integration \"WARN: missing probes\"</b>: site bundle changed shape — wait for the next extension update or report at <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
+      "<b>Deep Integration \"WARN: missing probes\"</b>: site bundle changed shape — wait for the next extension update or report at <a href=\"https://github.com/VAIPROG\" class=\"link\">GitHub</a>.",
       "<b>Still seeing separate Social / Clan tabs</b>: update to v6+ — they merged into the Community super-tab.",
       "<b>CORS errors</b>: clear cached service workers and reload. Production nginx now sets the headers explicitly.",
       "<b>\"out of paint\" toast</b>: that's the site's cooldown — wait for refill or submit pending pixels."

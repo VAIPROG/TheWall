@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/2.json",
+  "$id": "https://raw.githubusercontent.com/VAIPROG/TheWall/main/schema/theWallDev/2.json",
   "title": "The Wall Dev Format v2",
   "description": "Official JSON Schema for version 2 of The Wall Dev format. Multi-template layers, access control, contacts, multi-source image fallback, sprite-sheet animation with per-frame image overrides. Privacy-first: author field is opt-in — anonymous exports carry 'anon' or null.",
 

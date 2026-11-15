@@ -60,7 +60,7 @@ declare -r ENV_FILE="${ENV_DIR}/secrets.env"
 
 # Source of truth: the repo is cloned into APP_DIR and the Rust crate lives in
 # APP_DIR/backend. Override REPO_URL/REPO_BRANCH to deploy a fork or branch.
-declare -r REPO_URL="${REPO_URL:-https://github.com/Vadim-Khristenko/TheWall.git}"
+declare -r REPO_URL="${REPO_URL:-https://github.com/VAIPROG/TheWall.git}"
 declare -r REPO_BRANCH="${REPO_BRANCH:-main}"
 declare -r BACKEND_DIR="$APP_DIR/backend"
 
@@ -985,7 +985,7 @@ Environment variables (optional):
   APP_DIR      - Repo checkout path (default: /opt/the-wall)
   LANDING_DIR  - Static landing root (default: /var/www/the-wall)
   SITE_URL     - Canonical site URL (default: https://filianislost.com)
-  REPO_URL     - Git repo to deploy (default: https://github.com/Vadim-Khristenko/TheWall.git)
+  REPO_URL     - Git repo to deploy (default: https://github.com/VAIPROG/TheWall.git)
   REPO_BRANCH  - Branch to deploy (default: main)
 
 Examples:

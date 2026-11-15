@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/theWallDev/1.json",
+  "$id": "https://raw.githubusercontent.com/VAIPROG/TheWall/main/schema/theWallDev/1.json",
   "title": "The Wall Dev Format v1",
   "description": "Extension-native export envelope for version 1 of The Wall Dev format. Self-contained: the image is always embedded as an inline PNG data URL, so the file is fully portable with no external hosting required. Supports a single static or animated (sprite-sheet) template layer. Version 1 was not published as a formal schema during active development — this document was reconstructed from the original TypeScript implementation (wall-dev-export.ts).",
   "$comment": "Privacy design: the most private export is the default. Author and note are opt-in fields omitted entirely when not requested — a stripped file gives no hint of its creator.",

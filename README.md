@@ -16,7 +16,7 @@ canvas. It overlays your template on the board, shows you exactly which pixels
 are still wrong, and adds clans, shared templates, account linking and bot
 notifications through a small Rust backend. A static landing site rounds it out.
 
-**Author:** [VAI_PROG](https://github.com/Vadim-Khristenko) (Vadim Khristenko) · MIT licensed
+**Author:** [VAI_PROG](https://github.com/VAIPROG) (VAI_PROG (Vadim)) · MIT licensed
 
 ## Community
 
@@ -267,4 +267,4 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the development workflow.
 
 ---
 
-MIT © Vadim Khristenko (VAI_PROG) — see [LICENSE](./LICENSE).
+MIT © VAI_PROG (Vadim) — see [LICENSE](./LICENSE).

@@ -92,7 +92,7 @@ Meta:
               owner:
                 name: "VAI"
                 contact: "https://t.me/VAI_Programmer"
-                link: "https://github.com/Vadim-Khristenko"
+                link: "https://github.com/VAIPROG"
               maintenance: false
               maintenance_reason: null
 
@@ -180,7 +180,7 @@ WhoIsTheDev:
                   type: string
             example:
               name: "VAI"
-              full_name: "Vadim Khristenko"
+              full_name: "VAI_PROG (Vadim)"
               title: "The most powerful young dev from <NOT_FOUND_COUNTRY>"
               country: "<NOT_FOUND_COUNTRY>"
           application/xml:

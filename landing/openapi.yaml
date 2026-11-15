@@ -88,7 +88,7 @@ info:
     | `details` | Optional additional context (object, array, or null). |
   contact:
     name: The Wall Dev
-    url: https://github.com/Vadim-Khristenko/TheWall
+    url: https://github.com/VAIPROG/TheWall
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -6631,7 +6631,7 @@ paths:
                 owner:
                   name: VAI
                   contact: https://t.me/VAI_Programmer
-                  link: https://github.com/Vadim-Khristenko
+                  link: https://github.com/VAIPROG
                 maintenance: false
                 maintenance_reason: null
   /health:
@@ -6706,7 +6706,7 @@ paths:
                     type: string
               example:
                 name: VAI
-                full_name: Vadim Khristenko
+                full_name: VAI_PROG (Vadim)
                 title: The most powerful young dev from <NOT_FOUND_COUNTRY>
                 country: <NOT_FOUND_COUNTRY>
             application/xml:

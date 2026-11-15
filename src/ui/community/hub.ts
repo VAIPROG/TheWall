@@ -35,7 +35,7 @@ import { openClan, openThread, openBrowse } from "./shell";
 // External community links (from landing/about.html — authoritative).
 const AUTHOR_URL = "https://vai-rice.space";
 const WIKI_URL = "https://snackers.vai-rice.space";
-const GITHUB_URL = "https://github.com/Vadim-Khristenko";
+const GITHUB_URL = "https://github.com/VAIPROG";
 const X_URL = "https://x.com/VAI_PROG";
 const DISCORD_SNACKERS_URL = "https://discord.gg/filian";
 const DISCORD_URL = "https://discord.gg/snackersru";
@@ -170,7 +170,7 @@ function renderInfo(): string {
         <div class="wd-comm-info-note">${esc(t("commInfoDonateNote"))}</div>
       </div>
       ${link(WIKI_URL, "star", t("commInfoWiki"))}
-      ${link(GITHUB_URL, "github", `${t("commInfoGitHub")}: Vadim-Khristenko`)}
+      ${link(GITHUB_URL, "github", `${t("commInfoGitHub")}: VAIPROG`)}
       ${link(X_URL, "xcom", `${t("commInfoX")}: @VAI_PROG`)}
       <div class="wd-comm-info-discord">
         ${dbtn(DISCORD_SNACKERS_URL, t("commInfoDiscordSnackers"))}

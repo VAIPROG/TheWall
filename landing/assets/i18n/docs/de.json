@@ -74,7 +74,7 @@
     "items": [
       "<b>Panel erscheint nicht</b>: stelle sicher, dass du auf <code>https://filianislost.com</code> bist (nicht <code>www.</code>); nach der Installation neu laden.",
       "<b>Precise Place ausgegraut</b>: Deep Integration ist aus — in den Einstellungen aktivieren und neu laden.",
-      "<b>Deep Integration „WARN: missing probes“</b>: das Site-Bundle hat sich geändert — warte auf das nächste Update oder melde es auf <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
+      "<b>Deep Integration „WARN: missing probes“</b>: das Site-Bundle hat sich geändert — warte auf das nächste Update oder melde es auf <a href=\"https://github.com/VAIPROG\" class=\"link\">GitHub</a>.",
       "<b>Immer noch separate Social- / Clan-Tabs</b>: auf v6+ aktualisieren — sie wurden zum Community-Super-Tab zusammengeführt.",
       "<b>CORS-Fehler</b>: zwischengespeicherte Service-Worker löschen und neu laden. Das Produktions-nginx setzt die Header jetzt explizit.",
       "<b>„out of paint“-Toast</b>: das ist der Cooldown der Website — auf Auffüllung warten oder ausstehende Pixel absenden."

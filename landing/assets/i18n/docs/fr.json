@@ -74,7 +74,7 @@
     "items": [
       "<b>Le panneau n'apparaît pas</b> : vérifiez que vous êtes sur <code>https://filianislost.com</code> (pas <code>www.</code>) ; rechargez après l'installation.",
       "<b>Precise Place grisé</b> : Deep Integration est désactivée — activez-la dans les réglages et rechargez.",
-      "<b>Deep Integration « WARN: missing probes »</b> : le bundle du site a changé — attendez la prochaine mise à jour de l'extension ou signalez-le sur <a href=\"https://github.com/Vadim-Khristenko\" class=\"link\">GitHub</a>.",
+      "<b>Deep Integration « WARN: missing probes »</b> : le bundle du site a changé — attendez la prochaine mise à jour de l'extension ou signalez-le sur <a href=\"https://github.com/VAIPROG\" class=\"link\">GitHub</a>.",
       "<b>Vous voyez encore des onglets Social / Clan séparés</b> : mettez à jour vers v6+ — ils ont fusionné dans le super-onglet Community.",
       "<b>Erreurs CORS</b> : videz les service workers en cache et rechargez. Le nginx de production définit désormais les en-têtes explicitement.",
       "<b>Toast « out of paint »</b> : c'est le cooldown du site — attendez le rechargement ou soumettez les pixels en attente."

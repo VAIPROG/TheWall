@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/Vadim-Khristenko/TheWall/main/schema/third-party/charity.export.json",
+  "$id": "https://raw.githubusercontent.com/VAIPROG/TheWall/main/schema/third-party/charity.export.json",
   "title": "Charity Export / Interop Format",
   "description": "JSON Schema for the Charity format used by The Wall backend for bidirectional interop. This is the wire shape accepted by POST /api/v3/templates (format=charity) and returned by GET /api/v3/templates/{id}/charity and GET /api/v2/templates/{id}/charity. Derived from the canonical Rust implementation in backend/src/formats/charity.rs and backend/src/routes/v3/templates/export.rs.",
 
